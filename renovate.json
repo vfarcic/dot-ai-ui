@@ -1,0 +1,12 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "packageRules": [
+    {
+      "matchManagers": ["devbox"],
+      "automerge": true,
+      "automergeType": "branch",
+      "commitMessageSuffix": "[skip ci]"
+    }
+  ]
+}
