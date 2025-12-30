@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/@openapitools/openapi-generator-cli/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.10.0",
+    "generators": {
+      "typescript-fetch": {
+        "inputSpec": "http://localhost:8080/api/v1/openapi",
+        "generatorName": "typescript-fetch",
+        "output": "./src/api/generated",
+        "additionalProperties": {
+          "typescriptThreePlus": true,
+          "supportsES6": true,
+          "npmName": "dot-ai-api",
+          "useSingleRequestParameter": true
+        }
+      }
+    }
+  }
+}

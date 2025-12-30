@@ -2,7 +2,7 @@
 
 **Issue**: [#1](https://github.com/vfarcic/dot-ai-ui/issues/1)
 **Created**: 2025-09-17
-**Status**: Draft
+**Status**: In Progress (blocked on MCP chat endpoint)
 **Priority**: Medium
 
 > *Migrated from [vfarcic/dot-ai#109](https://github.com/vfarcic/dot-ai/issues/109)*
@@ -333,24 +333,99 @@ To support future clients with varying capabilities (e.g., Claude Code if termin
 - **UI Library**: Material-UI (MUI) or shadcn/ui for base components
 - **State Management**: User sessions, conversation history, deployment tracking
 
-**Backend Integration (Minor Additions for MVP)**
+**Backend Integration (Required MCP Server Additions)**
 - **MCP Server**: Existing REST API gateway at `/api/v1/*`
 - **OpenAPI Endpoint**: Schema available at `GET /api/v1/openapi`
-- **Tool Endpoints**: All tools at `POST /api/v1/tools/{toolName}`
+- **Tool Endpoints**: All tools at `POST /api/v1/tools/{toolName}` (called internally by MCP, not directly by Web UI)
 - **CORS**: Already configured for cross-origin requests
 - **New**: Mermaid.js integration for diagram generation (server-side rendering to SVG)
+- **New (Required)**: Unified chat endpoint at `POST /api/v1/chat` (see Chat Endpoint Architecture below)
+
+### Chat Endpoint Architecture
+
+The Web UI is a presentation layer without AI capabilities. It cannot determine which tool endpoint to call based on natural language. The MCP server provides a unified chat endpoint where **MCP acts as an AI agent** and **Web UI acts as the agent's interface**.
+
+**Key Design Principles:**
+- MCP handles all AI logic (intent classification, tool selection, response generation)
+- Web UI handles presentation only (rendering visualizations, managing UI state)
+- **Conversation state**: Echo-back model - Web UI sends `lastResponse` + new `message`
+- **Workflow state**: MCP maintains server-side via `sessionId`
+- MCP is **stateless for conversation history** but **stateful for active workflows**
+
+**Chat Endpoint API:**
+
+```
+POST /api/v1/chat
+```
+
+**New Conversation Request** (no prior context):
+```json
+{
+  "message": "deploy a postgres database"
+}
+```
+
+**Continuation Request** (with prior context):
+```json
+{
+  "lastResponse": {
+    "message": "Here are 3 PostgreSQL deployment options...",
+    "sessionId": "rec-123",
+    "toolUsed": "recommend",
+    "prompt": "Which solution would you like?"
+  },
+  "message": "I'll take option 1"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Great choice! I need a few details to configure the PostgreSQL Operator...",
+  "visualizations": [
+    { "type": "cards", "data": { "items": [...] } }
+  ],
+  "sessionId": "rec-123",
+  "toolUsed": "recommend",
+  "prompt": "What size database do you need?"
+}
+```
+
+**State Management:**
+| State Type | Managed By | How |
+|------------|------------|-----|
+| Conversation context | Web UI | Echo back `lastResponse` (excluding `visualizations`) |
+| Workflow state | MCP Server | Server-side, keyed by `sessionId` |
+| UI state | Web UI | Local (which visualizations shown, scroll position, etc.) |
+
+**New Conversation / Clear:**
+- Web UI provides "New Chat" button (similar to `/clear` in Claude Code)
+- Clears stored `lastResponse`
+- Next message sent without `lastResponse` field → MCP treats as new conversation
+
+**Intent Classification (MCP Server Responsibility):**
+| User Intent Pattern | Tool |
+|---------------------|------|
+| deploy, create, setup, install, run, launch | `recommend` |
+| fix, remediate, troubleshoot, why is, what's wrong | `remediate` |
+| scale, update, rollback, delete, restart | `operate` |
+| patterns, policies, capabilities, scan | `manageOrgData` |
+| setup project, audit repo, add README, add LICENSE | `projectSetup` |
+| General questions, no tool match | Direct AI response (no tool call) |
+
+**Note**: The chat endpoint is a **blocking dependency** for Web UI functionality. Individual tool endpoints (`/api/v1/tools/{toolName}`) remain available for direct MCP client access but are not used by the Web UI.
 
 ### Technology Stack
 
-**Frontend**
-- **Framework**: React with Next.js or Vite
+**Frontend** (Decided)
+- **Framework**: React with Vite
 - **Language**: TypeScript
-- **API Client**: Auto-generated from OpenAPI schema using `@openapitools/openapi-generator-cli`
-- **UI Components**: Material-UI (MUI) or shadcn/ui
-- **Styling**: Tailwind CSS
-- **State Management**: React Context + hooks (or Zustand if needed)
-- **Syntax Highlighting**: Prism.js or react-syntax-highlighter
-- **HTTP Client**: Fetch API or Axios
+- **API Client**: Manual TypeScript types (OpenAPI generator available via `npm run generate:api` for future use)
+- **UI Components**: Tailwind CSS (shadcn/ui components to be added as needed)
+- **Styling**: Tailwind CSS v4
+- **State Management**: React hooks + Context (conversation state: `lastResponse` echo-back)
+- **Syntax Highlighting**: Prism.js or react-syntax-highlighter (to be added)
+- **HTTP Client**: Fetch API
 - **Graph Visualization**: Not needed for MVP (server generates images); Future: D3.js, Cytoscape.js, or React Flow
 
 **Backend (dot-ai MCP Server - Minor Additions)**
@@ -419,6 +494,29 @@ To support future clients with varying capabilities (e.g., Claude Code if termin
 - [ ] Dark/light mode theming
 - [ ] Clickable elements in visualizations that insert text into chat (e.g., click card → "I want solution 1")
 
+### Tool-Specific Web UI Enhancement Review (Phase 2)
+
+After basic chat+MCP integration is functional, systematically review each tool for Web UI-specific enhancements:
+
+| Tool | Review Status | Enhancement PRD |
+|------|---------------|-----------------|
+| [ ] Kubernetes Deployment Recommendations (`recommend`) | Not started | — |
+| [ ] Cluster Query (`query`) | Not started | — |
+| [ ] Capability Management (`manageOrgData` - capabilities) | Not started | — |
+| [ ] Pattern Management (`manageOrgData` - patterns) | Not started | — |
+| [ ] Policy Management (`manageOrgData` - policies) | Not started | — |
+| [ ] Kubernetes Issue Remediation (`remediate`) | Not started | — |
+| [ ] Kubernetes Operations (`operate`) | Not started | — |
+| [ ] Project Setup & Governance (`projectSetup`) | Not started | — |
+
+**For each tool, evaluate:**
+- Visualization opportunities (graphs, diagrams, cards)
+- Response format optimizations for Web UI rendering
+- UI-specific features that wouldn't work in CLI
+- Workflow improvements for visual interaction
+
+**Reference**: [MCP Tools Overview](https://devopstoolkit.ai/docs/mcp/guides/mcp-tools-overview)
+
 ### Could-Have Features (Future)
 - [ ] Mobile-responsive design for tablet access
 - [ ] Integration with Git repositories for manifest storage
@@ -427,37 +525,57 @@ To support future clients with varying capabilities (e.g., Claude Code if termin
 
 ## Implementation Milestones
 
-### Milestone 1: API Client & Basic Framework
-- [ ] Set up React + TypeScript project (Next.js or Vite)
-- [ ] Configure OpenAPI code generation from `dot-ai` REST API
-- [ ] Generate TypeScript types and API client from OpenAPI schema
-- [ ] Create basic routing structure
-- [ ] Implement API client wrapper with error handling
-- [ ] Test connection to MCP server REST API (`/api/v1/tools/version`)
+### Milestone 0: MCP Chat Endpoint (Blocking Dependency)
+- [ ] MCP server implements `POST /api/v1/chat` endpoint
+- [ ] Endpoint accepts `{ message, lastResponse? }` request format
+- [ ] Endpoint returns `{ message, visualizations?, sessionId?, toolUsed?, prompt? }` response format
+- [ ] AI classifies intent and routes to appropriate tool (or responds directly)
+- [ ] Workflow state maintained server-side via `sessionId`
 
-**Success Criteria**: TypeScript types generated from OpenAPI, successful REST API calls
+**Owner**: dot-ai repository
+**Status**: In Progress
+**Note**: Web UI cannot fully function until this endpoint is available.
+
+### Milestone 1: API Client & Basic Framework
+- [x] Set up React + TypeScript project with Vite
+- [x] Configure OpenAPI code generation (available via `npm run generate:api`)
+- [x] Create manual TypeScript types for MCP responses
+- [x] Create basic routing structure
+- [x] Implement API client wrapper with error handling
+- [x] Basic Chat page with connection status indicator
+- [ ] Make API URL configurable (environment variable)
+- [ ] Update API client to use `/chat` endpoint (blocked on Milestone 0)
+
+**Success Criteria**: Project builds, basic UI shell functional
+**Status**: Partially Complete (blocked on MCP chat endpoint)
 
 ### Milestone 2: Core Visual Components
-- [ ] Define TypeScript interfaces for typed content blocks (Visualization types)
+- [x] Define TypeScript interfaces for typed content blocks (Visualization types) - in `src/types/visualization.ts`
 - [ ] Implement type-based renderer that dispatches to appropriate component
 - [ ] Implement CardRenderer component (displays solution options, patterns)
 - [ ] Implement CodeRenderer component with syntax highlighting (manifests, configs)
 - [ ] Implement ImageRenderer component (displays SVG/PNG from MCP - trivially simple)
 - [ ] Implement ProgressRenderer component (workflow progress, remediation steps)
-- [ ] Create base layout with chat input and visualization area
-- [ ] Add UI component library (MUI or shadcn/ui)
+- [ ] Implement TableRenderer component (tabular data)
+- [ ] Implement DiffRenderer component (before/after comparisons)
+- [x] Create base layout with chat input and visualization area
+- [ ] Add "New Chat" button to clear conversation and start fresh
 
 **Success Criteria**: UI renders typed content blocks from MCP responses; ImageRenderer simply displays server-generated diagrams (no graph library complexity)
 
-### Milestone 3: Complete Tool Workflows
-- [ ] Implement full `recommend` workflow (intent → solutions → questions → manifests → deploy)
-- [ ] Implement `remediate` workflow (issue analysis → remediation steps)
-- [ ] Implement `manageOrgData` workflows (patterns, policies, capabilities)
-- [ ] Implement `projectSetup` workflow
-- [ ] Add workflow state management
+### Milestone 3: Chat Integration & Workflows
+- [ ] Integrate with MCP `/chat` endpoint
+- [ ] Implement `lastResponse` state management (store, echo back on next message)
+- [ ] Implement conversation display (user messages + assistant responses + visualizations)
+- [ ] Handle multi-step workflows via `sessionId` continuations
+- [ ] Test full `recommend` workflow (intent → solutions → questions → manifests → deploy)
+- [ ] Test `remediate` workflow (issue analysis → remediation steps)
+- [ ] Test `manageOrgData` workflows (patterns, policies, capabilities)
+- [ ] Test `projectSetup` workflow
+- [ ] Test general questions (no tool match → direct AI response)
 - [ ] Error handling and user feedback systems
 
-**Success Criteria**: All major MCP tools accessible with complete multi-step workflows
+**Success Criteria**: All major MCP tools accessible via unified chat interface with complete multi-step workflows
 
 ### Milestone 4: Enhanced User Experience
 - [ ] Responsive design for different screen sizes
@@ -525,8 +643,9 @@ To support future clients with varying capabilities (e.g., Claude Code if termin
 ## Dependencies & Risks
 
 ### Technical Dependencies
+- **MCP Server Chat Endpoint (BLOCKING)**: Web UI requires `POST /api/v1/chat` endpoint for all functionality
 - **MCP Server REST API**: Web UI depends on existing REST API gateway in dot-ai
-- **OpenAPI Schema Availability**: Requires `GET /api/v1/openapi` endpoint for type generation
+- **OpenAPI Schema Availability**: Requires `GET /api/v1/openapi` endpoint for type generation (optional, manual types work)
 - **CORS Configuration**: MCP server must allow cross-origin requests from Web UI domain
 - **Kubernetes Access**: MCP server must have cluster access (Web UI is presentation layer only)
 - **Browser Support**: Modern browsers with ES6+, fetch API, and modern JavaScript features
@@ -608,7 +727,20 @@ To support future clients with varying capabilities (e.g., Claude Code if termin
   - Moved from vfarcic/dot-ai#109 to vfarcic/dot-ai-ui#1
   - Removed Milestone 0 (repository already exists)
   - Updated repository references
-- **Status**: Ready for implementation
+- **2025-12-30**: Added Tool-Specific Web UI Enhancement Review phase
+  - New Phase 2 section with trackable checklist of all 8 MCP tools
+  - Each tool to be reviewed for visualization opportunities, response format optimizations, and UI-specific features
+  - May generate additional PRDs for significant tool enhancements
+- **2025-12-30**: Chat endpoint architecture and implementation progress
+  - **Architecture Decision**: MCP acts as AI agent, Web UI acts as agent interface
+  - **State Management**: Echo-back model - Web UI sends `lastResponse` + `message`, MCP reconstructs context
+  - **Workflow State**: MCP maintains server-side via `sessionId`; MCP stateless for conversation, stateful for workflows
+  - **New Milestone 0**: MCP chat endpoint is blocking dependency (owned by dot-ai repo)
+  - **Technology Stack Finalized**: Vite (not Next.js), Tailwind CSS v4, manual TypeScript types
+  - **Milestone 1 Progress**: Project structure, API client, types, basic UI complete; blocked on chat endpoint
+  - **New Requirement**: "New Chat" button to clear conversation (like `/clear` in Claude Code)
+  - **New Requirement**: API URL must be configurable (environment variable)
+- **Status**: In Progress (blocked on MCP chat endpoint)
 
 ## Stakeholders
 
