@@ -2,8 +2,9 @@
 
 **Issue**: [#1](https://github.com/vfarcic/dot-ai-ui/issues/1)
 **Created**: 2025-09-17
-**Status**: In Progress (blocked on MCP chat endpoint)
-**Priority**: Medium
+**Status**: Superseded by [PRD #2](../2-web-ui-visualization.md)
+**Closed**: 2025-12-31
+**Priority**: N/A
 
 > *Migrated from [vfarcic/dot-ai#109](https://github.com/vfarcic/dot-ai/issues/109)*
 
