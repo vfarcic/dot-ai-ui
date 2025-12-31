@@ -198,7 +198,7 @@ interface Card {
 ### Milestone 3: Visualization Page
 - [x] Create `/v/{sessionId}` route
 - [x] Implement tab navigation for multiple visualizations
-- [ ] Display title and insights panel
+- [x] Display title and insights panel
 - [x] Loading and error states
 - [x] Remove unused Chat page and related code
 
@@ -269,6 +269,12 @@ Items explicitly not included in this PRD:
 ---
 
 ## Change Log
+
+- **2025-12-31**: Milestone 3 complete - Visualization Page
+  - Added collapsible InsightsPanel component with session ID and AI insights
+  - Panel starts collapsed by default to maximize diagram space
+  - Title displayed prominently at top of page
+  - All Milestone 3 items now complete
 
 - **2025-12-31**: Milestone 2 complete - Core Renderers with zoom/pan
   - Implemented all 4 renderer components: MermaidRenderer, CardRenderer, CodeRenderer, TableRenderer

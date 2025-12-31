@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { TabContainer } from '@/components/TabContainer'
+import { InsightsPanel } from '@/components/InsightsPanel'
 import { VisualizationRenderer } from '@/components/renderers'
 import { getVisualization, APIError } from '@/api'
 import type { VisualizationResponse } from '@/types'
@@ -76,12 +77,9 @@ export function Visualization() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold mb-1">{data.title}</h1>
-        <p className="text-sm text-muted-foreground">
-          Session: <code className="bg-muted px-2 py-1 rounded text-xs">{sessionId}</code>
-        </p>
-      </div>
+      <h1 className="text-2xl font-semibold mb-4">{data.title}</h1>
+
+      <InsightsPanel sessionId={sessionId!} insights={data.insights} />
 
       <TabContainer
         visualizations={data.visualizations}
