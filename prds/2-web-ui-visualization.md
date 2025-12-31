@@ -231,12 +231,12 @@ interface Card {
   - [x] Deployment template
   - [x] Service template
   - [x] Ingress/HTTPRoute templates (optional)
-- [ ] Set up GitHub Actions CI pipeline
-  - [ ] Build and test on PR
-  - [ ] Auto-version bump on main merge
-  - [ ] Build and push Docker image to GHCR
-  - [ ] Package and push Helm chart to GHCR OCI registry
-  - [ ] Create GitHub release with artifacts
+- [x] Set up GitHub Actions CI pipeline
+  - [x] Build and test on PR
+  - [x] Auto-version bump on main merge
+  - [x] Build and push Docker image to GHCR
+  - [x] Package and push Helm chart to GHCR OCI registry
+  - [x] Create GitHub release with artifacts
 - [ ] Documentation for installation via Helm
 
 **Success Criteria**: Users can deploy Web UI with `helm install dot-ai-ui oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui`
@@ -287,6 +287,14 @@ Items explicitly not included in this PRD:
 ---
 
 ## Change Log
+
+- **2025-12-31**: GitHub Actions CI pipeline complete - Milestone 6 progress
+  - Created `.github/workflows/ci.yml` with 4 jobs: test, security, version, release
+  - PR triggers: lint, build, CodeQL security analysis, npm audit
+  - Main merge triggers: version bump from git tags, Docker multi-arch build/push, Helm chart package/push
+  - Creates coordinated GitHub release with Docker image + Helm chart artifacts
+  - Created `.github/release.yml` for auto-generated release notes categorization
+  - Required secret: `GHCR_TOKEN` for package publishing
 
 - **2025-12-31**: Helm chart complete - Milestone 6 progress
   - Created Helm chart at `charts/` following dot-ai patterns

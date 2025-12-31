@@ -1,0 +1,292 @@
+name: CI Pipeline & Release
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    branches: [ main ]
+  workflow_dispatch:
+
+# Restrict default permissions to read-only for security
+permissions: read-all
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '22.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run linter
+      run: npm run lint
+
+    - name: Build project
+      run: npm run build
+
+  security:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@45c373516f557556c15d420e3f5e0aa3d64366bc # v3
+      with:
+        languages: typescript
+
+    - name: Setup Node.js
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '22.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build project
+      run: npm run build
+
+    - name: Run dependency security audit
+      run: npm audit --audit-level moderate
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@45c373516f557556c15d420e3f5e0aa3d64366bc # v3
+
+  version:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: read
+    outputs:
+      new-version: ${{ steps.version-check.outputs.new-version }}
+      version-changed: ${{ steps.version-check.outputs.version-changed }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Pull latest changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git pull origin main
+
+    - name: Calculate next version
+      id: version-check
+      run: |
+        # Get latest version from git tags (format: vX.Y.Z)
+        LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1 || echo "")
+
+        if [ -n "$LATEST_TAG" ]; then
+          # Strip 'v' prefix
+          PUBLISHED_VERSION="${LATEST_TAG#v}"
+        else
+          PUBLISHED_VERSION="0.0.0"
+        fi
+
+        echo "published-version=$PUBLISHED_VERSION" >> $GITHUB_OUTPUT
+
+        # Always bump from published version (avoids race conditions)
+        MAJOR=$(echo $PUBLISHED_VERSION | cut -d. -f1)
+        MINOR=$(echo $PUBLISHED_VERSION | cut -d. -f2)
+        NEW_MINOR=$((MINOR + 1))
+        NEW_VERSION="$MAJOR.$NEW_MINOR.0"
+
+        echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "Version will be incremented from $PUBLISHED_VERSION to $NEW_VERSION"
+        echo "version-changed=true" >> $GITHUB_OUTPUT
+
+  release:
+    needs: [version]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.version.outputs.version-changed == 'true'
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup git config
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git pull origin main
+
+    - name: Setup Node.js
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '22.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build project
+      run: npm run build
+
+    - name: Update package.json version if needed
+      run: |
+        VERSION=${{ needs.version.outputs.new-version }}
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+        if [ "$CURRENT_VERSION" != "$VERSION" ]; then
+          echo "Updating package.json from $CURRENT_VERSION to $VERSION"
+          npm version $VERSION --no-git-tag-version
+        else
+          echo "Package.json already at correct version: $VERSION"
+        fi
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+      with:
+        context: .
+        push: true
+        tags: |
+          ghcr.io/vfarcic/dot-ai-ui:${{ needs.version.outputs.new-version }}
+          ghcr.io/vfarcic/dot-ai-ui:latest
+        labels: |
+          org.opencontainers.image.source=https://github.com/vfarcic/dot-ai-ui
+          org.opencontainers.image.description=Web UI visualization companion for dot-ai MCP server
+          org.opencontainers.image.licenses=ISC
+          org.opencontainers.image.version=${{ needs.version.outputs.new-version }}
+        platforms: linux/amd64,linux/arm64
+
+    - name: Install Helm
+      uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
+      with:
+        version: 'v3.14.0'
+
+    - name: Update Chart.yaml and values.yaml versions
+      run: |
+        VERSION=${{ needs.version.outputs.new-version }}
+
+        # Update Chart.yaml versions to match the coordinated release
+        sed -i "s/^version: .*/version: \"$VERSION\"/" charts/Chart.yaml
+        # Update Chart.yaml appVersion to match the Docker image we just built
+        sed -i "s/^appVersion: .*/appVersion: \"$VERSION\"/" charts/Chart.yaml
+
+        # Update values.yaml image tag to reference the Docker image we just built
+        sed -i "s/tag: \".*\"/tag: \"$VERSION\"/" charts/values.yaml
+
+        echo "Updated chart to reference Docker image: ghcr.io/vfarcic/dot-ai-ui:$VERSION"
+
+    - name: Log in to GitHub Container Registry for Helm
+      run: |
+        helm registry login ghcr.io -u ${{ github.actor }} --password-stdin <<< "${{ secrets.GHCR_TOKEN }}"
+      env:
+        HELM_EXPERIMENTAL_OCI: 1
+
+    - name: Package and push Helm chart
+      run: |
+        VERSION=${{ needs.version.outputs.new-version }}
+
+        # Package the chart with coordinated version
+        helm package charts/ --version $VERSION --app-version $VERSION
+
+        # Push versioned chart to GHCR as OCI artifact
+        helm push dot-ai-ui-$VERSION.tgz oci://ghcr.io/vfarcic/dot-ai-ui/charts
+
+        echo "Published Helm chart: oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui:$VERSION"
+
+    - name: Commit all coordinated changes and create Git tag
+      run: |
+        VERSION=${{ needs.version.outputs.new-version }}
+
+        # Add all version-related changes
+        git add package.json charts/Chart.yaml charts/values.yaml
+
+        git commit -m "chore: coordinated release v$VERSION
+
+        - docker image: ghcr.io/vfarcic/dot-ai-ui:$VERSION
+        - helm chart: oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui:$VERSION
+
+        [skip ci]"
+
+        # Create release tag
+        git tag -a "v$VERSION" -m "Release v$VERSION - coordinated docker and helm chart release"
+
+        # Push changes and tag
+        git push origin main
+        git push origin "v$VERSION"
+
+        echo "Released coordinated version: $VERSION"
+
+    - name: Create GitHub Release with auto-generated notes
+      run: |
+        VERSION=${{ needs.version.outputs.new-version }}
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+
+        # Create release notes header with coordinated artifacts
+        cat > release_header.md << 'EOF'
+        ## Coordinated Release Artifacts
+        - **Docker image**: `ghcr.io/vfarcic/dot-ai-ui:$VERSION` (also available as `latest`)
+        - **Helm chart**: `oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui:$VERSION`
+
+        ### Installation
+
+        ```bash
+        helm install dot-ai-ui oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui --version $VERSION
+        ```
+
+        EOF
+
+        # Replace VERSION placeholder
+        sed -i "s/\$VERSION/$VERSION/g" release_header.md
+
+        # Create release with automatic notes generation and custom header
+        if [ -n "$PREV_TAG" ]; then
+          gh release create "v$VERSION" \
+            --title "Release v$VERSION" \
+            --notes-file release_header.md \
+            --generate-notes \
+            --notes-start-tag "$PREV_TAG"
+        else
+          gh release create "v$VERSION" \
+            --title "Release v$VERSION" \
+            --notes-file release_header.md \
+            --generate-notes
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
