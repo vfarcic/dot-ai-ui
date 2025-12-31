@@ -223,6 +223,24 @@ interface Card {
 
 **Success Criteria**: Clear decision on next phase of development
 
+### Milestone 6: Production Deployment
+- [ ] Create Dockerfile for production build
+- [ ] Create Helm chart (following dot-ai patterns)
+  - [ ] Chart.yaml with metadata
+  - [ ] values.yaml with configurable options (image, ingress/gateway, resources)
+  - [ ] Deployment template
+  - [ ] Service template
+  - [ ] Ingress/HTTPRoute templates (optional)
+- [ ] Set up GitHub Actions CI pipeline
+  - [ ] Build and test on PR
+  - [ ] Auto-version bump on main merge
+  - [ ] Build and push Docker image to GHCR
+  - [ ] Package and push Helm chart to GHCR OCI registry
+  - [ ] Create GitHub release with artifacts
+- [ ] Documentation for installation via Helm
+
+**Success Criteria**: Users can deploy Web UI with `helm install dot-ai-ui oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui`
+
 ## Technical Considerations
 
 ### Performance
@@ -269,6 +287,11 @@ Items explicitly not included in this PRD:
 ---
 
 ## Change Log
+
+- **2025-12-31**: Added Milestone 6 - Production Deployment
+  - Decision: Add Helm chart and CI/CD pipeline for releasing Web UI
+  - New tasks: Dockerfile, Helm chart (following dot-ai patterns), GitHub Actions CI
+  - Enables deployment via `helm install dot-ai-ui oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui`
 
 - **2025-12-31**: Milestone 3 complete - Visualization Page
   - Added collapsible InsightsPanel component with session ID and AI insights
