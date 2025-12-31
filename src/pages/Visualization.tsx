@@ -78,8 +78,8 @@ export function Visualization() {
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-3">
-        <h1 className="text-lg font-semibold">{data.title}</h1>
+      <div className="flex items-center justify-between mb-2 sm:mb-3">
+        <h1 className="text-base sm:text-lg font-semibold leading-tight">{data.title}</h1>
       </div>
 
       <InsightsPanel sessionId={sessionId!} insights={data.insights} />

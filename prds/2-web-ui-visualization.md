@@ -206,7 +206,7 @@ interface Card {
 
 ### Milestone 4: Integration & Polish
 - [x] Test with live MCP server
-- [ ] Responsive design for different screen sizes
+- [x] Responsive design for different screen sizes
 - [x] Error handling for network failures, expired sessions
 - [ ] Performance optimization (lazy loading mermaid.js)
 - [ ] Enhanced loading state (spinner/skeleton instead of text)
@@ -287,6 +287,13 @@ Items explicitly not included in this PRD:
 ---
 
 ## Change Log
+
+- **2025-12-31**: Responsive design complete - Milestone 4 progress
+  - Updated Layout component with responsive padding (px-3 sm:px-4 md:px-6), smaller logo/text on mobile
+  - Updated MermaidRenderer with flex-wrap controls, hidden hint on mobile, responsive viewport (min-h-[250px] sm:min-h-[400px])
+  - Updated Home page with responsive icon, text sizes, and spacing
+  - Updated Visualization page with responsive title sizing
+  - Verified with Playwright at mobile (375px), tablet (768px), and desktop (1280px) viewports
 
 - **2025-12-31**: GitHub Actions CI pipeline complete - Milestone 6 progress
   - Created `.github/workflows/ci.yml` with 4 jobs: test, security, version, release

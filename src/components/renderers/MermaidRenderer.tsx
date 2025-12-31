@@ -162,7 +162,7 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
       className={`relative flex flex-col ${isFullscreen ? 'bg-background' : ''}`}
     >
       {/* Controls */}
-      <div className="flex items-center justify-between mb-2 px-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2 px-1">
         <div className="flex items-center gap-1">
           <button
             onClick={handleZoomOut}
@@ -172,7 +172,7 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
           >
             −
           </button>
-          <span className="px-2 py-1 text-xs text-muted-foreground min-w-[4rem] text-center">
+          <span className="px-1.5 sm:px-2 py-1 text-xs text-muted-foreground min-w-[3rem] sm:min-w-[4rem] text-center">
             {Math.round(zoom * 100)}%
           </span>
           <button
@@ -192,7 +192,7 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
           </button>
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground mr-2">
+          <span className="hidden sm:inline text-xs text-muted-foreground mr-2">
             Scroll to zoom • Drag to pan
           </span>
           <button
@@ -208,7 +208,7 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
       {/* Diagram viewport */}
       <div
         className={`relative overflow-hidden rounded-lg border border-border bg-muted/20 ${
-          isFullscreen ? 'flex-1' : 'min-h-[400px] max-h-[70vh]'
+          isFullscreen ? 'flex-1' : 'min-h-[250px] sm:min-h-[400px] max-h-[60vh] sm:max-h-[70vh]'
         }`}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
