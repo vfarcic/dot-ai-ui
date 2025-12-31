@@ -16,8 +16,8 @@ export class APIError extends Error {
   }
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
-const DEFAULT_TIMEOUT = 30000
+const API_PATH = '/api/v1'
+const DEFAULT_TIMEOUT = 5 * 60 * 1000 // 5 minutes for AI generation
 
 /**
  * Fetch visualization data for a session
@@ -32,7 +32,7 @@ export async function getVisualization(
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT)
 
   try {
-    const response = await fetch(`${API_BASE_URL}/visualize/${sessionId}`, {
+    const response = await fetch(`${API_PATH}/visualize/${sessionId}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -55,7 +55,9 @@ export async function getVisualization(
       )
     }
 
-    return response.json()
+    const json = await response.json()
+    // MCP wraps response in { success, data, meta }
+    return json.data || json
   } catch (error) {
     if (error instanceof APIError) {
       throw error

@@ -197,9 +197,9 @@ interface Card {
 
 ### Milestone 3: Visualization Page
 - [x] Create `/v/{sessionId}` route
-- [ ] Implement tab navigation for multiple visualizations
+- [x] Implement tab navigation for multiple visualizations
 - [ ] Display title and insights panel
-- [ ] Loading and error states
+- [x] Loading and error states
 - [x] Remove unused Chat page and related code
 
 **Success Criteria**: Full visualization page works end-to-end with mock data
@@ -267,6 +267,15 @@ Items explicitly not included in this PRD:
 ---
 
 ## Change Log
+
+- **2025-12-31**: Milestone 3 progress - Tab navigation and backend proxy
+  - Implemented TabContainer component for switching between visualizations
+  - Added Express backend proxy for secure MCP authentication (token stays server-side)
+  - Implemented loading and error states with appropriate UI feedback
+  - Configured environment variables: `DOT_AI_MCP_URL`, `DOT_AI_AUTH_TOKEN`
+  - Adapted API client to handle MCP response wrapper (`{ success, data, meta }`)
+  - Increased API timeout to 5 minutes for AI generation
+  - Verified end-to-end flow with live MCP server
 
 - **2025-12-31**: Initial PRD creation
   - Visualization-only approach (not chat interface)

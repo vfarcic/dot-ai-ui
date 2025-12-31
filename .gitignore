@@ -30,3 +30,6 @@ src/api/generated
 gke_gcloud_auth_plugin_cache
 kubeconfig.yaml
 vite.config.d.ts
+
+# Playwright MCP screenshots
+.playwright-mcp
