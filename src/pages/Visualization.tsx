@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { TabContainer } from '@/components/TabContainer'
 import { InsightsPanel } from '@/components/InsightsPanel'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { VisualizationRenderer } from '@/components/renderers'
 import { getVisualization, APIError } from '@/api'
 import type { VisualizationResponse } from '@/types'
@@ -43,11 +44,7 @@ export function Visualization() {
   }, [sessionId, fetchData])
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   if (error) {

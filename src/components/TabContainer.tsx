@@ -7,12 +7,20 @@ interface TabContainerProps {
 }
 
 export function TabContainer({ visualizations, renderContent }: TabContainerProps) {
-  const [activeTabId, setActiveTabId] = useState<string>(
-    visualizations[0]?.id ?? ''
-  )
+  const [activeTabId, setActiveTabId] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
+
+  // Auto-select first tab when visualizations load or change
+  useEffect(() => {
+    if (visualizations.length > 0) {
+      const currentTabExists = visualizations.some((v) => v.id === activeTabId)
+      if (!currentTabExists) {
+        setActiveTabId(visualizations[0].id)
+      }
+    }
+  }, [visualizations, activeTabId])
 
   const updateScrollIndicators = useCallback(() => {
     const el = scrollRef.current

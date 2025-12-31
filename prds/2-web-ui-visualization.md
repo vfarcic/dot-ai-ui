@@ -208,8 +208,8 @@ interface Card {
 - [x] Test with live MCP server
 - [x] Responsive design for different screen sizes
 - [x] Error handling for network failures, expired sessions
-- [ ] Performance optimization (lazy loading mermaid.js)
-- [ ] Enhanced loading state (spinner/skeleton instead of text)
+- [~] Performance optimization (lazy loading mermaid.js) - Deferred: marginal benefit, library needed immediately
+- [x] Enhanced loading state (spinner/skeleton instead of text)
 - [x] Visual design polish (consistent styling, spacing, colors)
 
 **Success Criteria**: Production-ready visualization companion
@@ -287,6 +287,12 @@ Items explicitly not included in this PRD:
 ---
 
 ## Change Log
+
+- **2025-12-31**: Enhanced loading state and tab auto-selection fix
+  - Created LoadingSpinner component with animated spinner and messaging for long waits
+  - Fixed tab auto-selection bug - first tab now selected automatically on load
+  - Deferred lazy loading optimization (marginal benefit, library needed immediately)
+  - Milestone 4 now complete (all implementation items done, 1 deferred)
 
 - **2025-12-31**: Milestone 6 complete - Documentation for Helm installation
   - Created minimal README.md following dot-ai documentation pattern
