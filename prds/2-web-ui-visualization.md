@@ -224,7 +224,7 @@ interface Card {
 **Success Criteria**: Clear decision on next phase of development
 
 ### Milestone 6: Production Deployment
-- [ ] Create Dockerfile for production build
+- [x] Create Dockerfile for production build
 - [ ] Create Helm chart (following dot-ai patterns)
   - [ ] Chart.yaml with metadata
   - [ ] values.yaml with configurable options (image, ingress/gateway, resources)
@@ -287,6 +287,15 @@ Items explicitly not included in this PRD:
 ---
 
 ## Change Log
+
+- **2025-12-31**: Dockerfile for production build - Milestone 6 progress
+  - Created multi-stage Dockerfile (builder → runtime) with Node.js 24 Alpine
+  - Compiles frontend via Vite and server TypeScript separately
+  - Runs as non-root user (UID 10001) for security
+  - Configurable via environment variables: PORT, DOT_AI_MCP_URL, DOT_AI_AUTH_TOKEN
+  - Created .dockerignore for optimized build context
+  - Validated with successful build, container run, and Playwright UI testing
+  - Image size: ~620MB (due to node_modules for Express/React)
 
 - **2025-12-31**: Error handling and home page - Milestone 4 progress
   - Implemented ErrorDisplay component with contextual error types (session-expired, network, timeout, server, ai-unavailable)

@@ -1,0 +1,31 @@
+# Dependencies (reinstalled in container)
+node_modules
+
+# Build output (rebuilt in container)
+dist
+
+# Git
+.git
+.gitignore
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*.swo
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Development files
+.devbox
+.claude
+.playwright-mcp
+prds
+
+# Kubernetes configs (may contain sensitive data)
+kubeconfig.yaml
+gke_gcloud_auth_plugin_cache
