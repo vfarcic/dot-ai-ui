@@ -1,1 +1,1 @@
-export { getVisualization, APIError } from './client'
+export { getVisualization, APIError, type ErrorType } from './client'

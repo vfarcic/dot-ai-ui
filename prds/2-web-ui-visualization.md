@@ -207,7 +207,7 @@ interface Card {
 ### Milestone 4: Integration & Polish
 - [x] Test with live MCP server
 - [ ] Responsive design for different screen sizes
-- [ ] Error handling for network failures, expired sessions
+- [x] Error handling for network failures, expired sessions
 - [ ] Performance optimization (lazy loading mermaid.js)
 - [ ] Enhanced loading state (spinner/skeleton instead of text)
 - [x] Visual design polish (consistent styling, spacing, colors)
@@ -287,6 +287,15 @@ Items explicitly not included in this PRD:
 ---
 
 ## Change Log
+
+- **2025-12-31**: Error handling and home page - Milestone 4 progress
+  - Implemented ErrorDisplay component with contextual error types (session-expired, network, timeout, server, ai-unavailable)
+  - Added retry functionality for recoverable errors
+  - Made error messages agent-agnostic (works with any MCP client, not just Claude Code)
+  - Created Home page explaining site purpose with link to devopstoolkit.ai docs
+  - Made header logo/title clickable link to home page
+  - Added cursor-pointer to all interactive elements (tabs, buttons, insights panel)
+  - Verified error handling with Playwright testing
 
 - **2025-12-31**: Visual design polish complete - Milestone 4 progress
   - Updated color theme to match devopstoolkit.ai brand (yellow #FACB00, dark #2D2D2D/#1a1a1a)

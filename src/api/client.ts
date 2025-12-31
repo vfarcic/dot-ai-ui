@@ -5,14 +5,42 @@
 
 import type { VisualizationResponse } from '@/types'
 
+/**
+ * Error types based on actual MCP server responses:
+ * - session-expired: 404 SESSION_NOT_FOUND
+ * - ai-unavailable: 503 AI_NOT_CONFIGURED
+ * - server: 500 VISUALIZATION_ERROR
+ * - network: Connection failed (status 0)
+ * - timeout: Request aborted (status 408)
+ */
+export type ErrorType = 'session-expired' | 'ai-unavailable' | 'server' | 'network' | 'timeout'
+
 export class APIError extends Error {
+  public readonly errorType: ErrorType
+  public readonly errorCode?: string
+
   constructor(
     message: string,
     public status: number,
-    public statusText: string
+    public statusText: string,
+    errorCode?: string
   ) {
     super(message)
     this.name = 'APIError'
+    this.errorCode = errorCode
+    this.errorType = this.classifyError(status, errorCode)
+  }
+
+  private classifyError(status: number, errorCode?: string): ErrorType {
+    if (status === 404 || errorCode === 'SESSION_NOT_FOUND') return 'session-expired'
+    if (status === 503 || errorCode === 'AI_NOT_CONFIGURED') return 'ai-unavailable'
+    if (status === 408) return 'timeout'
+    if (status === 0) return 'network'
+    return 'server'
+  }
+
+  get isRetryable(): boolean {
+    return this.errorType !== 'session-expired'
   }
 }
 
@@ -41,18 +69,21 @@ export async function getVisualization(
     })
 
     if (!response.ok) {
-      if (response.status === 404) {
-        throw new APIError(
-          'Session not found or expired',
-          response.status,
-          response.statusText
-        )
+      // Try to extract error details from MCP response body
+      let errorCode: string | undefined
+      let errorMessage = `API request failed: ${response.status} ${response.statusText}`
+
+      try {
+        const errorBody = await response.json()
+        if (errorBody.error) {
+          errorCode = errorBody.error.code
+          errorMessage = errorBody.error.message || errorMessage
+        }
+      } catch {
+        // Failed to parse error body, use defaults
       }
-      throw new APIError(
-        `API request failed: ${response.status} ${response.statusText}`,
-        response.status,
-        response.statusText
-      )
+
+      throw new APIError(errorMessage, response.status, response.statusText, errorCode)
     }
 
     const json = await response.json()

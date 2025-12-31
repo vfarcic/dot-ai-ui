@@ -63,7 +63,7 @@ export function TabContainer({ visualizations, renderContent }: TabContainerProp
         {canScrollLeft && (
           <button
             onClick={scrollLeft}
-            className="absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-[#1a1a1a] via-[#1a1a1a]/90 to-transparent z-10 flex items-center justify-center hover:from-[#252525] transition-colors"
+            className="absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-[#1a1a1a] via-[#1a1a1a]/90 to-transparent z-10 flex items-center justify-center hover:from-[#252525] transition-colors cursor-pointer"
             aria-label="Scroll tabs left"
           >
             <span className="text-primary text-2xl font-bold">‹</span>
@@ -73,7 +73,7 @@ export function TabContainer({ visualizations, renderContent }: TabContainerProp
         {canScrollRight && (
           <button
             onClick={scrollRight}
-            className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-[#1a1a1a] via-[#1a1a1a]/90 to-transparent z-10 flex items-center justify-center hover:from-[#252525] transition-colors"
+            className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-[#1a1a1a] via-[#1a1a1a]/90 to-transparent z-10 flex items-center justify-center hover:from-[#252525] transition-colors cursor-pointer"
             aria-label="Scroll tabs right"
           >
             <span className="text-primary text-2xl font-bold">›</span>
@@ -87,7 +87,7 @@ export function TabContainer({ visualizations, renderContent }: TabContainerProp
             <button
               key={viz.id}
               onClick={() => setActiveTabId(viz.id)}
-              className={`px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+              className={`px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 cursor-pointer ${
                 activeTabId === viz.id
                   ? 'border-b-2 border-primary text-foreground'
                   : 'text-muted-foreground hover:text-foreground'

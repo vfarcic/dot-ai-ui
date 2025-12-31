@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { TabContainer } from '@/components/TabContainer'
 import { InsightsPanel } from '@/components/InsightsPanel'
+import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { VisualizationRenderer } from '@/components/renderers'
 import { getVisualization, APIError } from '@/api'
 import type { VisualizationResponse } from '@/types'
@@ -9,35 +10,37 @@ import type { VisualizationResponse } from '@/types'
 export function Visualization() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const [data, setData] = useState<VisualizationResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<APIError | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  const fetchData = useCallback(async () => {
+    if (!sessionId) return
+
+    try {
+      setIsLoading(true)
+      setError(null)
+      const response = await getVisualization(sessionId)
+      setData(response)
+    } catch (err) {
+      if (err instanceof APIError) {
+        setError(err)
+      } else {
+        setError(new APIError('An unexpected error occurred', 0, 'Unknown'))
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }, [sessionId])
 
   useEffect(() => {
     if (!sessionId) {
-      setError('No session ID provided')
+      setError(new APIError('No session ID provided', 400, 'Bad Request'))
       setIsLoading(false)
       return
     }
 
-    async function fetchData() {
-      try {
-        setIsLoading(true)
-        setError(null)
-        const response = await getVisualization(sessionId!)
-        setData(response)
-      } catch (err) {
-        if (err instanceof APIError) {
-          setError(err.message)
-        } else {
-          setError('An unexpected error occurred')
-        }
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchData()
-  }, [sessionId])
+  }, [sessionId, fetchData])
 
   if (isLoading) {
     return (
@@ -49,14 +52,12 @@ export function Visualization() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="text-center">
-          <p className="text-destructive mb-2">{error}</p>
-          <p className="text-sm text-muted-foreground">
-            Session: <code className="bg-muted px-2 py-1 rounded text-xs">{sessionId}</code>
-          </p>
-        </div>
-      </div>
+      <ErrorDisplay
+        type={error.errorType}
+        message={error.message}
+        sessionId={sessionId}
+        onRetry={error.isRetryable ? fetchData : undefined}
+      />
     )
   }
 

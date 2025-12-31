@@ -14,7 +14,7 @@ export function InsightsPanel({ sessionId, insights }: InsightsPanelProps) {
     <div className="bg-muted/50 border border-border rounded-lg mb-4 overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-muted/70 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-muted/70 transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-3">
           <svg
