@@ -1,8 +1,25 @@
 import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import rateLimit from 'express-rate-limit'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// Rate limiting configuration
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60, // 60 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+})
+
+const staticLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 120, // 120 requests per minute per IP for static files
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 const isDev = process.env.NODE_ENV !== 'production'
 const PORT = process.env.PORT || 3000
 const MCP_BASE_URL = process.env.DOT_AI_MCP_URL || 'http://localhost:8080'
@@ -15,7 +32,7 @@ async function createServer() {
   app.use(express.json())
 
   // Proxy visualization API requests to MCP server
-  app.get('/api/v1/visualize/:sessionId', async (req, res) => {
+  app.get('/api/v1/visualize/:sessionId', apiLimiter, async (req, res) => {
     const { sessionId } = req.params
 
     // Validate sessionId format to prevent path injection (SSRF)
@@ -73,7 +90,7 @@ async function createServer() {
     app.use(express.static(path.join(__dirname, '../dist')))
 
     // Handle SPA routing
-    app.get('/{*splat}', (req, res) => {
+    app.get('*', staticLimiter, (req, res) => {
       res.sendFile(path.join(__dirname, '../dist/index.html'))
     })
   }

@@ -25,9 +25,8 @@
   },
   "homepage": "https://github.com/vfarcic/dot-ai-ui#readme",
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
     "mermaid": "^11.12.2",
     "prismjs": "^1.30.0",
     "react": "^19.2.3",
@@ -38,7 +37,6 @@
     "@eslint/js": "^9.39.2",
     "@openapitools/openapi-generator-cli": "^2.27.0",
     "@tailwindcss/vite": "^4.1.18",
-    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.3",
     "@types/prismjs": "^1.26.5",
