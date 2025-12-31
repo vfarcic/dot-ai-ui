@@ -237,7 +237,7 @@ interface Card {
   - [x] Build and push Docker image to GHCR
   - [x] Package and push Helm chart to GHCR OCI registry
   - [x] Create GitHub release with artifacts
-- [ ] Documentation for installation via Helm
+- [x] Documentation for installation via Helm
 
 **Success Criteria**: Users can deploy Web UI with `helm install dot-ai-ui oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui`
 
@@ -287,6 +287,14 @@ Items explicitly not included in this PRD:
 ---
 
 ## Change Log
+
+- **2025-12-31**: Milestone 6 complete - Documentation for Helm installation
+  - Created minimal README.md following dot-ai documentation pattern
+  - Links to https://devopstoolkit.ai/docs/ui/ for detailed documentation
+  - Created docs/setup/kubernetes-setup.md with comprehensive Helm installation guide
+  - Covers: Quick Start, Configuration Reference, Existing Secrets, TLS, Gateway API
+  - Added LICENSE (MIT) file
+  - Milestone 6 (Production Deployment) is now 100% complete
 
 - **2025-12-31**: Responsive design complete - Milestone 4 progress
   - Updated Layout component with responsive padding (px-3 sm:px-4 md:px-6), smaller logo/text on mobile
