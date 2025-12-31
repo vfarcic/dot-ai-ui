@@ -135,13 +135,10 @@ Create a lightweight Web UI that renders visualizations for MCP tool responses. 
 }
 ```
 
-**Error Response** (expired/invalid session):
+**Error Response** (HTTP 404 - expired/invalid session):
 ```json
 {
-  "title": null,
-  "visualizations": [],
-  "insights": [],
-  "error": "Session expired or not found"
+  "error": "Session not found"
 }
 ```
 
@@ -245,9 +242,9 @@ interface Card {
 ## Dependencies
 
 ### MCP Server (dot-ai repo)
-- [ ] `GET /api/v1/visualize/{sessionId}` endpoint implemented
-- [ ] Tool responses include `visualizationUrl` field
-- [ ] Web UI base URL configurable via environment variable
+- [x] `GET /api/v1/visualize/{sessionId}` endpoint implemented (PR #319)
+- [x] Tool responses include `visualizationUrl` field (PR #319)
+- [x] Web UI base URL configurable via `WEB_UI_BASE_URL` env var (PR #319)
 
 ### External Libraries
 - mermaid.js - Diagram rendering
