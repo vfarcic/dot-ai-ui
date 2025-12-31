@@ -1,0 +1,73 @@
+{{/*
+Expand the name of the chart.
+*/}}
+{{- define "dot-ai-ui.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Create a default fully qualified app name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+If release name contains chart name it will be used as a full name.
+*/}}
+{{- define "dot-ai-ui.fullname" -}}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- if contains $name .Release.Name }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create chart name and version as used by the chart label.
+*/}}
+{{- define "dot-ai-ui.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Common labels
+*/}}
+{{- define "dot-ai-ui.labels" -}}
+helm.sh/chart: {{ include "dot-ai-ui.chart" . }}
+{{ include "dot-ai-ui.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Selector labels
+*/}}
+{{- define "dot-ai-ui.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "dot-ai-ui.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/*
+Create the name of the secret to use for auth token
+*/}}
+{{- define "dot-ai-ui.secretName" -}}
+{{- if .Values.dotAi.auth.existingSecret }}
+{{- .Values.dotAi.auth.existingSecret }}
+{{- else }}
+{{- include "dot-ai-ui.fullname" . }}-auth
+{{- end }}
+{{- end }}
+
+{{/*
+Create the key name for auth token in secret
+*/}}
+{{- define "dot-ai-ui.secretKey" -}}
+{{- if .Values.dotAi.auth.existingSecretKey }}
+{{- .Values.dotAi.auth.existingSecretKey }}
+{{- else }}
+{{- "auth-token" }}
+{{- end }}
+{{- end }}

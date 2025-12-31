@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dot-ai-ui.fullname" . }}
+  labels:
+    {{- include "dot-ai-ui.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dot-ai-ui.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "dot-ai-ui.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: web-ui
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
+        - name: DOT_AI_MCP_URL
+          value: {{ .Values.dotAi.url | quote }}
+        {{- if or .Values.dotAi.auth.existingSecret .Values.dotAi.auth.token }}
+        - name: DOT_AI_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "dot-ai-ui.secretName" . }}
+              key: {{ include "dot-ai-ui.secretKey" . }}
+              optional: true
+        {{- end }}
+{{- with .Values.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+{{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      terminationGracePeriodSeconds: 30

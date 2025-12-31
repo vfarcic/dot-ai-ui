@@ -225,12 +225,12 @@ interface Card {
 
 ### Milestone 6: Production Deployment
 - [x] Create Dockerfile for production build
-- [ ] Create Helm chart (following dot-ai patterns)
-  - [ ] Chart.yaml with metadata
-  - [ ] values.yaml with configurable options (image, ingress/gateway, resources)
-  - [ ] Deployment template
-  - [ ] Service template
-  - [ ] Ingress/HTTPRoute templates (optional)
+- [x] Create Helm chart (following dot-ai patterns)
+  - [x] Chart.yaml with metadata
+  - [x] values.yaml with configurable options (image, ingress/gateway, resources)
+  - [x] Deployment template
+  - [x] Service template
+  - [x] Ingress/HTTPRoute templates (optional)
 - [ ] Set up GitHub Actions CI pipeline
   - [ ] Build and test on PR
   - [ ] Auto-version bump on main merge
@@ -287,6 +287,15 @@ Items explicitly not included in this PRD:
 ---
 
 ## Change Log
+
+- **2025-12-31**: Helm chart complete - Milestone 6 progress
+  - Created Helm chart at `charts/` following dot-ai patterns
+  - Chart.yaml with metadata (name, version, maintainers, keywords)
+  - values.yaml with configurable options: image, resources, dotAi connection, ingress, gateway
+  - Templates: deployment, service, ingress (optional), httproute (optional), gateway (optional), secret
+  - Supports both traditional Ingress and Gateway API
+  - Auth token configurable via existing secret or chart-created secret
+  - Validated with `helm template` and `helm lint`
 
 - **2025-12-31**: Dockerfile for production build - Milestone 6 progress
   - Created multi-stage Dockerfile (builder → runtime) with Node.js 24 Alpine

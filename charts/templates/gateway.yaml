@@ -1,0 +1,51 @@
+{{- if .Values.gateway.create }}
+{{- if not .Values.gateway.className }}
+{{- fail "gateway.className is required when gateway.create is true" }}
+{{- end }}
+{{- if not (or .Values.gateway.listeners.http.enabled .Values.gateway.listeners.https.enabled) }}
+{{- fail "At least one listener (http or https) must be enabled when gateway.create is true" }}
+{{- end }}
+{{- if .Values.gateway.name }}
+{{- fail "gateway.name and gateway.create cannot both be set; disable gateway.create when using an existing gateway.name" }}
+{{- end }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ include "dot-ai-ui.fullname" . }}-http
+  labels:
+    {{- include "dot-ai-ui.labels" . | nindent 4 }}
+  {{- with .Values.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className }}
+  listeners:
+  {{- if .Values.gateway.listeners.http.enabled }}
+  - name: http
+    protocol: HTTP
+    port: 80
+    {{- if .Values.gateway.listeners.http.hostname }}
+    hostname: {{ .Values.gateway.listeners.http.hostname }}
+    {{- end }}
+    allowedRoutes:
+      namespaces:
+        from: Same
+  {{- end }}
+  {{- if .Values.gateway.listeners.https.enabled }}
+  - name: https
+    protocol: HTTPS
+    port: 443
+    {{- if .Values.gateway.listeners.https.hostname }}
+    hostname: {{ .Values.gateway.listeners.https.hostname }}
+    {{- end }}
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        name: {{ .Values.gateway.listeners.https.secretName | default (printf "%s-tls" (include "dot-ai-ui.fullname" .)) }}
+    allowedRoutes:
+      namespaces:
+        from: Same
+  {{- end }}
+{{- end }}
