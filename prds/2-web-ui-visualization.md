@@ -2,7 +2,7 @@
 
 **Issue**: [#2](https://github.com/vfarcic/dot-ai-ui/issues/2)
 **Created**: 2025-12-31
-**Status**: Ready for Implementation
+**Status**: In Progress
 **Priority**: High
 
 > *Supersedes the chat interface approach from [PRD #1](./done/1-web-ui-mcp-interaction.md), which has been closed.*
@@ -179,10 +179,10 @@ interface Card {
 ## Implementation Milestones
 
 ### Milestone 1: API Client & Types
-- [ ] Update TypeScript types for new visualization format
-- [ ] Create API client for `GET /api/v1/visualize/{sessionId}`
-- [ ] Add environment variable for API base URL
-- [ ] Handle error responses gracefully
+- [x] Update TypeScript types for new visualization format
+- [x] Create API client for `GET /api/v1/visualize/{sessionId}`
+- [x] Add environment variable for API base URL
+- [x] Handle error responses gracefully
 
 **Success Criteria**: Can fetch visualization data from MCP endpoint
 
@@ -196,11 +196,11 @@ interface Card {
 **Success Criteria**: Each visualization type renders correctly in isolation
 
 ### Milestone 3: Visualization Page
-- [ ] Create `/v/{sessionId}` route
+- [x] Create `/v/{sessionId}` route
 - [ ] Implement tab navigation for multiple visualizations
 - [ ] Display title and insights panel
 - [ ] Loading and error states
-- [ ] Remove unused Chat page and related code
+- [x] Remove unused Chat page and related code
 
 **Success Criteria**: Full visualization page works end-to-end with mock data
 

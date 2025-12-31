@@ -1,6 +1,6 @@
 /**
- * Typed content blocks for MCP visualization responses
- * Based on PRD specification
+ * Visualization types for PRD #2 - Web UI Visualization Companion
+ * Based on GET /api/v1/visualize/{sessionId} response format
  */
 
 export interface Card {
@@ -8,70 +8,61 @@ export interface Card {
   title: string
   description?: string
   tags?: string[]
-  metadata?: Record<string, string>
 }
 
-export interface ImageData {
-  format: 'svg' | 'png'
+export interface CodeContent {
+  language: string
+  code: string
+}
+
+export interface TableContent {
+  headers: string[]
+  rows: string[][]
+}
+
+export type VisualizationType = 'mermaid' | 'cards' | 'code' | 'table'
+
+export interface MermaidVisualization {
+  id: string
+  label: string
+  type: 'mermaid'
   content: string
-  alt: string
-  source?: 'mermaid' | 'graphviz'
 }
 
-export interface GraphNode {
+export interface CardsVisualization {
   id: string
   label: string
-  category?: string
-  metadata?: Record<string, unknown>
+  type: 'cards'
+  content: Card[]
 }
 
-export interface GraphEdge {
-  from: string
-  to: string
-  label?: string
-  relationship?: string
-}
-
-export interface GraphData {
-  nodes: GraphNode[]
-  edges: GraphEdge[]
-}
-
-export interface TreeNode {
+export interface CodeVisualization {
   id: string
   label: string
-  children?: TreeNode[]
+  type: 'code'
+  content: CodeContent
 }
 
-export interface Step {
+export interface TableVisualization {
+  id: string
   label: string
-  status: 'pending' | 'in_progress' | 'completed' | 'failed'
-  description?: string
+  type: 'table'
+  content: TableContent
 }
 
 export type Visualization =
-  | { type: 'text'; data: string }
-  | { type: 'code'; data: { content: string; language: string } }
-  | { type: 'table'; data: { headers: string[]; rows: string[][] } }
-  | { type: 'cards'; data: { items: Card[] } }
-  | { type: 'image'; data: ImageData }
-  | { type: 'graph'; data: GraphData }
-  | { type: 'tree'; data: { root: TreeNode } }
-  | { type: 'diff'; data: { before: string; after: string } }
-  | { type: 'progress'; data: { steps: Step[]; current: number } }
+  | MermaidVisualization
+  | CardsVisualization
+  | CodeVisualization
+  | TableVisualization
 
-export interface WorkflowState {
-  sessionId: string
-  progress?: {
-    current: number
-    total: number
-    label?: string
-  }
+export interface VisualizationResponse {
+  title: string
+  visualizations: Visualization[]
+  insights?: string[]
+  error: string | null
 }
 
-export interface MCPVisualizationResponse {
-  message: string
-  visualizations?: Visualization[]
-  prompt?: string
-  workflow?: WorkflowState
+export interface VisualizationErrorResponse {
+  error: string
 }
