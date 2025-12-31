@@ -209,6 +209,8 @@ interface Card {
 - [ ] Responsive design for different screen sizes
 - [ ] Error handling for network failures, expired sessions
 - [ ] Performance optimization (lazy loading mermaid.js)
+- [ ] Enhanced loading state (spinner/skeleton instead of text)
+- [ ] Visual design polish (consistent styling, spacing, colors)
 
 **Success Criteria**: Production-ready visualization companion
 
