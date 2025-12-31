@@ -22,7 +22,7 @@ export function VisualizationRenderer({ visualization }: VisualizationRendererPr
     case 'table':
       return <TableRenderer content={visualization.content} />
 
-    default:
+    default: {
       // TypeScript exhaustiveness check - this should never happen
       const _exhaustiveCheck: never = visualization
       return (
@@ -32,5 +32,6 @@ export function VisualizationRenderer({ visualization }: VisualizationRendererPr
           </p>
         </div>
       )
+    }
   }
 }
