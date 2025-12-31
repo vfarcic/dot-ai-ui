@@ -12,7 +12,7 @@ Users continue chatting in their preferred MCP client. When MCP responses includ
 
 ## How It Works
 
-```
+```text
 1. User in MCP client: "show me resources in production namespace"
 
 2. MCP server responds with visualization URL:

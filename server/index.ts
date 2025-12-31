@@ -18,6 +18,11 @@ async function createServer() {
   app.get('/api/v1/visualize/:sessionId', async (req, res) => {
     const { sessionId } = req.params
 
+    // Validate sessionId format to prevent path injection (SSRF)
+    if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
+      return res.status(400).json({ error: 'Invalid session ID format' })
+    }
+
     try {
       const headers: Record<string, string> = {
         Accept: 'application/json',
@@ -37,7 +42,12 @@ async function createServer() {
 
       clearTimeout(timeoutId)
 
-      const data = await response.json()
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
 
       if (!response.ok) {
         return res.status(response.status).json(data)

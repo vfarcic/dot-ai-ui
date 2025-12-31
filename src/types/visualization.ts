@@ -60,9 +60,4 @@ export interface VisualizationResponse {
   title: string
   visualizations: Visualization[]
   insights?: string[]
-  error: string | null
-}
-
-export interface VisualizationErrorResponse {
-  error: string
 }

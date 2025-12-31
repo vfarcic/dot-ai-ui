@@ -18,8 +18,8 @@ COPY server/ ./server/
 # Build frontend (TypeScript compilation + Vite bundle)
 RUN npm run build
 
-# Compile server TypeScript to JavaScript for production
-RUN npx tsc server/index.ts --outDir server-dist --module NodeNext --moduleResolution NodeNext --target ES2022 --esModuleInterop --skipLibCheck
+# Compile server TypeScript to JavaScript using project configuration
+RUN npx tsc --project server/tsconfig.json
 
 # Prune devDependencies for production
 RUN npm prune --omit=dev
@@ -54,6 +54,8 @@ USER appuser
 # Environment variables with sensible defaults
 ENV NODE_ENV=production
 ENV PORT=3000
+# DOT_AI_MCP_URL must be set at runtime to point to the MCP server
+# Example: http://dot-ai:3456 in Kubernetes
 ENV DOT_AI_MCP_URL=http://localhost:8080
 # DOT_AI_AUTH_TOKEN should be set at runtime, not in image
 
