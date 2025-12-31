@@ -187,11 +187,11 @@ interface Card {
 **Success Criteria**: Can fetch visualization data from MCP endpoint
 
 ### Milestone 2: Core Renderers
-- [ ] Implement MermaidRenderer component (mermaid.js integration)
-- [ ] Implement CardRenderer component (grid of cards)
-- [ ] Implement CodeRenderer component (syntax highlighting)
-- [ ] Implement TableRenderer component
-- [ ] Create VisualizationRenderer dispatcher (routes by type)
+- [x] Implement MermaidRenderer component (mermaid.js integration)
+- [x] Implement CardRenderer component (grid of cards)
+- [x] Implement CodeRenderer component (syntax highlighting)
+- [x] Implement TableRenderer component
+- [x] Create VisualizationRenderer dispatcher (routes by type)
 
 **Success Criteria**: Each visualization type renders correctly in isolation
 
@@ -205,7 +205,7 @@ interface Card {
 **Success Criteria**: Full visualization page works end-to-end with mock data
 
 ### Milestone 4: Integration & Polish
-- [ ] Test with live MCP server
+- [x] Test with live MCP server
 - [ ] Responsive design for different screen sizes
 - [ ] Error handling for network failures, expired sessions
 - [ ] Performance optimization (lazy loading mermaid.js)
@@ -269,6 +269,16 @@ Items explicitly not included in this PRD:
 ---
 
 ## Change Log
+
+- **2025-12-31**: Milestone 2 complete - Core Renderers with zoom/pan
+  - Implemented all 4 renderer components: MermaidRenderer, CardRenderer, CodeRenderer, TableRenderer
+  - Created VisualizationRenderer dispatcher for type-based routing
+  - Added mermaid.js and prismjs dependencies
+  - Enhanced MermaidRenderer with zoom controls (25%-300%), pan (drag), and fullscreen mode
+  - Added Prism.js dark theme CSS for syntax highlighting
+  - Integrated renderers into Visualization page
+  - Verified with Playwright testing against live MCP server
+  - Created CLAUDE.md with Playwright testing requirements
 
 - **2025-12-31**: Milestone 3 progress - Tab navigation and backend proxy
   - Implemented TabContainer component for switching between visualizations

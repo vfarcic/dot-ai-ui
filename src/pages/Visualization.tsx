@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { TabContainer } from '@/components/TabContainer'
+import { VisualizationRenderer } from '@/components/renderers'
 import { getVisualization, APIError } from '@/api'
 import type { VisualizationResponse } from '@/types'
 
@@ -84,16 +85,7 @@ export function Visualization() {
 
       <TabContainer
         visualizations={data.visualizations}
-        renderContent={(viz) => (
-          <div className="bg-muted/50 rounded-lg p-4">
-            <div className="text-sm text-muted-foreground mb-2">
-              Type: <code>{viz.type}</code>
-            </div>
-            <pre className="text-xs overflow-auto">
-              {JSON.stringify(viz.content, null, 2)}
-            </pre>
-          </div>
-        )}
+        renderContent={(viz) => <VisualizationRenderer visualization={viz} />}
       />
     </div>
   )
