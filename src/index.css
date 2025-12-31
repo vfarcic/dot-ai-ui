@@ -89,14 +89,16 @@ pre[class*="language-"] {
 }
 
 @theme {
-  --color-background: #0a0a0a;
+  /* Brand colors from devopstoolkit.ai */
+  --color-background: #1a1a1a;
   --color-foreground: #fafafa;
-  --color-muted: #262626;
+  --color-muted: #2D2D2D;
   --color-muted-foreground: #a3a3a3;
-  --color-border: #262626;
-  --color-primary: #3b82f6;
-  --color-primary-foreground: #ffffff;
-  --color-ring: #3b82f6;
+  --color-border: #3d3d3d;
+  --color-primary: #FACB00;
+  --color-primary-foreground: #2D2D2D;
+  --color-ring: #FACB00;
+  --color-header-bg: #2D2D2D;
 }
 
 :root {
@@ -106,7 +108,7 @@ pre[class*="language-"] {
 
   color-scheme: dark;
   color: var(--color-foreground);
-  background-color: var(--color-background);
+  background-color: #1a1a1a;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -118,4 +120,28 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background-color: #1a1a1a;
+}
+
+/* Thin scrollbar for tab containers */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #3d3d3d transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #3d3d3d;
+  border-radius: 2px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: #4d4d4d;
 }

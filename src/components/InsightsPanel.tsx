@@ -11,7 +11,7 @@ export function InsightsPanel({ sessionId, insights }: InsightsPanelProps) {
   const hasInsights = insights && insights.length > 0
 
   return (
-    <div className="bg-muted/50 border border-border rounded-lg mb-6 overflow-hidden">
+    <div className="bg-muted/50 border border-border rounded-lg mb-4 overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-muted/70 transition-colors"

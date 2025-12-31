@@ -5,22 +5,22 @@ interface MermaidRendererProps {
   content: string
 }
 
-// Initialize mermaid with dark theme
+// Initialize mermaid with dark theme matching devopstoolkit.ai brand
 mermaid.initialize({
   startOnLoad: false,
   theme: 'dark',
   themeVariables: {
-    primaryColor: '#3b82f6',
-    primaryTextColor: '#fafafa',
-    primaryBorderColor: '#3b82f6',
+    primaryColor: '#FACB00',
+    primaryTextColor: '#2D2D2D',
+    primaryBorderColor: '#FACB00',
     lineColor: '#a3a3a3',
-    secondaryColor: '#262626',
-    tertiaryColor: '#0a0a0a',
-    background: '#0a0a0a',
-    mainBkg: '#262626',
-    secondBkg: '#0a0a0a',
-    border1: '#262626',
-    border2: '#3b82f6',
+    secondaryColor: '#3d3d3d',
+    tertiaryColor: '#2D2D2D',
+    background: '#1a1a1a',
+    mainBkg: '#3d3d3d',
+    secondBkg: '#2D2D2D',
+    border1: '#4d4d4d',
+    border2: '#FACB00',
     arrowheadColor: '#a3a3a3',
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: '14px',

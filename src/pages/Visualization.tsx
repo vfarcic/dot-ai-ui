@@ -76,8 +76,10 @@ export function Visualization() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-4">{data.title}</h1>
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-3">
+        <h1 className="text-lg font-semibold">{data.title}</h1>
+      </div>
 
       <InsightsPanel sessionId={sessionId!} insights={data.insights} />
 
