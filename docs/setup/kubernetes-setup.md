@@ -151,3 +151,15 @@ helm install dot-ai-ui \
 | `gateway.namespace` | Gateway namespace (for cross-namespace) | `""` |
 | `gateway.create` | Create new Gateway (dev/testing only) | `false` |
 | `gateway.className` | GatewayClass name (when create=true) | `""` |
+| `gateway.annotations` | Annotations for Gateway (when create=true) | `{}` |
+| `gateway.listeners.http.enabled` | Enable HTTP listener on port 80 | `true` |
+| `gateway.listeners.http.hostname` | Hostname for HTTP listener | `""` |
+| `gateway.listeners.https.enabled` | Enable HTTPS listener on port 443 | `false` |
+| `gateway.listeners.https.hostname` | Hostname for HTTPS listener | `""` |
+| `gateway.listeners.https.secretName` | TLS secret name for HTTPS | `""` |
+
+## Additional Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `extraEnv` | Additional environment variables | `[]` |
