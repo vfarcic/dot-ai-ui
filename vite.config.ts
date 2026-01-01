@@ -5,6 +5,7 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
+  envPrefix: 'DOT_AI_',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

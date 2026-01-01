@@ -1,2 +1,1 @@
-export { mcpClient, MCPClient, APIError } from './client'
-export type { APIClientConfig } from './client'
+export { getVisualization, APIError, type ErrorType } from './client'

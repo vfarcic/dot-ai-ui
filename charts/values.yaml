@@ -1,0 +1,75 @@
+# Application image configuration
+image:
+  repository: ghcr.io/vfarcic/dot-ai-ui  # Container image repository
+  tag: "0.1.0"                           # Container image tag - set by CI pipeline during release
+  pullPolicy: IfNotPresent               # Image pull policy
+
+# Resource configuration
+resources:
+  requests:
+    memory: "128Mi"  # Minimum memory required
+    cpu: "50m"       # Minimum CPU required
+  limits:
+    memory: "256Mi"  # Maximum memory allowed
+    cpu: "200m"      # Maximum CPU allowed
+
+# dot-ai MCP server connection
+dotAi:
+  # URL of the dot-ai MCP server API
+  # Required: The Web UI proxies visualization requests to this endpoint
+  url: "http://dot-ai:3456"
+
+  # Authentication configuration
+  auth:
+    # Option 1: Reference existing secret (recommended for production)
+    existingSecret: ""           # Name of existing secret containing auth token
+    existingSecretKey: ""        # Key within the secret (default: "auth-token")
+
+    # Option 2: Let chart create secret (for development/testing)
+    token: ""                    # Auth token value (only if existingSecret is empty)
+
+# Ingress configuration
+# NOTE: Mutually exclusive with gateway - only one can be enabled
+ingress:
+  enabled: false                 # Create Ingress resource
+  className: nginx               # Ingress class name
+  host: dot-ai-ui.127.0.0.1.nip.io  # Ingress hostname
+  annotations: {}                # Additional ingress annotations
+  tls:
+    enabled: false               # Enable TLS/HTTPS
+    secretName: ""               # TLS secret name (generated if empty when enabled)
+    clusterIssuer: ""            # cert-manager ClusterIssuer name (e.g., "letsencrypt")
+
+# Gateway API configuration (Kubernetes 1.26+)
+# NOTE: Mutually exclusive with ingress.enabled - only one can be enabled
+# Requires Gateway API CRDs pre-installed in cluster
+gateway:
+  # Reference mode: Specify name of existing Gateway resource (RECOMMENDED)
+  name: ""                       # Gateway name to reference (e.g., "cluster-gateway")
+
+  # Optional: Gateway namespace for cross-namespace references
+  namespace: ""                  # Gateway namespace (e.g., "gateway-system")
+
+  # Creation mode: Create a new Gateway resource (for development/testing only)
+  create: false                  # Create Gateway resource (false = reference mode)
+
+  # GatewayClass name - REQUIRED when create=true
+  className: ""                  # GatewayClass name (e.g., "istio", "envoy-gateway")
+
+  # Annotations for Gateway (only used when create=true)
+  annotations: {}
+
+  # Listener configuration - only used when create=true
+  listeners:
+    http:
+      enabled: true              # Enable HTTP listener on port 80
+      hostname: ""               # Optional: hostname for HTTP listener
+    https:
+      enabled: false             # Enable HTTPS listener on port 443
+      hostname: ""               # Optional: hostname for HTTPS listener
+      secretName: ""             # TLS secret name
+
+# Additional environment variables (optional)
+extraEnv: []
+  # - name: NODE_ENV
+  #   value: "production"

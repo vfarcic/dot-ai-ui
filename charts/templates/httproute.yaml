@@ -1,0 +1,32 @@
+{{- if or .Values.gateway.name .Values.gateway.create }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "dot-ai-ui.fullname" . }}
+  labels:
+    {{- include "dot-ai-ui.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+  - name: {{ if .Values.gateway.name }}{{ .Values.gateway.name }}{{ else }}{{ include "dot-ai-ui.fullname" . }}-http{{ end }}
+    kind: Gateway
+    {{- if and .Values.gateway.name .Values.gateway.namespace }}
+    namespace: {{ .Values.gateway.namespace }}
+    {{- end }}
+  {{- if or .Values.gateway.listeners.http.hostname .Values.gateway.listeners.https.hostname }}
+  hostnames:
+  {{- if .Values.gateway.listeners.http.hostname }}
+  - {{ .Values.gateway.listeners.http.hostname }}
+  {{- end }}
+  {{- if and .Values.gateway.listeners.https.hostname (ne .Values.gateway.listeners.http.hostname .Values.gateway.listeners.https.hostname) }}
+  - {{ .Values.gateway.listeners.https.hostname }}
+  {{- end }}
+  {{- end }}
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: {{ include "dot-ai-ui.fullname" . }}
+      port: 3000
+{{- end }}

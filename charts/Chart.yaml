@@ -1,0 +1,22 @@
+apiVersion: v2
+name: dot-ai-ui
+description: Web UI visualization companion for dot-ai MCP server - renders Mermaid diagrams, cards, code blocks, and tables
+type: application
+version: "0.1.0"
+appVersion: "0.1.0"
+home: https://github.com/vfarcic/dot-ai-ui
+sources:
+  - https://github.com/vfarcic/dot-ai-ui
+maintainers:
+  - name: Viktor Farcic
+    email: viktor@farcic.com
+keywords:
+  - devops
+  - ai
+  - kubernetes
+  - visualization
+  - mcp
+  - mermaid
+  - web-ui
+annotations:
+  category: Developer Tools
