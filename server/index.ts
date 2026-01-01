@@ -89,8 +89,8 @@ async function createServer() {
     // Production: serve static files
     app.use(express.static(path.join(__dirname, '../dist')))
 
-    // Handle SPA routing
-    app.get('*', staticLimiter, (req, res) => {
+    // Handle SPA routing - catch all unmatched routes
+    app.use(staticLimiter, (_req, res) => {
       res.sendFile(path.join(__dirname, '../dist/index.html'))
     })
   }
