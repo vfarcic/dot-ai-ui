@@ -192,6 +192,8 @@ jobs:
           org.opencontainers.image.licenses=ISC
           org.opencontainers.image.version=${{ needs.version.outputs.new-version }}
         platforms: linux/amd64,linux/arm64
+        cache-from: type=registry,ref=ghcr.io/vfarcic/dot-ai-ui:buildcache
+        cache-to: type=registry,ref=ghcr.io/vfarcic/dot-ai-ui:buildcache,mode=max
 
     - name: Install Helm
       uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
