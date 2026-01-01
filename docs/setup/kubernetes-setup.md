@@ -158,6 +158,33 @@ helm install dot-ai-ui \
 | `gateway.listeners.https.hostname` | Hostname for HTTPS listener | `""` |
 | `gateway.listeners.https.secretName` | TLS secret name for HTTPS | `""` |
 
+### Cloud Provider Considerations
+
+Some cloud providers require additional configuration for Gateway API that cannot be included in the Helm chart due to provider-specific CRDs. Common requirements include:
+
+- **Backend timeouts**: The Web UI proxies requests to the MCP server, which may take time for AI-powered responses. Default gateway timeouts (often 30 seconds) may be insufficient, causing 504 errors on first request or complex queries.
+- **Health check configuration**: Custom health check intervals or thresholds.
+- **Security policies**: WAF rules, rate limiting at the gateway level.
+
+**GKE Example**: Create a `GCPBackendPolicy` to extend the timeout:
+
+```yaml
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: dot-ai-ui
+  namespace: dot-ai
+spec:
+  default:
+    timeoutSec: 3600
+  targetRef:
+    group: ""
+    kind: Service
+    name: dot-ai-ui
+```
+
+Consult your cloud provider's Gateway API documentation for equivalent configurations on other platforms.
+
 ## Additional Configuration
 
 | Parameter | Description | Default |
