@@ -1,4 +1,4 @@
-# dot-ai Web UI
+# DevOps AI Toolkit Web UI
 
 <div align="center">
 
@@ -25,7 +25,7 @@
 
 ## Overview
 
-dot-ai Web UI renders rich visualizations for MCP tool responses that text-based terminals cannot display. It's a visualization companion to your MCP client (Claude Code, Cursor, VS Code), not a replacement.
+DevOps AI Toolkit Web UI renders rich visualizations for MCP tool responses that text-based terminals cannot display. It's a visualization companion to your MCP client, not a replacement.
 
 **Key capabilities:**
 - Mermaid diagrams with zoom, pan, and fullscreen controls
@@ -55,4 +55,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**dot-ai Web UI** - Rich visualizations for AI-powered DevOps workflows.
+**DevOps AI Toolkit Web UI** - Rich visualizations for AI-powered DevOps workflows.

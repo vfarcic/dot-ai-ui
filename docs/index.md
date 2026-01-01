@@ -1,12 +1,12 @@
-# dot-ai Web UI
+# DevOps AI Toolkit Web UI
 
 **Web UI visualization companion for the DevOps AI Toolkit MCP server - renders rich visualizations for MCP tool responses that text-based terminals cannot display.**
 
 ---
 
-## What is dot-ai Web UI?
+## What is DevOps AI Toolkit Web UI?
 
-dot-ai Web UI is a visualization companion to your MCP client. It renders Mermaid diagrams, card grids, code blocks, and tables for MCP tool responses that text-based terminals cannot display effectively.
+DevOps AI Toolkit Web UI is a visualization companion to your MCP client. It renders Mermaid diagrams, card grids, code blocks, and tables for MCP tool responses that text-based terminals cannot display effectively.
 
 Users continue chatting in their preferred MCP client. When MCP responses include visualization URLs, users open them in a browser to see rich visual representations of their data.
 
@@ -103,4 +103,4 @@ helm upgrade dot-ai-mcp oci://ghcr.io/vfarcic/dot-ai/charts/dot-ai:$DOT_AI_VERSI
 
 ---
 
-**dot-ai Web UI** - Rich visualizations for AI-powered DevOps workflows.
+**DevOps AI Toolkit Web UI** - Rich visualizations for AI-powered DevOps workflows.

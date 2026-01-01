@@ -1,6 +1,6 @@
 # Kubernetes Setup Guide
 
-**Deploy dot-ai Web UI to Kubernetes using Helm chart.**
+**Deploy DevOps AI Toolkit Web UI to Kubernetes using Helm chart.**
 
 ## Prerequisites
 
@@ -56,7 +56,7 @@ helm upgrade dot-ai-mcp oci://ghcr.io/vfarcic/dot-ai/charts/dot-ai:$DOT_AI_VERSI
 
 ### Step 4: Verify Installation
 
-Open your browser and navigate to the Web UI hostname. You should see the dot-ai Web UI home page.
+Open your browser and navigate to the Web UI hostname. You should see the DevOps AI Toolkit Web UI home page.
 
 ## Configuration Reference
 
