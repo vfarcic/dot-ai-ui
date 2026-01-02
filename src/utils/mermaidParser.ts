@@ -130,12 +130,32 @@ export function parseSubgraphs(code: string): ParsedSubgraph[] {
     }
 
     // Check for subgraph start
-    // Patterns: "subgraph id[label]", "subgraph id [label]", "subgraph id"
-    const subgraphMatch = trimmedLine.match(/^subgraph\s+(\w+)(?:\s*\[([^\]]*)\])?/)
+    // Patterns:
+    // 1. "subgraph id[label]" or "subgraph id [label]" - id with bracket label
+    // 2. "subgraph id" - id only
+    // 3. "subgraph "label"" - quoted label (label becomes sanitized id)
+    const subgraphMatchId = trimmedLine.match(/^subgraph\s+(\w+)(?:\s*\[([^\]]*)\])?/)
+    const subgraphMatchQuoted = trimmedLine.match(/^subgraph\s+"([^"]+)"/)
+
+    const subgraphMatch = subgraphMatchId || subgraphMatchQuoted
 
     if (subgraphMatch) {
-      const id = subgraphMatch[1]
-      const label = subgraphMatch[2] || id // Use id as label if not specified
+      let id: string
+      let label: string
+
+      if (subgraphMatchQuoted && !subgraphMatchId) {
+        // Quoted label pattern: subgraph "Label Text"
+        label = subgraphMatchQuoted[1]
+        // Generate ID from label by sanitizing (remove spaces, special chars)
+        id = label.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+      } else if (subgraphMatchId) {
+        // ID-based pattern: subgraph id[label] or subgraph id
+        id = subgraphMatchId[1]
+        label = subgraphMatchId[2] || id
+      } else {
+        currentIndex += line.length + 1
+        continue
+      }
       const depth = stack.length
       const parentId = stack.length > 0 ? stack[stack.length - 1].id : null
 
@@ -308,6 +328,35 @@ export function extractEdges(code: string): ParsedEdge[] {
 }
 
 /**
+ * Find the outermost collapsed ancestor for a subgraph
+ */
+function findOutermostCollapsedAncestor(
+  parsed: ParsedMermaid,
+  subgraphId: string,
+  collapsedIds: Set<string>
+): string | null {
+  const subgraph = parsed.subgraphs.find(sg => sg.id === subgraphId)
+  if (!subgraph) return null
+
+  // Walk up the parent chain to find the outermost collapsed ancestor
+  let current: ParsedSubgraph | undefined = subgraph
+  let outermostCollapsed: string | null = null
+
+  while (current) {
+    if (collapsedIds.has(current.id)) {
+      outermostCollapsed = current.id
+    }
+    if (current.parentId) {
+      current = parsed.subgraphs.find(sg => sg.id === current!.parentId)
+    } else {
+      break
+    }
+  }
+
+  return outermostCollapsed
+}
+
+/**
  * Get all node IDs that are hidden (inside collapsed subgraphs)
  */
 export function getHiddenNodes(
@@ -335,9 +384,14 @@ export function getHiddenNodes(
     }
   }
 
-  // Process each collapsed subgraph
+  // Process each collapsed subgraph, but only if it doesn't have a collapsed parent
+  // (nested collapsed subgraphs are handled by their parent's collapse)
   for (const collapsedId of collapsedIds) {
-    collectNodes(collapsedId, collapsedId)
+    const outermostAncestor = findOutermostCollapsedAncestor(parsed, collapsedId, collapsedIds)
+    // Only process top-level collapsed subgraphs (those that are their own outermost ancestor)
+    if (outermostAncestor === collapsedId) {
+      collectNodes(collapsedId, collapsedId)
+    }
   }
 
   return hiddenNodes
@@ -383,10 +437,23 @@ export function generateCollapsedCode(
       continue
     }
 
-    // Check for subgraph start
-    const subgraphMatch = trimmed.match(/^subgraph\s+(\w+)/)
-    if (subgraphMatch) {
-      const subgraphId = subgraphMatch[1]
+    // Check for subgraph start - handle both syntaxes
+    const subgraphMatchId = trimmed.match(/^subgraph\s+(\w+)/)
+    const subgraphMatchQuoted = trimmed.match(/^subgraph\s+"([^"]+)"/)
+
+    if (subgraphMatchId || subgraphMatchQuoted) {
+      let subgraphId: string
+
+      if (subgraphMatchQuoted && !subgraphMatchId) {
+        // Quoted label: generate ID from label
+        const label = subgraphMatchQuoted[1]
+        subgraphId = label.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+      } else if (subgraphMatchId) {
+        subgraphId = subgraphMatchId[1]
+      } else {
+        lines.push(line)
+        continue
+      }
 
       if (inCollapsedSubgraph) {
         // We're inside a collapsed subgraph, track depth but skip content
@@ -395,13 +462,23 @@ export function generateCollapsedCode(
       }
 
       if (collapsedIds.has(subgraphId)) {
-        // This subgraph is collapsed - emit placeholder and skip content
+        // Check if this collapsed subgraph has a collapsed parent
         const subgraph = parsed.subgraphs.find(sg => sg.id === subgraphId)
-        if (subgraph) {
-          const nodeCount = countSubgraphNodes(parsed, subgraphId)
-          const placeholder = `    ${subgraphId}[["▶ ${subgraph.label} (${nodeCount} items)"]]`
-          lines.push(placeholder)
+        const outermostAncestor = findOutermostCollapsedAncestor(parsed, subgraphId, collapsedIds)
+
+        if (outermostAncestor === subgraphId) {
+          // This is a top-level collapsed subgraph - emit placeholder
+          if (subgraph) {
+            const nodeCount = countSubgraphNodes(parsed, subgraphId)
+            // Use simple rectangle shape to avoid Mermaid parse errors
+            // Escape quotes in label to prevent syntax issues
+            const safeLabel = subgraph.label.replace(/"/g, "'")
+            const itemText = nodeCount === 1 ? '1 item' : `${nodeCount} items`
+            const placeholder = `    ${subgraphId}["▶ ${safeLabel} • ${itemText}"]`
+            lines.push(placeholder)
+          }
         }
+        // Either way, skip the content
         inCollapsedSubgraph = true
         collapsedDepth = 1
         continue

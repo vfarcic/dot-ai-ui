@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import mermaid from 'mermaid'
+import { parseMermaid, generateCollapsedCode, type ParsedMermaid } from '../../utils/mermaidParser'
 
 interface MermaidRendererProps {
   content: string
@@ -46,25 +47,80 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [isFullscreen, setIsFullscreen] = useState(false)
 
+  // Collapsible subgraphs state
+  const [collapsedSubgraphs, setCollapsedSubgraphs] = useState<Set<string>>(new Set())
+
+  // Parse Mermaid content to extract subgraph structure
+  const parsedMermaid = useMemo<ParsedMermaid>(() => {
+    return parseMermaid(content)
+  }, [content])
+
+  // Initialize collapsed state when content changes (all subgraphs collapsed by default)
+  useEffect(() => {
+    if (parsedMermaid.type === 'flowchart' && parsedMermaid.subgraphs.length > 0) {
+      const allSubgraphIds = new Set(parsedMermaid.subgraphs.map(sg => sg.id))
+      setCollapsedSubgraphs(allSubgraphIds)
+    } else {
+      setCollapsedSubgraphs(new Set())
+    }
+  }, [parsedMermaid])
+
+  // Generate display code based on collapsed state
+  const displayCode = useMemo(() => {
+    if (parsedMermaid.type !== 'flowchart' || collapsedSubgraphs.size === 0) {
+      return content
+    }
+    return generateCollapsedCode(parsedMermaid, collapsedSubgraphs)
+  }, [content, parsedMermaid, collapsedSubgraphs])
+
+  // Toggle a subgraph's collapsed state (exported for M4 click handling)
+  const toggleSubgraph = useCallback((subgraphId: string) => {
+    setCollapsedSubgraphs(prev => {
+      const next = new Set(prev)
+      if (next.has(subgraphId)) {
+        next.delete(subgraphId)
+      } else {
+        next.add(subgraphId)
+      }
+      return next
+    })
+  }, [])
+
+  // Expose toggleSubgraph for external use (M4 will wire up click handlers)
+  // Store in window for debugging/testing purposes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as unknown as Record<string, unknown>).__mermaidToggleSubgraph = toggleSubgraph
+    }
+  }, [toggleSubgraph])
+
+  // Track previous content to know when to reset zoom/pan
+  const prevContentRef = useRef<string>(content)
+
   useEffect(() => {
     async function renderDiagram() {
-      if (!svgContainerRef.current || !content) return
+      if (!svgContainerRef.current || !displayCode) return
 
       setIsRendering(true)
       setError(null)
 
       try {
         const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`
-        await mermaid.parse(content)
-        const { svg } = await mermaid.render(id, content)
+        await mermaid.parse(displayCode)
+        const { svg, bindFunctions } = await mermaid.render(id, displayCode)
 
         if (svgContainerRef.current) {
           svgContainerRef.current.innerHTML = svg
+          // Call bindFunctions if available (enables click callbacks in M4)
+          bindFunctions?.(svgContainerRef.current)
         }
 
-        // Reset zoom/pan when content changes
-        setZoom(1)
-        setPan({ x: 0, y: 0 })
+        // Only reset zoom/pan when the original content changes, not on collapse/expand
+        if (prevContentRef.current !== content) {
+          setZoom(1)
+          setPan({ x: 0, y: 0 })
+          prevContentRef.current = content
+        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to render diagram'
         setError(errorMessage)
@@ -75,7 +131,7 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     }
 
     renderDiagram()
-  }, [content])
+  }, [displayCode, content])
 
   const handleZoomIn = useCallback(() => {
     setZoom(z => Math.min(z + ZOOM_STEP, MAX_ZOOM))

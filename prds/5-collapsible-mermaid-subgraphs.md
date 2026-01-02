@@ -151,7 +151,7 @@ bindFunctions?.(element)
 
 - [x] **M1: Subgraph Parser** - Parse flowchart Mermaid code to extract subgraph structure (IDs, labels, contained nodes, edges)
 - [x] **M2: Collapsed Code Generator** - Generate modified Mermaid code with collapsed subgraphs replaced by placeholder nodes
-- [ ] **M3: State Management & Re-render** - Implement collapse state tracking and re-render flow with `bindFunctions()`
+- [x] **M3: State Management & Re-render** - Implement collapse state tracking and re-render flow with `bindFunctions()`
 - [ ] **M4: Click Interaction** - Add click handlers to expand/collapse subgraphs with visual indicators (▶/▼)
 - [ ] **M5: Edge Case Handling** - Handle nested subgraphs, edges to/from subgraphs, and various flowchart syntax patterns
 - [ ] **M6: Testing & Polish** - Test with real MCP outputs, ensure no regression in existing functionality
@@ -165,6 +165,7 @@ bindFunctions?.(element)
 | 2026-01-01 | PRD Created | Initial PRD based on research into Mermaid interactivity options |
 | 2026-01-02 | M1: Subgraph Parser | Created `src/utils/mermaidParser.ts` with full parsing capabilities for flowchart subgraphs |
 | 2026-01-02 | M2: Collapsed Code Generator | Added `extractEdges()`, `getHiddenNodes()`, and `generateCollapsedCode()` functions for generating collapsed Mermaid code |
+| 2026-01-02 | M3: State Management & Re-render | Integrated parser into `MermaidRenderer.tsx` with collapse state tracking, memoized parsing, and re-render flow using `bindFunctions()`. Extended parser to support quoted label syntax. |
 
 ---
 
