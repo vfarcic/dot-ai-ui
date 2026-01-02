@@ -153,7 +153,7 @@ bindFunctions?.(element)
 - [x] **M2: Collapsed Code Generator** - Generate modified Mermaid code with collapsed subgraphs replaced by placeholder nodes
 - [x] **M3: State Management & Re-render** - Implement collapse state tracking and re-render flow with `bindFunctions()`
 - [x] **M4: Click Interaction** - Add click handlers to expand/collapse subgraphs with visual indicators (▶/▼)
-- [ ] **M5: Edge Case Handling** - Handle nested subgraphs, edges to/from subgraphs, and various flowchart syntax patterns
+- [x] **M5: Edge Case Handling** - Handle nested subgraphs, edges to/from subgraphs, and various flowchart syntax patterns
 - [ ] **M6: Testing & Polish** - Test with real MCP outputs, ensure no regression in existing functionality
 
 ---
@@ -167,6 +167,8 @@ bindFunctions?.(element)
 | 2026-01-02 | M2: Collapsed Code Generator | Added `extractEdges()`, `getHiddenNodes()`, and `generateCollapsedCode()` functions for generating collapsed Mermaid code |
 | 2026-01-02 | M3: State Management & Re-render | Integrated parser into `MermaidRenderer.tsx` with collapse state tracking, memoized parsing, and re-render flow using `bindFunctions()`. Extended parser to support quoted label syntax. |
 | 2026-01-02 | M4: Click Interaction | Added Mermaid `click` directives for collapsed placeholders, registered `__mermaidToggle` callback with `securityLevel: 'loose'`, implemented `attachExpandedSubgraphHandlers()` matching clusters by label text (Mermaid uses generic IDs), added ▶/▼ visual indicators, CSS hover states, and fixed foreignObject width for title truncation. |
+| 2026-01-02 | M5: Edge Case Handling | Implemented chained edges (`A --> B --> C`), parallel edges (`A & B --> C`), text on arrows (`A -- text --> B`), additional node shapes (stadium, cylinder, hexagon, trapezoid, double-circle), direction directive preservation, linkStyle passthrough, edge deduplication. Fixed quoted-label subgraph matching for expand/collapse handlers. |
+| 2026-01-02 | UX: Pulse Animation | Added periodic golden glow pulse animation for collapsed subgraph placeholders to help users discover the interactive expand/collapse feature. Pulses twice every 6 seconds using brand primary color. |
 
 ---
 

@@ -39,8 +39,36 @@ export function getFlowchartDirection(code: string): string {
 }
 
 /**
+ * Keywords to exclude from node ID extraction
+ */
+const MERMAID_KEYWORDS = new Set([
+  'subgraph', 'end', 'graph', 'flowchart', 'direction',
+  'style', 'class', 'click', 'linkStyle', 'classDef',
+  'td', 'tb', 'bt', 'lr', 'rl', 'dt'
+])
+
+/**
+ * Check if a string is a Mermaid keyword
+ */
+function isMermaidKeyword(str: string): boolean {
+  return MERMAID_KEYWORDS.has(str.toLowerCase())
+}
+
+/**
  * Extract node IDs from a block of Mermaid content.
- * Matches various node shapes: [], (), {}, (()), [[]], etc.
+ * Matches various node shapes including:
+ * - Rectangle: A[text]
+ * - Rounded: B(text)
+ * - Stadium: C([text])
+ * - Subroutine: D[[text]]
+ * - Cylinder/Database: E[(text)]
+ * - Circle: F((text))
+ * - Asymmetric: G>text]
+ * - Rhombus: H{text}
+ * - Hexagon: I{{text}}
+ * - Parallelogram: J[/text/], K[\text\]
+ * - Trapezoid: L[/text\], M[\text/]
+ * - Double circle: N(((text)))
  */
 export function extractNodeIds(content: string): string[] {
   const nodeIds: string[] = []
@@ -48,50 +76,51 @@ export function extractNodeIds(content: string): string[] {
   // Remove comments
   const withoutComments = content.replace(/%%.*$/gm, '')
 
-  // Match node definitions with various shapes
-  // Patterns: A[text], B(text), C{text}, D((text)), E[[text]], F>text], G{{text}}
+  // Comprehensive node shape patterns
+  // Order matters - more specific patterns first
   const nodePatterns = [
-    /(\w+)\s*\[(?:[^\[\]]|\[[^\]]*\])*\]/g,     // A[text] or A[[text]]
-    /(\w+)\s*\((?:[^()]|\([^)]*\))*\)/g,        // B(text) or B((text))
-    /(\w+)\s*\{(?:[^{}]|\{[^}]*\})*\}/g,        // C{text} or C{{text}}
-    /(\w+)\s*>\s*[^\]]+\]/g,                     // D>text]
+    // Triple parentheses: (((text))) - double circle
+    /(\w+)\s*\(\(\([^)]*\)\)\)/g,
+    // Double brackets with special chars: [/text/], [\text\], [/text\], [\text/]
+    /(\w+)\s*\[[\\/][^\]]*[\\/]\]/g,
+    // Double square brackets: [[text]] - subroutine
+    /(\w+)\s*\[\[[^\]]*\]\]/g,
+    // Stadium shape: ([text])
+    /(\w+)\s*\(\[[^\]]*\]\)/g,
+    // Cylinder/database: [(text)]
+    /(\w+)\s*\[\([^)]*\)\]/g,
+    // Double curly: {{text}} - hexagon
+    /(\w+)\s*\{\{[^}]*\}\}/g,
+    // Double parentheses: ((text)) - circle
+    /(\w+)\s*\(\([^)]*\)\)/g,
+    // Single brackets with nested (handles complex content)
+    /(\w+)\s*\[(?:[^\[\]]|\[[^\]]*\])*\]/g,
+    // Single parentheses
+    /(\w+)\s*\((?:[^()]|\([^)]*\))*\)/g,
+    // Single curly: {text} - rhombus
+    /(\w+)\s*\{(?:[^{}]|\{[^}]*\})*\}/g,
+    // Asymmetric: >text]
+    /(\w+)\s*>\s*[^\]]+\]/g,
   ]
 
   for (const pattern of nodePatterns) {
     let match
     while ((match = pattern.exec(withoutComments)) !== null) {
       const nodeId = match[1]
-      // Exclude keywords
-      if (!['subgraph', 'end', 'graph', 'flowchart', 'direction', 'style', 'class', 'click', 'linkStyle'].includes(nodeId.toLowerCase())) {
-        if (!nodeIds.includes(nodeId)) {
-          nodeIds.push(nodeId)
-        }
-      }
-    }
-  }
-
-  // Also match nodes that appear in edges without explicit shape definition
-  // e.g., A --> B where B might not have a shape defined yet
-  const edgePattern = /(\w+)\s*(?:-->|---|-\.-|===|--[^>]|-.->|\s*--\s*[^>])/g
-  let edgeMatch
-  while ((edgeMatch = edgePattern.exec(withoutComments)) !== null) {
-    const nodeId = edgeMatch[1]
-    if (!['subgraph', 'end', 'graph', 'flowchart', 'direction', 'style', 'class', 'click', 'linkStyle'].includes(nodeId.toLowerCase())) {
-      if (!nodeIds.includes(nodeId)) {
+      if (!isMermaidKeyword(nodeId) && !nodeIds.includes(nodeId)) {
         nodeIds.push(nodeId)
       }
     }
   }
 
-  // Match target of edges: --> B or --> B[text]
-  const targetPattern = /(?:-->|---|-\.-|===|-.->)\s*(?:\|[^|]*\|\s*)?(\w+)/g
-  let targetMatch
-  while ((targetMatch = targetPattern.exec(withoutComments)) !== null) {
-    const nodeId = targetMatch[1]
-    if (!['subgraph', 'end', 'graph', 'flowchart', 'direction', 'style', 'class', 'click', 'linkStyle'].includes(nodeId.toLowerCase())) {
-      if (!nodeIds.includes(nodeId)) {
-        nodeIds.push(nodeId)
-      }
+  // Extract nodes from edges (handles nodes without explicit shape definition)
+  const edges = extractEdges(withoutComments)
+  for (const edge of edges) {
+    if (!isMermaidKeyword(edge.source) && !nodeIds.includes(edge.source)) {
+      nodeIds.push(edge.source)
+    }
+    if (!isMermaidKeyword(edge.target) && !nodeIds.includes(edge.target)) {
+      nodeIds.push(edge.target)
     }
   }
 
@@ -291,15 +320,52 @@ export interface ParsedEdge {
 }
 
 /**
+ * Arrow patterns for Mermaid edges
+ * Ordered by specificity (longer patterns first to avoid partial matches)
+ */
+const ARROW_PATTERNS = [
+  // Bidirectional
+  '<-->',
+  'o--o',
+  'x--x',
+  // Thick arrows
+  '==>',
+  '===',
+  // Dotted arrows with text: -. text .->
+  '-\\.\\s*[^.]+\\s*\\.->',
+  '-\\.\\s*[^.]+\\s*\\.-',
+  // Dotted arrows
+  '-.->',
+  '-.-',
+  // Standard arrows with text: -- text -->
+  '--\\s*[^-]+\\s*-->',
+  '--\\s*[^-]+\\s*---',
+  // Circle/cross ends
+  '--o',
+  '--x',
+  'o--',
+  'x--',
+  // Standard arrows
+  '-->',
+  '---',
+]
+
+// Build regex pattern for arrows (escape special chars for non-text patterns)
+const ARROW_REGEX_PART = ARROW_PATTERNS.map(p => {
+  // Patterns with \s already have regex, use as-is
+  if (p.includes('\\s')) return `(${p})`
+  // Escape special regex chars
+  return `(${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`
+}).join('|')
+
+/**
  * Extract all edges from Mermaid flowchart code
+ * Handles: simple edges, chained edges (A --> B --> C), parallel edges (A & B --> C),
+ * and text on arrows (A -- text --> B)
  */
 export function extractEdges(code: string): ParsedEdge[] {
   const edges: ParsedEdge[] = []
   const lines = code.split('\n')
-
-  // Edge patterns to match various Mermaid arrow styles
-  // Pattern: source ARROW target or source ARROW|label| target
-  const edgeRegex = /^\s*(\w+)\s*(-->|---|-\.->|-\.-|==>|===|--[ox]|o--o|x--x|<-->)\s*(?:\|([^|]*)\|\s*)?(\w+)/
 
   for (const line of lines) {
     const trimmed = line.trim()
@@ -308,23 +374,176 @@ export function extractEdges(code: string): ParsedEdge[] {
     if (trimmed.startsWith('%%') ||
         trimmed.startsWith('subgraph') ||
         trimmed === 'end' ||
-        trimmed.match(/^(graph|flowchart)\s+/i)) {
+        trimmed.match(/^(graph|flowchart)\s+/i) ||
+        trimmed.match(/^(style|class|click|linkStyle)\s+/i) ||
+        trimmed.match(/^direction\s+/i)) {
       continue
     }
 
-    const match = trimmed.match(edgeRegex)
-    if (match) {
+    // Parse edges from this line
+    const lineEdges = parseEdgeLine(trimmed, line)
+    edges.push(...lineEdges)
+  }
+
+  return edges
+}
+
+/**
+ * Parse a single line for edges, handling chains and parallel syntax
+ */
+function parseEdgeLine(trimmed: string, originalLine: string): ParsedEdge[] {
+  const edges: ParsedEdge[] = []
+
+  // Handle parallel sources: A & B --> C
+  // Split on & but only outside of brackets/quotes
+  const parallelMatch = trimmed.match(/^([\w\s&]+?)\s*(-->|---|-\.->|-\.-|==>|===|--[ox]|o--o|x--x|<-->|-\.[^.]+\.->|--[^-]+-->)\s*(?:\|([^|]*)\|\s*)?([\w\[\](){}'"<>\s&]+)$/)
+
+  if (parallelMatch) {
+    const sourcePart = parallelMatch[1]
+    const style = normalizeArrowStyle(parallelMatch[2])
+    const label = parallelMatch[3] || extractArrowText(parallelMatch[2])
+    const targetPart = parallelMatch[4]
+
+    // Split sources by &
+    const sources = sourcePart.split('&').map(s => extractNodeId(s.trim())).filter(Boolean)
+    // Split targets by & (for A --> B & C syntax)
+    const targets = targetPart.split('&').map(t => extractNodeId(t.trim())).filter(Boolean)
+
+    // Create edges for all combinations
+    for (const source of sources) {
+      for (const target of targets) {
+        if (source && target) {
+          edges.push({ source, target, label, style, originalLine })
+        }
+      }
+    }
+
+    return edges
+  }
+
+  // Handle chained edges: A --> B --> C
+  // Find all nodes and arrows in sequence
+  const chainedEdges = parseChainedEdges(trimmed, originalLine)
+  if (chainedEdges.length > 0) {
+    return chainedEdges
+  }
+
+  // Simple single edge fallback
+  const simpleEdgeRegex = new RegExp(
+    `^\\s*(\\w+)\\s*(?:${ARROW_REGEX_PART})\\s*(?:\\|([^|]*)\\|\\s*)?(\\w+)`
+  )
+  const simpleMatch = trimmed.match(simpleEdgeRegex)
+  if (simpleMatch) {
+    const source = simpleMatch[1]
+    // Find which arrow group matched
+    let style = ''
+    let labelFromArrow = ''
+    for (let i = 2; i < simpleMatch.length - 2; i++) {
+      if (simpleMatch[i]) {
+        const arrowText = simpleMatch[i]
+        labelFromArrow = extractArrowText(arrowText)
+        style = normalizeArrowStyle(arrowText)
+        break
+      }
+    }
+    const pipeLabel = simpleMatch[simpleMatch.length - 2]
+    const target = simpleMatch[simpleMatch.length - 1]
+
+    edges.push({
+      source,
+      target,
+      label: pipeLabel || labelFromArrow || undefined,
+      style: style || '-->',
+      originalLine,
+    })
+  }
+
+  return edges
+}
+
+/**
+ * Parse chained edges like A --> B --> C --> D
+ */
+function parseChainedEdges(line: string, originalLine: string): ParsedEdge[] {
+  const edges: ParsedEdge[] = []
+
+  // Regex to split by arrows while capturing them
+  const arrowRegex = /(-->|---|-\.->|-\.-|==>|===|--[ox]|o--o|x--x|<-->|-\.[^.]+\.->|--[^-]+-->)/g
+
+  // Split the line by arrows
+  const parts = line.split(arrowRegex)
+
+  // Need at least 3 parts for a chain: [node, arrow, node]
+  if (parts.length < 3) return []
+
+  // Process pairs: node, arrow, node, arrow, node, ...
+  for (let i = 0; i < parts.length - 2; i += 2) {
+    const sourcePart = parts[i].trim()
+    const arrow = parts[i + 1]
+    const targetPart = parts[i + 2].trim()
+
+    // Extract node IDs (handle node definitions like A[text])
+    const source = extractNodeId(sourcePart)
+    const target = extractNodeId(targetPart)
+
+    // Check for pipe label after arrow: --> |label| target
+    let label = extractArrowText(arrow)
+    const pipeMatch = targetPart.match(/^\|([^|]*)\|\s*(\w+)/)
+    if (pipeMatch) {
+      label = pipeMatch[1]
+    }
+
+    if (source && target) {
       edges.push({
-        source: match[1],
-        target: match[4],
-        label: match[3] || undefined,
-        style: match[2],
-        originalLine: line,
+        source,
+        target,
+        label: label || undefined,
+        style: normalizeArrowStyle(arrow),
+        originalLine,
       })
     }
   }
 
   return edges
+}
+
+/**
+ * Extract node ID from a node definition (handles A, A[text], A(text), etc.)
+ */
+function extractNodeId(nodePart: string): string {
+  // Remove leading pipe label if present: |label| nodeId
+  const withoutPipeLabel = nodePart.replace(/^\|[^|]*\|\s*/, '')
+
+  // Match node ID at start, before any shape brackets
+  const match = withoutPipeLabel.match(/^(\w+)/)
+  return match ? match[1] : ''
+}
+
+/**
+ * Extract text from arrow with embedded text (-- text --> or -. text .->)
+ */
+function extractArrowText(arrow: string): string {
+  // Match -- text --> pattern
+  const dashMatch = arrow.match(/^--\s*(.+?)\s*-->$/)
+  if (dashMatch) return dashMatch[1]
+
+  // Match -. text .-> pattern
+  const dotMatch = arrow.match(/^-\.\s*(.+?)\s*\.->$/)
+  if (dotMatch) return dotMatch[1]
+
+  return ''
+}
+
+/**
+ * Normalize arrow style to standard form (remove embedded text)
+ */
+function normalizeArrowStyle(arrow: string): string {
+  // Convert text arrows to standard form
+  if (arrow.match(/^--\s*.+\s*-->$/)) return '-->'
+  if (arrow.match(/^--\s*.+\s*---$/)) return '---'
+  if (arrow.match(/^-\.\s*.+\s*\.->$/)) return '-.->'
+  if (arrow.match(/^-\.\s*.+\s*\.-$/)) return '-.-'
+  return arrow
 }
 
 /**
@@ -519,29 +738,61 @@ export function generateCollapsedCode(
       continue
     }
 
-    // Handle edges - rewrite if needed
-    const edgeMatch = trimmed.match(/^\s*(\w+)\s*(-->|---|-\.->|-\.-|==>|===|--[ox]|o--o|x--x|<-->)\s*(?:\|([^|]*)\|\s*)?(\w+)/)
-    if (edgeMatch) {
-      const source = edgeMatch[1]
-      const style = edgeMatch[2]
-      const label = edgeMatch[3]
-      const target = edgeMatch[4]
+    // Preserve direction directives (e.g., direction LR inside subgraphs)
+    if (trimmed.match(/^direction\s+(TD|TB|BT|LR|RL|DT)/i)) {
+      lines.push(line)
+      continue
+    }
 
-      const newSource = hiddenNodes.get(source) || source
-      const newTarget = hiddenNodes.get(target) || target
+    // Handle linkStyle directives - filter if they target hidden edges
+    const linkStyleMatch = trimmed.match(/^linkStyle\s+(\d+(?:\s*,\s*\d+)*)\s+/)
+    if (linkStyleMatch) {
+      // linkStyle uses edge indices - we'd need to track edge indices to filter properly
+      // For now, pass through linkStyle as the edge indices may shift anyway
+      // TODO: Future enhancement - track edge indices and filter appropriately
+      lines.push(line)
+      continue
+    }
 
-      // Skip edges where both ends are in the same collapsed subgraph
-      if (hiddenNodes.has(source) && hiddenNodes.has(target)) {
-        const sourceParent = hiddenNodes.get(source)
-        const targetParent = hiddenNodes.get(target)
-        if (sourceParent === targetParent) {
-          continue // Internal edge, skip it
+    // Handle edges - rewrite if needed (supports chained, parallel, and text arrows)
+    const lineEdges = parseEdgeLine(trimmed, line)
+    if (lineEdges.length > 0) {
+      // Process each edge from this line
+      const rewrittenEdges: ParsedEdge[] = []
+
+      for (const edge of lineEdges) {
+        const newSource = hiddenNodes.get(edge.source) || edge.source
+        const newTarget = hiddenNodes.get(edge.target) || edge.target
+
+        // Skip edges where both ends are in the same collapsed subgraph
+        if (hiddenNodes.has(edge.source) && hiddenNodes.has(edge.target)) {
+          const sourceParent = hiddenNodes.get(edge.source)
+          const targetParent = hiddenNodes.get(edge.target)
+          if (sourceParent === targetParent) {
+            continue // Internal edge, skip it
+          }
+        }
+
+        // Check for duplicate edges (same source->target already added)
+        const isDuplicate = rewrittenEdges.some(
+          e => e.source === newSource && e.target === newTarget
+        )
+        if (!isDuplicate) {
+          rewrittenEdges.push({
+            source: newSource,
+            target: newTarget,
+            label: edge.label,
+            style: edge.style,
+            originalLine: edge.originalLine,
+          })
         }
       }
 
-      // Reconstruct edge with potentially new source/target
-      const labelPart = label ? `|${label}| ` : ''
-      lines.push(`    ${newSource} ${style} ${labelPart}${newTarget}`)
+      // Emit rewritten edges
+      for (const edge of rewrittenEdges) {
+        const labelPart = edge.label ? `|${edge.label}| ` : ''
+        lines.push(`    ${edge.source} ${edge.style} ${labelPart}${edge.target}`)
+      }
       continue
     }
 
@@ -559,6 +810,14 @@ export function generateCollapsedCode(
     const styleMatch = trimmed.match(/^(style|class)\s+(\w+)/)
     if (styleMatch && hiddenNodes.has(styleMatch[2])) {
       continue // Skip styles for hidden nodes
+    }
+
+    // Check for classDef targeting hidden nodes
+    const classDefMatch = trimmed.match(/^classDef\s+(\w+)/)
+    if (classDefMatch) {
+      // classDef defines a class, always pass through
+      lines.push(line)
+      continue
     }
 
     lines.push(line)

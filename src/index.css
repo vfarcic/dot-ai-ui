@@ -180,3 +180,28 @@ body {
 .mermaid-collapsible-header:hover text {
   text-decoration-color: currentColor;
 }
+
+/* Pulse animation for collapsed subgraphs - repeats periodically */
+@keyframes mermaid-glow {
+  /* Pulse twice (0-24%), then pause (24-100%) */
+  0% {
+    filter: drop-shadow(0 0 2px rgba(250, 203, 0, 0));
+  }
+  6% {
+    filter: drop-shadow(0 0 10px rgba(250, 203, 0, 0.7));
+  }
+  12% {
+    filter: drop-shadow(0 0 2px rgba(250, 203, 0, 0));
+  }
+  18% {
+    filter: drop-shadow(0 0 10px rgba(250, 203, 0, 0.7));
+  }
+  24%, 100% {
+    filter: drop-shadow(0 0 2px rgba(250, 203, 0, 0));
+  }
+}
+
+.mermaid-collapsed-pulse rect,
+.mermaid-collapsed-pulse polygon {
+  animation: mermaid-glow 6s ease-in-out infinite;
+}

@@ -122,15 +122,27 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
       // Match cluster by label text since Mermaid uses generic IDs (subGraph0, subGraph1, etc.)
       let matchedCluster: Element | null = null
 
-      for (const cluster of clusters) {
-        const labelSpan = cluster.querySelector('.cluster-label foreignObject span') ||
-                          cluster.querySelector('.cluster-label text')
-        const labelText = labelSpan?.textContent?.replace(/^▼\s*/, '') || ''
+      // Normalize label for comparison (strip quotes, trim whitespace)
+      const normalizeLabel = (text: string) =>
+        text.replace(/^▼\s*/, '').replace(/^['"]|['"]$/g, '').trim()
 
-        // Match by label (handle both exact match and quoted labels)
-        if (labelText === subgraph.label ||
-            labelText === `'${subgraph.label}'` ||
-            labelText.replace(/^'|'$/g, '') === subgraph.label) {
+      const normalizedSubgraphLabel = normalizeLabel(subgraph.label)
+
+      for (const cluster of clusters) {
+        // Try multiple selectors - Mermaid structure varies by diagram complexity
+        const labelSpan = cluster.querySelector('.cluster-label foreignObject span') ||
+                          cluster.querySelector('.cluster-label text') ||
+                          cluster.querySelector('.cluster-label p') ||
+                          cluster.querySelector('.nodeLabel') ||
+                          cluster.querySelector('text')
+
+        if (!labelSpan) continue
+
+        const labelText = labelSpan.textContent || ''
+        const normalizedLabelText = normalizeLabel(labelText)
+
+        // Match by normalized label (handles quotes, indicators, whitespace)
+        if (normalizedLabelText === normalizedSubgraphLabel) {
           matchedCluster = cluster
           break
         }
@@ -138,13 +150,20 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
 
       if (!matchedCluster) continue
 
-      const clusterLabel = matchedCluster.querySelector('.cluster-label')
-      if (!clusterLabel) continue
+      // Find cluster label - try multiple selectors for different Mermaid structures
+      let clusterLabel = matchedCluster.querySelector('.cluster-label')
+
+      // If no .cluster-label, use the cluster itself as the clickable area
+      if (!clusterLabel) {
+        clusterLabel = matchedCluster
+      }
 
       // Find the span with the label text and the foreignObject container
       const foreignObject = clusterLabel.querySelector('foreignObject')
       const labelSpan = clusterLabel.querySelector('foreignObject span') ||
-                        clusterLabel.querySelector('text')
+                        clusterLabel.querySelector('.cluster-label text') ||
+                        clusterLabel.querySelector('text') ||
+                        clusterLabel.querySelector('p')
 
       if (labelSpan) {
         const labelText = labelSpan.textContent || ''
@@ -177,6 +196,19 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     }
   }, [parsedMermaid, collapsedSubgraphs, toggleSubgraph])
 
+  // Apply pulse animation to collapsed placeholder nodes
+  const applyPulseToCollapsedNodes = useCallback((container: HTMLElement) => {
+    if (parsedMermaid.type !== 'flowchart' || collapsedSubgraphs.size === 0) return
+
+    // Find all clickable nodes (collapsed placeholders have click handlers)
+    const clickableNodes = container.querySelectorAll('.node.clickable')
+
+    for (const node of clickableNodes) {
+      // Add pulse class - animation will play twice then stop
+      node.classList.add('mermaid-collapsed-pulse')
+    }
+  }, [parsedMermaid, collapsedSubgraphs])
+
   useEffect(() => {
     async function renderDiagram() {
       if (!svgContainerRef.current || !displayCode) return
@@ -195,6 +227,8 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
           bindFunctions?.(svgContainerRef.current)
           // Add click handlers for expanded subgraph headers
           attachExpandedSubgraphHandlers(svgContainerRef.current)
+          // Apply pulse animation to collapsed nodes
+          applyPulseToCollapsedNodes(svgContainerRef.current)
         }
 
         // Only reset zoom/pan when the original content changes, not on collapse/expand
@@ -213,7 +247,7 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     }
 
     renderDiagram()
-  }, [displayCode, content, attachExpandedSubgraphHandlers])
+  }, [displayCode, content, attachExpandedSubgraphHandlers, applyPulseToCollapsedNodes])
 
   const handleZoomIn = useCallback(() => {
     setZoom(z => Math.min(z + ZOOM_STEP, MAX_ZOOM))
