@@ -2,7 +2,7 @@
 
 **GitHub Issue**: [#5](https://github.com/vfarcic/dot-ai-ui/issues/5)
 **Created**: 2026-01-01
-**Status**: Draft
+**Status**: In Progress
 **Priority**: Medium
 
 ---
@@ -149,7 +149,7 @@ bindFunctions?.(element)
 
 ## Milestones
 
-- [ ] **M1: Subgraph Parser** - Parse flowchart Mermaid code to extract subgraph structure (IDs, labels, contained nodes, edges)
+- [x] **M1: Subgraph Parser** - Parse flowchart Mermaid code to extract subgraph structure (IDs, labels, contained nodes, edges)
 - [ ] **M2: Collapsed Code Generator** - Generate modified Mermaid code with collapsed subgraphs replaced by placeholder nodes
 - [ ] **M3: State Management & Re-render** - Implement collapse state tracking and re-render flow with `bindFunctions()`
 - [ ] **M4: Click Interaction** - Add click handlers to expand/collapse subgraphs with visual indicators (▶/▼)
@@ -163,6 +163,7 @@ bindFunctions?.(element)
 | Date | Milestone | Notes |
 |------|-----------|-------|
 | 2026-01-01 | PRD Created | Initial PRD based on research into Mermaid interactivity options |
+| 2026-01-02 | M1: Subgraph Parser | Created `src/utils/mermaidParser.ts` with full parsing capabilities for flowchart subgraphs |
 
 ---
 
