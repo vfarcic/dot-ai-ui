@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import mermaid from 'mermaid'
 import { parseMermaid, generateCollapsedCode, type ParsedMermaid } from '../../utils/mermaidParser'
+import { generateGitHubIssueUrl, GitHubIcon } from '@/utils/errorReporting'
 
 interface MermaidRendererProps {
   content: string
@@ -314,6 +315,12 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
   }, [])
 
   if (error) {
+    const issueUrl = generateGitHubIssueUrl({
+      errorName: 'RenderError',
+      errorMessage: error,
+      component: 'MermaidRenderer',
+    })
+
     return (
       <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
         <p className="text-red-400 text-sm mb-2">Failed to render diagram</p>
@@ -324,6 +331,15 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
           </summary>
           <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-auto">{content}</pre>
         </details>
+        <a
+          href={issueUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <GitHubIcon className="w-3.5 h-3.5" />
+          Report Issue
+        </a>
       </div>
     )
   }

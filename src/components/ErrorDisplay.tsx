@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { ErrorType } from '@/api'
+import { generateGitHubIssueUrl, GitHubIcon } from '@/utils/errorReporting'
 
 interface ErrorDisplayProps {
   type: ErrorType
@@ -93,6 +94,12 @@ export function ErrorDisplay({ type, message, sessionId, onRetry }: ErrorDisplay
   const config = errorConfig[type]
   const showRetry = type !== 'session-expired' && onRetry
 
+  const issueUrl = generateGitHubIssueUrl({
+    errorName: config.title,
+    errorMessage: message || config.description,
+    component: 'Visualization',
+  })
+
   return (
     <div className="flex items-center justify-center min-h-[50vh]">
       <div className="text-center max-w-md px-4">
@@ -138,6 +145,16 @@ export function ErrorDisplay({ type, message, sessionId, onRetry }: ErrorDisplay
             Return to your coding agent and run your query again to get a new visualization URL.
           </p>
         )}
+
+        <a
+          href={issueUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <GitHubIcon className="w-3.5 h-3.5" />
+          Report Issue
+        </a>
       </div>
     </div>
   )

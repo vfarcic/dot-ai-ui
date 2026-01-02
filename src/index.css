@@ -203,5 +203,5 @@ body {
 
 .mermaid-collapsed-pulse rect,
 .mermaid-collapsed-pulse polygon {
-  animation: mermaid-glow 6s ease-in-out infinite;
+  animation: mermaid-glow 10s ease-in-out infinite;
 }
