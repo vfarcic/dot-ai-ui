@@ -399,10 +399,12 @@ export function getHiddenNodes(
 
 /**
  * Generate modified Mermaid code with collapsed subgraphs replaced by placeholders
+ * @param callbackName - Optional callback function name for click handlers (default: __mermaidToggle)
  */
 export function generateCollapsedCode(
   parsed: ParsedMermaid,
-  collapsedIds: Set<string>
+  collapsedIds: Set<string>,
+  callbackName: string = '__mermaidToggle'
 ): string {
   // If no subgraphs to collapse, return original
   if (collapsedIds.size === 0 || parsed.type !== 'flowchart') {
@@ -410,6 +412,7 @@ export function generateCollapsedCode(
   }
 
   const lines: string[] = []
+  const clickDirectives: string[] = [] // Collect click directives to add at the end
   const hiddenNodes = getHiddenNodes(parsed, collapsedIds)
   const originalLines = parsed.originalCode.split('\n')
 
@@ -476,6 +479,8 @@ export function generateCollapsedCode(
             const itemText = nodeCount === 1 ? '1 item' : `${nodeCount} items`
             const placeholder = `    ${subgraphId}["▶ ${safeLabel} • ${itemText}"]`
             lines.push(placeholder)
+            // Add click directive for this collapsed placeholder
+            clickDirectives.push(`    click ${subgraphId} ${callbackName}`)
           }
         }
         // Either way, skip the content
@@ -557,6 +562,12 @@ export function generateCollapsedCode(
     }
 
     lines.push(line)
+  }
+
+  // Add click directives at the end (Mermaid requires them after node definitions)
+  if (clickDirectives.length > 0) {
+    lines.push('')
+    lines.push(...clickDirectives)
   }
 
   return lines.join('\n')

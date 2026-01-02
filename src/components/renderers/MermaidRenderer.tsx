@@ -6,10 +6,14 @@ interface MermaidRendererProps {
   content: string
 }
 
+// Callback name for Mermaid click handlers
+const MERMAID_CALLBACK_NAME = '__mermaidToggle'
+
 // Initialize mermaid with dark theme matching devopstoolkit.ai brand
 mermaid.initialize({
   startOnLoad: false,
   theme: 'dark',
+  securityLevel: 'loose', // Required for click callbacks to work
   themeVariables: {
     primaryColor: '#FACB00',
     primaryTextColor: '#2D2D2D',
@@ -65,15 +69,7 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     }
   }, [parsedMermaid])
 
-  // Generate display code based on collapsed state
-  const displayCode = useMemo(() => {
-    if (parsedMermaid.type !== 'flowchart' || collapsedSubgraphs.size === 0) {
-      return content
-    }
-    return generateCollapsedCode(parsedMermaid, collapsedSubgraphs)
-  }, [content, parsedMermaid, collapsedSubgraphs])
-
-  // Toggle a subgraph's collapsed state (exported for M4 click handling)
+  // Toggle a subgraph's collapsed state
   const toggleSubgraph = useCallback((subgraphId: string) => {
     setCollapsedSubgraphs(prev => {
       const next = new Set(prev)
@@ -86,16 +82,100 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     })
   }, [])
 
-  // Expose toggleSubgraph for external use (M4 will wire up click handlers)
-  // Store in window for debugging/testing purposes
+  // Register the callback on window for Mermaid's click handlers
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window as unknown as Record<string, unknown>).__mermaidToggleSubgraph = toggleSubgraph
+      // Mermaid's click callback receives the node ID as the argument
+      (window as unknown as Record<string, (id: string) => void>)[MERMAID_CALLBACK_NAME] = toggleSubgraph
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as unknown as Record<string, unknown>)[MERMAID_CALLBACK_NAME]
+      }
     }
   }, [toggleSubgraph])
 
+  // Generate display code based on collapsed state
+  const displayCode = useMemo(() => {
+    if (parsedMermaid.type !== 'flowchart' || collapsedSubgraphs.size === 0) {
+      return content
+    }
+    return generateCollapsedCode(parsedMermaid, collapsedSubgraphs, MERMAID_CALLBACK_NAME)
+  }, [content, parsedMermaid, collapsedSubgraphs])
+
   // Track previous content to know when to reset zoom/pan
   const prevContentRef = useRef<string>(content)
+
+  // Add click handlers to expanded subgraph headers after render
+  const attachExpandedSubgraphHandlers = useCallback((container: HTMLElement) => {
+    if (parsedMermaid.type !== 'flowchart') return
+
+    // Find all expanded subgraphs (those not in collapsedSubgraphs set)
+    const expandedSubgraphs = parsedMermaid.subgraphs.filter(
+      sg => !collapsedSubgraphs.has(sg.id)
+    )
+
+    // Find all cluster elements in the SVG
+    const clusters = container.querySelectorAll('.cluster')
+
+    for (const subgraph of expandedSubgraphs) {
+      // Match cluster by label text since Mermaid uses generic IDs (subGraph0, subGraph1, etc.)
+      let matchedCluster: Element | null = null
+
+      for (const cluster of clusters) {
+        const labelSpan = cluster.querySelector('.cluster-label foreignObject span') ||
+                          cluster.querySelector('.cluster-label text')
+        const labelText = labelSpan?.textContent?.replace(/^▼\s*/, '') || ''
+
+        // Match by label (handle both exact match and quoted labels)
+        if (labelText === subgraph.label ||
+            labelText === `'${subgraph.label}'` ||
+            labelText.replace(/^'|'$/g, '') === subgraph.label) {
+          matchedCluster = cluster
+          break
+        }
+      }
+
+      if (!matchedCluster) continue
+
+      const clusterLabel = matchedCluster.querySelector('.cluster-label')
+      if (!clusterLabel) continue
+
+      // Find the span with the label text and the foreignObject container
+      const foreignObject = clusterLabel.querySelector('foreignObject')
+      const labelSpan = clusterLabel.querySelector('foreignObject span') ||
+                        clusterLabel.querySelector('text')
+
+      if (labelSpan) {
+        const labelText = labelSpan.textContent || ''
+        // Add visual indicator if not already present
+        if (!labelText.startsWith('▼')) {
+          labelSpan.textContent = `▼ ${labelText}`
+          // Increase foreignObject width to accommodate the indicator
+          if (foreignObject) {
+            const currentWidth = parseFloat(foreignObject.getAttribute('width') || '0')
+            foreignObject.setAttribute('width', String(currentWidth + 20))
+          }
+        }
+      }
+
+      // Make the cluster label clickable
+      ;(clusterLabel as HTMLElement).style.cursor = 'pointer'
+      clusterLabel.classList.add('mermaid-collapsible-header')
+
+      // Create click handler
+      const clickHandler = (e: Event) => {
+        e.stopPropagation()
+        e.preventDefault()
+        toggleSubgraph(subgraph.id)
+      }
+
+      // Clone and replace to remove old handlers, then add new one
+      const newClusterLabel = clusterLabel.cloneNode(true) as HTMLElement
+      newClusterLabel.addEventListener('click', clickHandler)
+      clusterLabel.parentNode?.replaceChild(newClusterLabel, clusterLabel)
+    }
+  }, [parsedMermaid, collapsedSubgraphs, toggleSubgraph])
 
   useEffect(() => {
     async function renderDiagram() {
@@ -111,8 +191,10 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
 
         if (svgContainerRef.current) {
           svgContainerRef.current.innerHTML = svg
-          // Call bindFunctions if available (enables click callbacks in M4)
+          // Call bindFunctions to enable click callbacks for collapsed placeholders
           bindFunctions?.(svgContainerRef.current)
+          // Add click handlers for expanded subgraph headers
+          attachExpandedSubgraphHandlers(svgContainerRef.current)
         }
 
         // Only reset zoom/pan when the original content changes, not on collapse/expand
@@ -131,7 +213,7 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     }
 
     renderDiagram()
-  }, [displayCode, content])
+  }, [displayCode, content, attachExpandedSubgraphHandlers])
 
   const handleZoomIn = useCallback(() => {
     setZoom(z => Math.min(z + ZOOM_STEP, MAX_ZOOM))

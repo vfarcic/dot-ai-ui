@@ -145,3 +145,38 @@ body {
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: #4d4d4d;
 }
+
+/* Mermaid collapsible subgraph styles */
+
+/* Collapsed placeholder nodes - clickable */
+.mermaid svg .node.clickable rect,
+.mermaid svg .node.clickable polygon {
+  cursor: pointer;
+  transition: filter 0.15s ease, stroke-width 0.15s ease;
+}
+
+.mermaid svg .node.clickable:hover rect,
+.mermaid svg .node.clickable:hover polygon {
+  filter: brightness(1.2);
+  stroke-width: 2.5px;
+}
+
+/* Expanded subgraph headers - clickable */
+.mermaid-collapsible-header {
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.mermaid-collapsible-header:hover {
+  opacity: 0.8;
+}
+
+.mermaid-collapsible-header text {
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.mermaid-collapsible-header:hover text {
+  text-decoration-color: currentColor;
+}
