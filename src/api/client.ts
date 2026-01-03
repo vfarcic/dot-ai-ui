@@ -32,7 +32,9 @@ export class APIError extends Error {
   }
 
   private classifyError(status: number, errorCode?: string): ErrorType {
-    if (status === 404 || errorCode === 'SESSION_NOT_FOUND') return 'session-expired'
+    // Only treat as session-expired with explicit MCP error code, not generic 404s
+    // (generic 404s during server restart should be retryable server errors)
+    if (errorCode === 'SESSION_NOT_FOUND') return 'session-expired'
     if (status === 503 || errorCode === 'AI_NOT_CONFIGURED') return 'ai-unavailable'
     if (status === 408) return 'timeout'
     if (status === 0) return 'network'
@@ -47,26 +49,39 @@ export class APIError extends Error {
 const API_PATH = '/api/v1'
 const DEFAULT_TIMEOUT = 5 * 60 * 1000 // 5 minutes for AI generation
 
+export interface GetVisualizationOptions {
+  reload?: boolean
+}
+
 /**
  * Fetch visualization data for a session
  * @param sessionId - The session ID from the MCP tool response URL
+ * @param options - Optional parameters (reload: invalidate cache and regenerate)
  * @returns Visualization data including title, visualizations array, and insights
  * @throws APIError for network errors, timeouts, or invalid sessions
  */
 export async function getVisualization(
-  sessionId: string
+  sessionId: string,
+  options?: GetVisualizationOptions
 ): Promise<VisualizationResponse> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT)
 
   try {
-    const response = await fetch(`${API_PATH}/visualize/${sessionId}`, {
+    const startTime = performance.now()
+    const reloadParam = options?.reload ? '?reload=true' : ''
+    console.log(`[API] Fetching visualization for session: ${sessionId}${options?.reload ? ' (reload)' : ''}`)
+
+    const response = await fetch(`${API_PATH}/visualize/${sessionId}${reloadParam}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
       },
       signal: controller.signal,
     })
+
+    const elapsed = ((performance.now() - startTime) / 1000).toFixed(2)
+    console.log(`[API] Response received in ${elapsed}s (status: ${response.status})`)
 
     if (!response.ok) {
       // Try to extract error details from MCP response body

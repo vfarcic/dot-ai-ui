@@ -52,23 +52,29 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [isFullscreen, setIsFullscreen] = useState(false)
 
-  // Collapsible subgraphs state
-  const [collapsedSubgraphs, setCollapsedSubgraphs] = useState<Set<string>>(new Set())
-
   // Parse Mermaid content to extract subgraph structure
   const parsedMermaid = useMemo<ParsedMermaid>(() => {
     return parseMermaid(content)
   }, [content])
 
-  // Initialize collapsed state when content changes (all subgraphs collapsed by default)
+  // Collapsible subgraphs state - initialize with all subgraphs collapsed
+  const [collapsedSubgraphs, setCollapsedSubgraphs] = useState<Set<string>>(() => {
+    const parsed = parseMermaid(content)
+    if (parsed.type === 'flowchart' && parsed.subgraphs.length > 0) {
+      return new Set(parsed.subgraphs.map(sg => sg.id))
+    }
+    return new Set()
+  })
+
+  // Reset collapsed state when content changes
   useEffect(() => {
-    if (parsedMermaid.type === 'flowchart' && parsedMermaid.subgraphs.length > 0) {
-      const allSubgraphIds = new Set(parsedMermaid.subgraphs.map(sg => sg.id))
-      setCollapsedSubgraphs(allSubgraphIds)
+    const parsed = parseMermaid(content)
+    if (parsed.type === 'flowchart' && parsed.subgraphs.length > 0) {
+      setCollapsedSubgraphs(new Set(parsed.subgraphs.map(sg => sg.id)))
     } else {
       setCollapsedSubgraphs(new Set())
     }
-  }, [parsedMermaid])
+  }, [content])
 
   // Toggle a subgraph's collapsed state
   const toggleSubgraph = useCallback((subgraphId: string) => {
@@ -104,8 +110,10 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     return generateCollapsedCode(parsedMermaid, collapsedSubgraphs, MERMAID_CALLBACK_NAME)
   }, [content, parsedMermaid, collapsedSubgraphs])
 
-  // Track previous content to know when to reset zoom/pan
-  const prevContentRef = useRef<string>(content)
+  // Track previous content to know when to reset zoom/pan and pulse animation
+  // Initialize to empty string so first render is detected as "new content"
+  const prevContentRef = useRef<string>('')
+  const hasAppliedInitialPulse = useRef<boolean>(false)
 
   // Add click handlers to expanded subgraph headers after render
   const attachExpandedSubgraphHandlers = useCallback((container: HTMLElement) => {
@@ -199,10 +207,12 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
 
   // Apply pulse animation to collapsed placeholder nodes
   const applyPulseToCollapsedNodes = useCallback((container: HTMLElement) => {
+    console.log('[Pulse] Checking - type:', parsedMermaid.type, 'collapsedCount:', collapsedSubgraphs.size)
     if (parsedMermaid.type !== 'flowchart' || collapsedSubgraphs.size === 0) return
 
     // Find all clickable nodes (collapsed placeholders have click handlers)
     const clickableNodes = container.querySelectorAll('.node.clickable')
+    console.log('[Pulse] Found clickable nodes:', clickableNodes.length)
 
     for (const node of clickableNodes) {
       // Add pulse class - animation will play twice then stop
@@ -228,15 +238,20 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
           bindFunctions?.(svgContainerRef.current)
           // Add click handlers for expanded subgraph headers
           attachExpandedSubgraphHandlers(svgContainerRef.current)
-          // Apply pulse animation to collapsed nodes
-          applyPulseToCollapsedNodes(svgContainerRef.current)
-        }
 
-        // Only reset zoom/pan when the original content changes, not on collapse/expand
-        if (prevContentRef.current !== content) {
-          setZoom(1)
-          setPan({ x: 0, y: 0 })
-          prevContentRef.current = content
+          // Only reset zoom/pan and apply pulse when the original content changes, not on collapse/expand
+          if (prevContentRef.current !== content) {
+            setZoom(1)
+            setPan({ x: 0, y: 0 })
+            prevContentRef.current = content
+            hasAppliedInitialPulse.current = false
+          }
+
+          // Only apply pulse animation on initial render for this content
+          if (!hasAppliedInitialPulse.current) {
+            applyPulseToCollapsedNodes(svgContainerRef.current)
+            hasAppliedInitialPulse.current = true
+          }
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to render diagram'
@@ -319,27 +334,33 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
       errorName: 'RenderError',
       errorMessage: error,
       component: 'MermaidRenderer',
+      rawContent: content,
+      contentLabel: 'Mermaid diagram',
     })
 
     return (
       <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-        <p className="text-red-400 text-sm mb-2">Failed to render diagram</p>
-        <pre className="text-xs text-muted-foreground overflow-auto">{error}</pre>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <p className="text-red-400 text-sm mb-2">Failed to render diagram</p>
+            <pre className="text-xs text-muted-foreground overflow-auto">{error}</pre>
+          </div>
+          <a
+            href={issueUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-[#FACB00] hover:bg-[#FACB00]/80 rounded-md text-[#2D2D2D] transition-colors shrink-0"
+          >
+            <GitHubIcon className="w-4 h-4" />
+            Report Issue
+          </a>
+        </div>
         <details className="mt-4">
           <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
             Show raw content
           </summary>
           <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-auto">{content}</pre>
         </details>
-        <a
-          href={issueUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <GitHubIcon className="w-3.5 h-3.5" />
-          Report Issue
-        </a>
       </div>
     )
   }

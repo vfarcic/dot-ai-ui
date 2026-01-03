@@ -696,7 +696,8 @@ export function generateCollapsedCode(
             // Escape quotes in label to prevent syntax issues
             const safeLabel = subgraph.label.replace(/"/g, "'")
             const itemText = nodeCount === 1 ? '1 item' : `${nodeCount} items`
-            const placeholder = `    ${subgraphId}["▶ ${safeLabel} • ${itemText}"]`
+            // Add :::collapsedPulse class for CSS animation targeting
+            const placeholder = `    ${subgraphId}["▶ ${safeLabel} • ${itemText}"]:::collapsedPulse`
             lines.push(placeholder)
             // Add click directive for this collapsed placeholder
             clickDirectives.push(`    click ${subgraphId} ${callbackName}`)

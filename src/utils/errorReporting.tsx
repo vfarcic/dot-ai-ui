@@ -10,6 +10,10 @@ export interface ErrorReportContext {
   errorName: string
   errorMessage: string
   component: string
+  /** Optional raw content that caused the error (e.g., Mermaid code) */
+  rawContent?: string
+  /** Optional title/label for the content (e.g., visualization tab name) */
+  contentLabel?: string
 }
 
 const GITHUB_REPO = 'vfarcic/dot-ai-ui'
@@ -74,9 +78,27 @@ function getBrowserInfo(): string {
  * Opens the "new issue" page with title and body pre-populated.
  */
 export function generateGitHubIssueUrl(context: ErrorReportContext): string {
-  const { errorName, errorMessage, component } = context
+  const { errorName, errorMessage, component, rawContent, contentLabel } = context
 
   const title = `Error: ${errorName} in ${component}`
+
+  // Build raw content section if provided
+  let rawContentSection = ''
+  if (rawContent) {
+    const label = contentLabel ? ` (${contentLabel})` : ''
+    // Truncate very long content to avoid URL length limits
+    const truncatedContent = rawContent.length > 2000
+      ? rawContent.slice(0, 2000) + '\n\n... (truncated, content too long)'
+      : rawContent
+    rawContentSection = `
+
+## Raw Content${label}
+
+\`\`\`
+${truncatedContent}
+\`\`\`
+`
+  }
 
   const body = `## Error Details
 
@@ -88,7 +110,7 @@ export function generateGitHubIssueUrl(context: ErrorReportContext): string {
 ## Environment
 
 **Browser**: ${getBrowserInfo()}
-
+${rawContentSection}
 ## Steps to Reproduce
 
 <!-- Please describe what you were doing when this error occurred -->

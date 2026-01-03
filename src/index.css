@@ -201,7 +201,8 @@ body {
   }
 }
 
-.mermaid-collapsed-pulse rect,
-.mermaid-collapsed-pulse polygon {
+/* Pulse animation for collapsed subgraph placeholders - class added via Mermaid :::collapsedPulse */
+.collapsedPulse rect,
+.collapsedPulse polygon {
   animation: mermaid-glow 10s ease-in-out infinite;
 }

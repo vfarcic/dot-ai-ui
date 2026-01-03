@@ -123,38 +123,40 @@ export function ErrorDisplay({ type, message, sessionId, onRetry }: ErrorDisplay
           </p>
         )}
 
-        {showRetry && (
-          <button
-            onClick={onRetry}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium cursor-pointer"
+        <div className="flex items-center justify-center gap-4 mt-2">
+          {showRetry && (
+            <button
+              onClick={onRetry}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Try Again
+            </button>
+          )}
+
+          <a
+            href={issueUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#FACB00] hover:bg-[#FACB00]/80 rounded-md text-[#2D2D2D] transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            Try Again
-          </button>
-        )}
+            <GitHubIcon className="w-4 h-4" />
+            Report Issue
+          </a>
+        </div>
 
         {type === 'session-expired' && (
           <p className="text-xs text-muted-foreground mt-4">
             Return to your coding agent and run your query again to get a new visualization URL.
           </p>
         )}
-
-        <a
-          href={issueUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <GitHubIcon className="w-3.5 h-3.5" />
-          Report Issue
-        </a>
       </div>
     </div>
   )

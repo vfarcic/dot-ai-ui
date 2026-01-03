@@ -2,7 +2,7 @@
 
 **GitHub Issue**: [#5](https://github.com/vfarcic/dot-ai-ui/issues/5)
 **Created**: 2026-01-01
-**Status**: In Progress
+**Status**: Complete
 **Priority**: Medium
 
 ---
@@ -178,7 +178,7 @@ function generateIssueUrl(error: Error, context: string): string {
 - [x] **M4: Click Interaction** - Add click handlers to expand/collapse subgraphs with visual indicators (▶/▼)
 - [x] **M5: Edge Case Handling** - Handle nested subgraphs, edges to/from subgraphs, and various flowchart syntax patterns
 - [x] **M6: Error Reporting Links** - Add GitHub issue creation links to error states with pre-filled diagnostic info
-- [ ] **M7: Testing & Polish** - Test with real MCP outputs, ensure no regression in existing functionality
+- [x] **M7: Testing & Polish** - Test with real MCP outputs, ensure no regression in existing functionality
 
 ---
 
@@ -195,6 +195,7 @@ function generateIssueUrl(error: Error, context: string): string {
 | 2026-01-02 | UX: Pulse Animation | Added periodic golden glow pulse animation for collapsed subgraph placeholders to help users discover the interactive expand/collapse feature. Pulses twice every 10 seconds using brand primary color. |
 | 2026-01-02 | Decision: M6 Error Reporting | Added milestone for GitHub issue creation links on errors. Will include: error message, browser/OS info, app version, route. Will exclude sensitive diagram content. Uses GitHub URL params for pre-filling. |
 | 2026-01-02 | M6: Error Reporting Links | Created `src/utils/errorReporting.tsx` with `generateGitHubIssueUrl()` and `GitHubIcon` component. Added "Report Issue" links to MermaidRenderer and ErrorDisplay error states. Uses User-Agent Client Hints API for accurate browser/OS detection. Pre-fills GitHub issue with error details, component, route, timestamp, and bug label. |
+| 2026-01-03 | M7: Testing & Polish | Tested with real MCP outputs. All functionality verified working - collapse/expand, zoom/pan/fullscreen, error reporting links. No regressions. |
 
 ---
 
