@@ -94,7 +94,7 @@ export function extractNodeIds(content: string): string[] {
     // Double parentheses: ((text)) - circle
     /(\w+)\s*\(\([^)]*\)\)/g,
     // Single brackets with nested (handles complex content)
-    /(\w+)\s*\[(?:[^\[\]]|\[[^\]]*\])*\]/g,
+    /(\w+)\s*\[(?:[^[\]]|\[[^\]]*\])*\]/g,
     // Single parentheses
     /(\w+)\s*\((?:[^()]|\([^)]*\))*\)/g,
     // Single curly: {text} - rhombus
@@ -396,7 +396,7 @@ function parseEdgeLine(trimmed: string, originalLine: string): ParsedEdge[] {
 
   // Handle parallel sources: A & B --> C
   // Split on & but only outside of brackets/quotes
-  const parallelMatch = trimmed.match(/^([\w\s&]+?)\s*(-->|---|-\.->|-\.-|==>|===|--[ox]|o--o|x--x|<-->|-\.[^.]+\.->|--[^-]+-->)\s*(?:\|([^|]*)\|\s*)?([\w\[\](){}'"<>\s&]+)$/)
+  const parallelMatch = trimmed.match(/^([\w\s&]+?)\s*(-->|---|-\.->|-\.-|==>|===|--[ox]|o--o|x--x|<-->|-\.[^.]+\.->|--[^-]+-->)\s*(?:\|([^|]*)\|\s*)?([\w[\](){}'"<>\s&]+)$/)
 
   if (parallelMatch) {
     const sourcePart = parallelMatch[1]
@@ -799,7 +799,7 @@ export function generateCollapsedCode(
 
     // Other lines (node definitions, styles, etc.) - pass through unless hidden
     // Check if this is a node definition for a hidden node
-    const nodeDefMatch = trimmed.match(/^(\w+)\s*[\[\(\{>]/)
+    const nodeDefMatch = trimmed.match(/^(\w+)\s*[[({>]/)
     if (nodeDefMatch) {
       const nodeId = nodeDefMatch[1]
       if (hiddenNodes.has(nodeId)) {
