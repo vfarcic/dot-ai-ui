@@ -57,24 +57,24 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     return parseMermaid(content)
   }, [content])
 
-  // Collapsible subgraphs state - initialize with all subgraphs collapsed
-  const [collapsedSubgraphs, setCollapsedSubgraphs] = useState<Set<string>>(() => {
-    const parsed = parseMermaid(content)
-    if (parsed.type === 'flowchart' && parsed.subgraphs.length > 0) {
-      return new Set(parsed.subgraphs.map(sg => sg.id))
-    }
-    return new Set()
-  })
+  // Collapsible subgraphs state - initialized empty, effect sets based on parsed content
+  const [collapsedSubgraphs, setCollapsedSubgraphs] = useState<Set<string>>(new Set())
 
-  // Reset collapsed state when content changes
+  // Track content for which collapse state has been initialized
+  const initializedContentRef = useRef<string>('')
+
+  // Set/reset collapsed state when content changes (uses memoized parsedMermaid)
   useEffect(() => {
-    const parsed = parseMermaid(content)
-    if (parsed.type === 'flowchart' && parsed.subgraphs.length > 0) {
-      setCollapsedSubgraphs(new Set(parsed.subgraphs.map(sg => sg.id)))
+    // Skip if already initialized for this content
+    if (initializedContentRef.current === content) return
+    initializedContentRef.current = content
+
+    if (parsedMermaid.type === 'flowchart' && parsedMermaid.subgraphs.length > 0) {
+      setCollapsedSubgraphs(new Set(parsedMermaid.subgraphs.map(sg => sg.id)))
     } else {
       setCollapsedSubgraphs(new Set())
     }
-  }, [content])
+  }, [content, parsedMermaid])
 
   // Toggle a subgraph's collapsed state
   const toggleSubgraph = useCallback((subgraphId: string) => {

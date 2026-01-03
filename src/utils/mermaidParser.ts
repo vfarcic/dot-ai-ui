@@ -148,6 +148,9 @@ export function parseSubgraphs(code: string): ParsedSubgraph[] {
 
   let currentIndex = 0
 
+  // Track generated IDs to detect collisions
+  const generatedIds = new Set<string>()
+
   for (let lineNum = 0; lineNum < lines.length; lineNum++) {
     const line = lines[lineNum]
     const trimmedLine = line.trim()
@@ -176,7 +179,14 @@ export function parseSubgraphs(code: string): ParsedSubgraph[] {
         // Quoted label pattern: subgraph "Label Text"
         label = subgraphMatchQuoted[1]
         // Generate ID from label by sanitizing (remove spaces, special chars)
-        id = label.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+        const baseId = label.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+        // Ensure uniqueness by appending counter if collision
+        id = baseId
+        let counter = 1
+        while (generatedIds.has(id)) {
+          id = `${baseId}_${counter++}`
+        }
+        generatedIds.add(id)
       } else if (subgraphMatchId) {
         // ID-based pattern: subgraph id[label] or subgraph id
         id = subgraphMatchId[1]
@@ -358,6 +368,11 @@ const ARROW_REGEX_PART = ARROW_PATTERNS.map(p => {
   return `(${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`
 }).join('|')
 
+// Pre-compiled regex for simple edge matching (avoids repeated regex construction)
+const SIMPLE_EDGE_REGEX = new RegExp(
+  `^\\s*(\\w+)\\s*(?:${ARROW_REGEX_PART})\\s*(?:\\|([^|]*)\\|\\s*)?(\\w+)`
+)
+
 /**
  * Extract all edges from Mermaid flowchart code
  * Handles: simple edges, chained edges (A --> B --> C), parallel edges (A & B --> C),
@@ -428,11 +443,8 @@ function parseEdgeLine(trimmed: string, originalLine: string): ParsedEdge[] {
     return chainedEdges
   }
 
-  // Simple single edge fallback
-  const simpleEdgeRegex = new RegExp(
-    `^\\s*(\\w+)\\s*(?:${ARROW_REGEX_PART})\\s*(?:\\|([^|]*)\\|\\s*)?(\\w+)`
-  )
-  const simpleMatch = trimmed.match(simpleEdgeRegex)
+  // Simple single edge fallback (uses pre-compiled regex)
+  const simpleMatch = trimmed.match(SIMPLE_EDGE_REGEX)
   if (simpleMatch) {
     const source = simpleMatch[1]
     // Find which arrow group matched
