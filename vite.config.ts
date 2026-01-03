@@ -12,6 +12,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1000, // Mermaid.js dependencies are large but gzip well
+  },
   server: {
     port: 3000,
     proxy: {

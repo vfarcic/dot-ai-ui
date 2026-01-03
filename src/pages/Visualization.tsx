@@ -13,14 +13,19 @@ export function Visualization() {
   const [data, setData] = useState<VisualizationResponse | null>(null)
   const [error, setError] = useState<APIError | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isReloading, setIsReloading] = useState(false)
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (reload = false) => {
     if (!sessionId) return
 
     try {
-      setIsLoading(true)
+      if (reload) {
+        setIsReloading(true)
+      } else {
+        setIsLoading(true)
+      }
       setError(null)
-      const response = await getVisualization(sessionId)
+      const response = await getVisualization(sessionId, { reload })
       setData(response)
     } catch (err) {
       if (err instanceof APIError) {
@@ -30,8 +35,13 @@ export function Visualization() {
       }
     } finally {
       setIsLoading(false)
+      setIsReloading(false)
     }
   }, [sessionId])
+
+  const handleReload = useCallback(() => {
+    fetchData(true)
+  }, [fetchData])
 
   useEffect(() => {
     if (!sessionId) {
@@ -77,6 +87,27 @@ export function Visualization() {
     <div className="w-full">
       <div className="flex items-center justify-between mb-2 sm:mb-3">
         <h1 className="text-base sm:text-lg font-semibold leading-tight">{data.title}</h1>
+        <button
+          onClick={handleReload}
+          disabled={isReloading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-black bg-yellow-400 hover:bg-yellow-500 rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Reload data (invalidate cache)"
+        >
+          <svg
+            className={`w-4 h-4 ${isReloading ? 'animate-spin' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+          {isReloading ? 'Reloading...' : 'Reload'}
+        </button>
       </div>
 
       <InsightsPanel sessionId={sessionId!} insights={data.insights} />

@@ -13,10 +13,19 @@ This is the Web UI visualization companion for the dot-ai MCP server. It renders
 ## Development
 
 ```bash
-npm run dev    # Start dev server (Express + Vite)
-npm run build  # Build for production
-npm run start  # Run production server
+./scripts/dev-start.sh  # Start dev server (cleans ports, sets MCP config)
+./scripts/dev-stop.sh   # Stop dev server and clean up ports
+npm run build           # Build for production
+npm run start           # Run production server
 ```
+
+The dev scripts handle port cleanup. Required environment variables (must be set before running):
+- `DOT_AI_MCP_URL` - MCP server URL (e.g., `http://localhost:8080`)
+- `DOT_AI_AUTH_TOKEN` - Auth token for MCP server
+
+### Error Classification
+
+The API client (`src/api/client.ts`) classifies errors by type. Important: "session-expired" errors are ONLY triggered by the explicit `SESSION_NOT_FOUND` error code from MCP, not generic 404s. This prevents false "session expired" errors during Vite HMR restarts.
 
 ## Testing Requirements
 

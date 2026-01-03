@@ -1,14 +1,20 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import mermaid from 'mermaid'
+import { parseMermaid, generateCollapsedCode, type ParsedMermaid } from '../../utils/mermaidParser'
+import { generateGitHubIssueUrl, GitHubIcon } from '@/utils/errorReporting'
 
 interface MermaidRendererProps {
   content: string
 }
 
+// Callback name for Mermaid click handlers
+const MERMAID_CALLBACK_NAME = '__mermaidToggle'
+
 // Initialize mermaid with dark theme matching devopstoolkit.ai brand
 mermaid.initialize({
   startOnLoad: false,
   theme: 'dark',
+  securityLevel: 'loose', // Required for click callbacks to work
   themeVariables: {
     primaryColor: '#FACB00',
     primaryTextColor: '#2D2D2D',
@@ -46,25 +52,207 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [isFullscreen, setIsFullscreen] = useState(false)
 
+  // Parse Mermaid content to extract subgraph structure
+  const parsedMermaid = useMemo<ParsedMermaid>(() => {
+    return parseMermaid(content)
+  }, [content])
+
+  // Collapsible subgraphs state - initialized empty, effect sets based on parsed content
+  const [collapsedSubgraphs, setCollapsedSubgraphs] = useState<Set<string>>(new Set())
+
+  // Track content for which collapse state has been initialized
+  const initializedContentRef = useRef<string>('')
+
+  // Set/reset collapsed state when content changes (uses memoized parsedMermaid)
+  useEffect(() => {
+    // Skip if already initialized for this content
+    if (initializedContentRef.current === content) return
+    initializedContentRef.current = content
+
+    if (parsedMermaid.type === 'flowchart' && parsedMermaid.subgraphs.length > 0) {
+      setCollapsedSubgraphs(new Set(parsedMermaid.subgraphs.map(sg => sg.id)))
+    } else {
+      setCollapsedSubgraphs(new Set())
+    }
+  }, [content, parsedMermaid])
+
+  // Toggle a subgraph's collapsed state
+  const toggleSubgraph = useCallback((subgraphId: string) => {
+    setCollapsedSubgraphs(prev => {
+      const next = new Set(prev)
+      if (next.has(subgraphId)) {
+        next.delete(subgraphId)
+      } else {
+        next.add(subgraphId)
+      }
+      return next
+    })
+  }, [])
+
+  // Register the callback on window for Mermaid's click handlers
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Mermaid's click callback receives the node ID as the argument
+      (window as unknown as Record<string, (id: string) => void>)[MERMAID_CALLBACK_NAME] = toggleSubgraph
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as unknown as Record<string, unknown>)[MERMAID_CALLBACK_NAME]
+      }
+    }
+  }, [toggleSubgraph])
+
+  // Generate display code based on collapsed state
+  const displayCode = useMemo(() => {
+    if (parsedMermaid.type !== 'flowchart' || collapsedSubgraphs.size === 0) {
+      return content
+    }
+    return generateCollapsedCode(parsedMermaid, collapsedSubgraphs, MERMAID_CALLBACK_NAME)
+  }, [content, parsedMermaid, collapsedSubgraphs])
+
+  // Track previous content to know when to reset zoom/pan and pulse animation
+  // Initialize to empty string so first render is detected as "new content"
+  const prevContentRef = useRef<string>('')
+  const hasAppliedInitialPulse = useRef<boolean>(false)
+
+  // Add click handlers to expanded subgraph headers after render
+  const attachExpandedSubgraphHandlers = useCallback((container: HTMLElement) => {
+    if (parsedMermaid.type !== 'flowchart') return
+
+    // Find all expanded subgraphs (those not in collapsedSubgraphs set)
+    const expandedSubgraphs = parsedMermaid.subgraphs.filter(
+      sg => !collapsedSubgraphs.has(sg.id)
+    )
+
+    // Find all cluster elements in the SVG
+    const clusters = container.querySelectorAll('.cluster')
+
+    for (const subgraph of expandedSubgraphs) {
+      // Match cluster by label text since Mermaid uses generic IDs (subGraph0, subGraph1, etc.)
+      let matchedCluster: Element | null = null
+
+      // Normalize label for comparison (strip quotes, trim whitespace)
+      const normalizeLabel = (text: string) =>
+        text.replace(/^▼\s*/, '').replace(/^['"]|['"]$/g, '').trim()
+
+      const normalizedSubgraphLabel = normalizeLabel(subgraph.label)
+
+      for (const cluster of clusters) {
+        // Try multiple selectors - Mermaid structure varies by diagram complexity
+        const labelSpan = cluster.querySelector('.cluster-label foreignObject span') ||
+                          cluster.querySelector('.cluster-label text') ||
+                          cluster.querySelector('.cluster-label p') ||
+                          cluster.querySelector('.nodeLabel') ||
+                          cluster.querySelector('text')
+
+        if (!labelSpan) continue
+
+        const labelText = labelSpan.textContent || ''
+        const normalizedLabelText = normalizeLabel(labelText)
+
+        // Match by normalized label (handles quotes, indicators, whitespace)
+        if (normalizedLabelText === normalizedSubgraphLabel) {
+          matchedCluster = cluster
+          break
+        }
+      }
+
+      if (!matchedCluster) continue
+
+      // Find cluster label - try multiple selectors for different Mermaid structures
+      let clusterLabel = matchedCluster.querySelector('.cluster-label')
+
+      // If no .cluster-label, use the cluster itself as the clickable area
+      if (!clusterLabel) {
+        clusterLabel = matchedCluster
+      }
+
+      // Find the span with the label text and the foreignObject container
+      const foreignObject = clusterLabel.querySelector('foreignObject')
+      const labelSpan = clusterLabel.querySelector('foreignObject span') ||
+                        clusterLabel.querySelector('.cluster-label text') ||
+                        clusterLabel.querySelector('text') ||
+                        clusterLabel.querySelector('p')
+
+      if (labelSpan) {
+        const labelText = labelSpan.textContent || ''
+        // Add visual indicator if not already present
+        if (!labelText.startsWith('▼')) {
+          labelSpan.textContent = `▼ ${labelText}`
+          // Increase foreignObject width to accommodate the indicator
+          if (foreignObject) {
+            const currentWidth = parseFloat(foreignObject.getAttribute('width') || '0')
+            foreignObject.setAttribute('width', String(currentWidth + 20))
+          }
+        }
+      }
+
+      // Make the cluster label clickable
+      ;(clusterLabel as HTMLElement).style.cursor = 'pointer'
+      clusterLabel.classList.add('mermaid-collapsible-header')
+
+      // Create click handler
+      const clickHandler = (e: Event) => {
+        e.stopPropagation()
+        e.preventDefault()
+        toggleSubgraph(subgraph.id)
+      }
+
+      // Clone and replace to remove old handlers, then add new one
+      const newClusterLabel = clusterLabel.cloneNode(true) as HTMLElement
+      newClusterLabel.addEventListener('click', clickHandler)
+      clusterLabel.parentNode?.replaceChild(newClusterLabel, clusterLabel)
+    }
+  }, [parsedMermaid, collapsedSubgraphs, toggleSubgraph])
+
+  // Apply pulse animation to collapsed placeholder nodes
+  const applyPulseToCollapsedNodes = useCallback((container: HTMLElement) => {
+    console.log('[Pulse] Checking - type:', parsedMermaid.type, 'collapsedCount:', collapsedSubgraphs.size)
+    if (parsedMermaid.type !== 'flowchart' || collapsedSubgraphs.size === 0) return
+
+    // Find all clickable nodes (collapsed placeholders have click handlers)
+    const clickableNodes = container.querySelectorAll('.node.clickable')
+    console.log('[Pulse] Found clickable nodes:', clickableNodes.length)
+
+    for (const node of clickableNodes) {
+      // Add pulse class - animation will play twice then stop
+      node.classList.add('mermaid-collapsed-pulse')
+    }
+  }, [parsedMermaid, collapsedSubgraphs])
+
   useEffect(() => {
     async function renderDiagram() {
-      if (!svgContainerRef.current || !content) return
+      if (!svgContainerRef.current || !displayCode) return
 
       setIsRendering(true)
       setError(null)
 
       try {
         const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`
-        await mermaid.parse(content)
-        const { svg } = await mermaid.render(id, content)
+        await mermaid.parse(displayCode)
+        const { svg, bindFunctions } = await mermaid.render(id, displayCode)
 
         if (svgContainerRef.current) {
           svgContainerRef.current.innerHTML = svg
-        }
+          // Call bindFunctions to enable click callbacks for collapsed placeholders
+          bindFunctions?.(svgContainerRef.current)
+          // Add click handlers for expanded subgraph headers
+          attachExpandedSubgraphHandlers(svgContainerRef.current)
 
-        // Reset zoom/pan when content changes
-        setZoom(1)
-        setPan({ x: 0, y: 0 })
+          // Only reset zoom/pan and apply pulse when the original content changes, not on collapse/expand
+          if (prevContentRef.current !== content) {
+            setZoom(1)
+            setPan({ x: 0, y: 0 })
+            prevContentRef.current = content
+            hasAppliedInitialPulse.current = false
+          }
+
+          // Only apply pulse animation on initial render for this content
+          if (!hasAppliedInitialPulse.current) {
+            applyPulseToCollapsedNodes(svgContainerRef.current)
+            hasAppliedInitialPulse.current = true
+          }
+        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to render diagram'
         setError(errorMessage)
@@ -75,7 +263,7 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     }
 
     renderDiagram()
-  }, [content])
+  }, [displayCode, content, attachExpandedSubgraphHandlers, applyPulseToCollapsedNodes])
 
   const handleZoomIn = useCallback(() => {
     setZoom(z => Math.min(z + ZOOM_STEP, MAX_ZOOM))
@@ -142,10 +330,31 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
   }, [])
 
   if (error) {
+    const issueUrl = generateGitHubIssueUrl({
+      errorName: 'RenderError',
+      errorMessage: error,
+      component: 'MermaidRenderer',
+      rawContent: content,
+      contentLabel: 'Mermaid diagram',
+    })
+
     return (
       <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-        <p className="text-red-400 text-sm mb-2">Failed to render diagram</p>
-        <pre className="text-xs text-muted-foreground overflow-auto">{error}</pre>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <p className="text-red-400 text-sm mb-2">Failed to render diagram</p>
+            <pre className="text-xs text-muted-foreground overflow-auto">{error}</pre>
+          </div>
+          <a
+            href={issueUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-[#FACB00] hover:bg-[#FACB00]/80 rounded-md text-[#2D2D2D] transition-colors shrink-0"
+          >
+            <GitHubIcon className="w-4 h-4" />
+            Report Issue
+          </a>
+        </div>
         <details className="mt-4">
           <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
             Show raw content

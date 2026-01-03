@@ -2,7 +2,7 @@
 
 **GitHub Issue**: [#5](https://github.com/vfarcic/dot-ai-ui/issues/5)
 **Created**: 2026-01-01
-**Status**: Draft
+**Status**: Complete
 **Priority**: Medium
 
 ---
@@ -108,6 +108,27 @@ bindFunctions?.(element)
 - Use Mermaid's `click nodeId callback` syntax for placeholder nodes
 - Or add click handlers directly to SVG elements post-render
 
+### 6. Error Reporting Links
+When errors occur (render failures, API errors), provide a "Report Issue" link that:
+
+```typescript
+function generateIssueUrl(error: Error, context: string): string {
+  const params = new URLSearchParams({
+    title: `Error: ${error.name} in ${context}`,
+    body: `**Error**: ${error.message}
+**Browser**: ${navigator.userAgent}
+**Route**: ${window.location.pathname}
+**Timestamp**: ${new Date().toISOString()}`
+  })
+  return `https://github.com/vfarcic/dot-ai-ui/issues/new?${params}`
+}
+```
+
+**Privacy considerations:**
+- Exclude actual diagram/visualization content (may contain sensitive k8s configs)
+- Let users review the issue before submitting
+- Only include diagnostic metadata
+
 ## Scope
 
 ### In Scope
@@ -116,6 +137,7 @@ bindFunctions?.(element)
 - Nested subgraphs (collapsed parent hides all nested content)
 - Visual indicators for collapse state
 - Preserve existing zoom/pan/fullscreen functionality
+- Error reporting links with pre-filled GitHub issue creation
 
 ### Out of Scope
 - Non-flowchart diagram types (sequence, state, ER, etc.)
@@ -131,6 +153,7 @@ bindFunctions?.(element)
 4. Non-flowchart diagrams continue to work unchanged
 5. No regression in existing zoom/pan/fullscreen functionality
 6. Performance remains acceptable for diagrams with multiple subgraphs
+7. Error states display "Report Issue" link that opens GitHub with pre-filled diagnostic info
 
 ## Risks & Mitigations
 
@@ -149,12 +172,13 @@ bindFunctions?.(element)
 
 ## Milestones
 
-- [ ] **M1: Subgraph Parser** - Parse flowchart Mermaid code to extract subgraph structure (IDs, labels, contained nodes, edges)
-- [ ] **M2: Collapsed Code Generator** - Generate modified Mermaid code with collapsed subgraphs replaced by placeholder nodes
-- [ ] **M3: State Management & Re-render** - Implement collapse state tracking and re-render flow with `bindFunctions()`
-- [ ] **M4: Click Interaction** - Add click handlers to expand/collapse subgraphs with visual indicators (▶/▼)
-- [ ] **M5: Edge Case Handling** - Handle nested subgraphs, edges to/from subgraphs, and various flowchart syntax patterns
-- [ ] **M6: Testing & Polish** - Test with real MCP outputs, ensure no regression in existing functionality
+- [x] **M1: Subgraph Parser** - Parse flowchart Mermaid code to extract subgraph structure (IDs, labels, contained nodes, edges)
+- [x] **M2: Collapsed Code Generator** - Generate modified Mermaid code with collapsed subgraphs replaced by placeholder nodes
+- [x] **M3: State Management & Re-render** - Implement collapse state tracking and re-render flow with `bindFunctions()`
+- [x] **M4: Click Interaction** - Add click handlers to expand/collapse subgraphs with visual indicators (▶/▼)
+- [x] **M5: Edge Case Handling** - Handle nested subgraphs, edges to/from subgraphs, and various flowchart syntax patterns
+- [x] **M6: Error Reporting Links** - Add GitHub issue creation links to error states with pre-filled diagnostic info
+- [x] **M7: Testing & Polish** - Test with real MCP outputs, ensure no regression in existing functionality
 
 ---
 
@@ -163,6 +187,15 @@ bindFunctions?.(element)
 | Date | Milestone | Notes |
 |------|-----------|-------|
 | 2026-01-01 | PRD Created | Initial PRD based on research into Mermaid interactivity options |
+| 2026-01-02 | M1: Subgraph Parser | Created `src/utils/mermaidParser.ts` with full parsing capabilities for flowchart subgraphs |
+| 2026-01-02 | M2: Collapsed Code Generator | Added `extractEdges()`, `getHiddenNodes()`, and `generateCollapsedCode()` functions for generating collapsed Mermaid code |
+| 2026-01-02 | M3: State Management & Re-render | Integrated parser into `MermaidRenderer.tsx` with collapse state tracking, memoized parsing, and re-render flow using `bindFunctions()`. Extended parser to support quoted label syntax. |
+| 2026-01-02 | M4: Click Interaction | Added Mermaid `click` directives for collapsed placeholders, registered `__mermaidToggle` callback with `securityLevel: 'loose'`, implemented `attachExpandedSubgraphHandlers()` matching clusters by label text (Mermaid uses generic IDs), added ▶/▼ visual indicators, CSS hover states, and fixed foreignObject width for title truncation. |
+| 2026-01-02 | M5: Edge Case Handling | Implemented chained edges (`A --> B --> C`), parallel edges (`A & B --> C`), text on arrows (`A -- text --> B`), additional node shapes (stadium, cylinder, hexagon, trapezoid, double-circle), direction directive preservation, linkStyle passthrough, edge deduplication. Fixed quoted-label subgraph matching for expand/collapse handlers. |
+| 2026-01-02 | UX: Pulse Animation | Added periodic golden glow pulse animation for collapsed subgraph placeholders to help users discover the interactive expand/collapse feature. Pulses twice every 10 seconds using brand primary color. |
+| 2026-01-02 | Decision: M6 Error Reporting | Added milestone for GitHub issue creation links on errors. Will include: error message, browser/OS info, app version, route. Will exclude sensitive diagram content. Uses GitHub URL params for pre-filling. |
+| 2026-01-02 | M6: Error Reporting Links | Created `src/utils/errorReporting.tsx` with `generateGitHubIssueUrl()` and `GitHubIcon` component. Added "Report Issue" links to MermaidRenderer and ErrorDisplay error states. Uses User-Agent Client Hints API for accurate browser/OS detection. Pre-fills GitHub issue with error details, component, route, timestamp, and bug label. |
+| 2026-01-03 | M7: Testing & Polish | Tested with real MCP outputs. All functionality verified working - collapse/expand, zoom/pan/fullscreen, error reporting links. No regressions. |
 
 ---
 

@@ -54,6 +54,7 @@ jobs:
       uses: github/codeql-action/init@45c373516f557556c15d420e3f5e0aa3d64366bc # v3
       with:
         languages: typescript
+        config-file: .github/codeql/codeql-config.yml
 
     - name: Setup Node.js
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5

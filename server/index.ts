@@ -26,17 +26,33 @@ const MCP_BASE_URL = process.env.DOT_AI_MCP_URL || 'http://localhost:8080'
 const AUTH_TOKEN = process.env.DOT_AI_AUTH_TOKEN
 const API_TIMEOUT = 5 * 60 * 1000 // 5 minutes for AI generation
 
+console.log(`[Config] MCP_BASE_URL: ${MCP_BASE_URL}`)
+console.log(`[Config] AUTH_TOKEN: ${AUTH_TOKEN ? '***set***' : 'NOT SET'}`)
+
 async function createServer() {
   const app = express()
 
+  // Log ALL incoming requests
+  app.use((req, _res, next) => {
+    console.log(`[Express] ${req.method} ${req.url}`)
+    next()
+  })
+
   app.use(express.json())
+
+  // Debug endpoint
+  app.get('/api/debug', (_req, res) => {
+    console.log('[Debug] Hit debug endpoint')
+    res.json({ ok: true, mcp: MCP_BASE_URL, hasToken: !!AUTH_TOKEN })
+  })
 
   // Proxy visualization API requests to MCP server
   app.get('/api/v1/visualize/:sessionId', apiLimiter, async (req, res) => {
     const { sessionId } = req.params
 
     // Validate sessionId format to prevent path injection (SSRF)
-    if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
+    // Allows + for multi-session IDs (e.g., id1+id2+id3)
+    if (!/^[a-zA-Z0-9_+-]+$/.test(sessionId)) {
       return res.status(400).json({ error: 'Invalid session ID format' })
     }
 
@@ -51,11 +67,20 @@ async function createServer() {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
 
-      const response = await fetch(`${MCP_BASE_URL}/api/v1/visualize/${sessionId}`, {
+      const startTime = Date.now()
+      const queryString = new URLSearchParams(req.query as Record<string, string>).toString()
+      const url = `${MCP_BASE_URL}/api/v1/visualize/${sessionId}${queryString ? `?${queryString}` : ''}`
+      console.log(`[Proxy] Fetching from MCP: ${url}`)
+      console.log(`[Proxy] Headers:`, JSON.stringify(headers))
+
+      const response = await fetch(url, {
         method: 'GET',
         headers,
         signal: controller.signal,
       })
+
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(2)
+      console.log(`[Proxy] MCP response in ${elapsed}s (status: ${response.status})`)
 
       clearTimeout(timeoutId)
 

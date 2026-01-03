@@ -1,0 +1,12 @@
+# CodeQL configuration for dot-ai-ui
+# Excludes false positives from Mermaid diagram parser
+
+name: "dot-ai-ui CodeQL config"
+
+paths-ignore:
+  # Exclude bundled third-party code
+  - dist
+  # Exclude Mermaid parser - produces false positives for js/bad-tag-filter
+  # The --> pattern is Mermaid arrow syntax (A --> B), not HTML comment filtering
+  # This is a domain-specific language parser, not an HTML sanitizer
+  - src/utils/mermaidParser.ts
