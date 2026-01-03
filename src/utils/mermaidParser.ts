@@ -345,8 +345,8 @@ const ARROW_PATTERNS = [
   '--x',
   'o--',
   'x--',
-  // Standard arrows
-  '-->',
+  // Standard Mermaid arrows (not HTML comment syntax)
+  '-->', // lgtm[js/incomplete-sanitization] - Mermaid arrow, not HTML
   '---',
 ]
 
@@ -467,7 +467,9 @@ function parseEdgeLine(trimmed: string, originalLine: string): ParsedEdge[] {
 function parseChainedEdges(line: string, originalLine: string): ParsedEdge[] {
   const edges: ParsedEdge[] = []
 
-  // Regex to split by arrows while capturing them
+  // Regex to split by Mermaid arrows while capturing them
+  // Note: --> is Mermaid arrow syntax, not HTML comment closer
+  // lgtm[js/incomplete-sanitization] - Parsing Mermaid diagram DSL, not filtering HTML
   const arrowRegex = /(-->|---|-\.->|-\.-|==>|===|--[ox]|o--o|x--x|<-->|-\.[^.]+\.->|--[^-]+-->)/g
 
   // Split the line by arrows
