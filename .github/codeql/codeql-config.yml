@@ -3,14 +3,10 @@
 
 name: "dot-ai-ui CodeQL config"
 
-# Exclude bundled third-party code in dist/
 paths-ignore:
+  # Exclude bundled third-party code
   - dist
-
-# Filter out specific queries that produce false positives
-query-filters:
-  # Exclude js/bad-tag-filter for mermaidParser.ts
-  # The --> pattern is Mermaid arrow syntax, not HTML comment filtering
-  - exclude:
-      id: js/bad-tag-filter
-      path: src/utils/mermaidParser.ts
+  # Exclude Mermaid parser - produces false positives for js/bad-tag-filter
+  # The --> pattern is Mermaid arrow syntax (A --> B), not HTML comment filtering
+  # This is a domain-specific language parser, not an HTML sanitizer
+  - src/utils/mermaidParser.ts
