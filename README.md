@@ -36,6 +36,10 @@ DevOps AI Toolkit Web UI renders rich visualizations for MCP tool responses that
 
 ## Deployment
 
+> **Recommended**: For the easiest setup, install the complete dot-ai stack which includes all components. See the [Stack Installation Guide](https://devopstoolkit.ai/docs/stack).
+
+For individual component installation:
+
 - **[Kubernetes Setup](https://devopstoolkit.ai/docs/ui/setup/kubernetes-setup/)** - Deploy via Helm chart
 
 [Read the Documentation](https://devopstoolkit.ai/docs/ui/)

@@ -51,6 +51,10 @@ Multiple visualizations displayed as switchable tabs, maximizing screen space wh
 
 ## Quick Start
 
+> **Recommended**: For the easiest setup, install the complete dot-ai stack which includes all components (MCP server, Web UI, and Controller). See the [Stack Installation Guide](https://devopstoolkit.ai/docs/stack).
+>
+> Continue below if you want to install this component individually (for non-Kubernetes setups or granular control).
+
 ### Prerequisites
 
 - Kubernetes cluster with [dot-ai MCP server](https://devopstoolkit.ai/docs/mcp/setup/kubernetes-setup/) deployed
