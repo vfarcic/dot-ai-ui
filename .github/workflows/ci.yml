@@ -155,7 +155,7 @@ jobs:
       run: npm run build
 
     - name: Install Devbox
-      uses: jetify-com/devbox-install-action@a03caf5813591bc882139571571f94c2a2ef9a14 # v0.11.0
+      uses: jetify-com/devbox-install-action@a03caf5813591bc882139eba6ae947930a83a427 # v0.11.0
       with:
         enable-cache: true
 
@@ -336,7 +336,7 @@ jobs:
           token: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
 
       - name: Install Devbox
-        uses: jetify-com/devbox-install-action@a03caf5813591bc882139571571f94c2a2ef9a14 # v0.11.0
+        uses: jetify-com/devbox-install-action@a03caf5813591bc882139eba6ae947930a83a427 # v0.11.0
         with:
           enable-cache: true
 
