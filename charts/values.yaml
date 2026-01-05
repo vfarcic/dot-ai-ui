@@ -1,7 +1,7 @@
 # Application image configuration
 image:
   repository: ghcr.io/vfarcic/dot-ai-ui  # Container image repository
-  tag: "0.7.0"                           # Container image tag - set by CI pipeline during release
+  tag: "0.8.0"                           # Container image tag - set by CI pipeline during release
   pullPolicy: IfNotPresent               # Image pull policy
 
 # Resource configuration
