@@ -22,11 +22,12 @@ dotAi:
   # Authentication configuration
   auth:
     # Option 1: Reference existing secret (recommended for production)
-    existingSecret: ""           # Name of existing secret containing auth token
-    existingSecretKey: ""        # Key within the secret (default: "auth-token")
+    secretRef:
+      name: ""                   # Secret name (default: dot-ai-secrets when set)
+      key: "auth-token"          # Key within the secret (default: auth-token)
 
     # Option 2: Let chart create secret (for development/testing)
-    token: ""                    # Auth token value (only if existingSecret is empty)
+    token: ""                    # Auth token value (only if secretRef.name is empty)
 
 # Ingress configuration
 # NOTE: Mutually exclusive with gateway - only one can be enabled

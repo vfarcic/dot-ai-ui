@@ -29,7 +29,7 @@ spec:
           value: "3000"
         - name: DOT_AI_MCP_URL
           value: {{ .Values.dotAi.url | quote }}
-        {{- if or .Values.dotAi.auth.existingSecret .Values.dotAi.auth.token }}
+        {{- if or .Values.dotAi.auth.secretRef.name .Values.dotAi.auth.token }}
         - name: DOT_AI_AUTH_TOKEN
           valueFrom:
             secretKeyRef:

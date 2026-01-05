@@ -54,8 +54,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the name of the secret to use for auth token
 */}}
 {{- define "dot-ai-ui.secretName" -}}
-{{- if .Values.dotAi.auth.existingSecret }}
-{{- .Values.dotAi.auth.existingSecret }}
+{{- if .Values.dotAi.auth.secretRef.name }}
+{{- .Values.dotAi.auth.secretRef.name }}
 {{- else }}
 {{- include "dot-ai-ui.fullname" . }}-auth
 {{- end }}
@@ -65,9 +65,5 @@ Create the name of the secret to use for auth token
 Create the key name for auth token in secret
 */}}
 {{- define "dot-ai-ui.secretKey" -}}
-{{- if .Values.dotAi.auth.existingSecretKey }}
-{{- .Values.dotAi.auth.existingSecretKey }}
-{{- else }}
-{{- "auth-token" }}
-{{- end }}
+{{- default "auth-token" .Values.dotAi.auth.secretRef.key }}
 {{- end }}
