@@ -23,8 +23,8 @@ dotAi:
   auth:
     # Option 1: Reference existing secret (recommended for production)
     secretRef:
-      name: ""                   # Secret name (default: dot-ai-secrets when set)
-      key: "auth-token"          # Key within the secret (default: auth-token)
+      name: "dot-ai-secrets"     # Secret name (matches dot-ai MCP server default)
+      key: "auth-token"          # Key within the secret
 
     # Option 2: Let chart create secret (for development/testing)
     token: ""                    # Auth token value (only if secretRef.name is empty)

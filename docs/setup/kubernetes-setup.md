@@ -70,7 +70,7 @@ Open your browser and navigate to the Web UI hostname. You should see the DevOps
 | `image.tag` | Container image tag | Chart appVersion |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `dotAi.url` | URL of the dot-ai MCP server | `http://dot-ai:3456` |
-| `dotAi.auth.secretRef.name` | Name of existing secret with auth token | `""` |
+| `dotAi.auth.secretRef.name` | Name of existing secret with auth token | `dot-ai-secrets` |
 | `dotAi.auth.secretRef.key` | Key in existing secret | `auth-token` |
 | `dotAi.auth.token` | Auth token (if not using secretRef) | `""` |
 | `ingress.enabled` | Enable Ingress resource | `false` |
