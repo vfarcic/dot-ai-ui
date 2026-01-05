@@ -70,9 +70,9 @@ Open your browser and navigate to the Web UI hostname. You should see the DevOps
 | `image.tag` | Container image tag | Chart appVersion |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `dotAi.url` | URL of the dot-ai MCP server | `http://dot-ai:3456` |
-| `dotAi.auth.existingSecret` | Name of existing secret with auth token | `""` |
-| `dotAi.auth.existingSecretKey` | Key in existing secret | `auth-token` |
-| `dotAi.auth.token` | Auth token (if not using existing secret) | `""` |
+| `dotAi.auth.secretRef.name` | Name of existing secret with auth token | `""` |
+| `dotAi.auth.secretRef.key` | Key in existing secret | `auth-token` |
+| `dotAi.auth.token` | Auth token (if not using secretRef) | `""` |
 | `ingress.enabled` | Enable Ingress resource | `false` |
 | `ingress.className` | Ingress class name | `nginx` |
 | `ingress.host` | Ingress hostname | `dot-ai-ui.127.0.0.1.nip.io` |
@@ -85,7 +85,7 @@ Open your browser and navigate to the Web UI hostname. You should see the DevOps
 | `resources.limits.memory` | Memory limit | `256Mi` |
 | `resources.limits.cpu` | CPU limit | `200m` |
 
-## Using Existing Secret
+## Using Secret Reference
 
 For production, reference an existing secret instead of passing the token directly:
 
@@ -93,8 +93,8 @@ For production, reference an existing secret instead of passing the token direct
 helm install dot-ai-ui \
   oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui:$DOT_AI_UI_VERSION \
   --set dotAi.url="http://dot-ai:3456" \
-  --set dotAi.auth.existingSecret="dot-ai-secrets" \
-  --set dotAi.auth.existingSecretKey="auth-token" \
+  --set dotAi.auth.secretRef.name="dot-ai-secrets" \
+  --set dotAi.auth.secretRef.key="auth-token" \
   --set ingress.enabled=true \
   --set ingress.className="$INGRESS_CLASS_NAME" \
   --set ingress.host="dot-ai-ui.example.com" \
@@ -110,7 +110,7 @@ Enable HTTPS with cert-manager:
 helm install dot-ai-ui \
   oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui:$DOT_AI_UI_VERSION \
   --set dotAi.url="http://dot-ai:3456" \
-  --set dotAi.auth.existingSecret="dot-ai-secrets" \
+  --set dotAi.auth.secretRef.name="dot-ai-secrets" \
   --set ingress.enabled=true \
   --set ingress.className="$INGRESS_CLASS_NAME" \
   --set ingress.host="dot-ai-ui.example.com" \
@@ -139,7 +139,7 @@ For Kubernetes 1.26+ with Gateway API support, you can use HTTPRoute instead of 
 helm install dot-ai-ui \
   oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui:$DOT_AI_UI_VERSION \
   --set dotAi.url="http://dot-ai:3456" \
-  --set dotAi.auth.existingSecret="dot-ai-secrets" \
+  --set dotAi.auth.secretRef.name="dot-ai-secrets" \
   --set ingress.enabled=false \
   --set gateway.name="cluster-gateway" \
   --set gateway.namespace="gateway-system" \
