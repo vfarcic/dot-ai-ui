@@ -123,6 +123,23 @@ body {
   background-color: #1a1a1a;
 }
 
+/* Default pointer cursor for interactive elements */
+button,
+select,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 /* Thin scrollbar for tab containers */
 .scrollbar-thin {
   scrollbar-width: thin;

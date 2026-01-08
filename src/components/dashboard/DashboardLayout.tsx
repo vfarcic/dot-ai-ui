@@ -1,19 +1,64 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useCallback } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { DashboardSidebar } from './DashboardSidebar'
 import { NamespaceSelector } from './NamespaceSelector'
 import { ResourceList } from './ResourceList'
+import type { ResourceKind } from '../../api/dashboard'
+
+// URL param keys (short for cleaner URLs)
+const PARAM_NAMESPACE = 'ns'
+const PARAM_KIND = 'kind'
+const PARAM_GROUP = 'group'
+const PARAM_VERSION = 'version'
 
 export function DashboardLayout() {
-  const [selectedKind, setSelectedKind] = useState<string | null>(null)
-  const [selectedApiGroup, setSelectedApiGroup] = useState<string | null>(null)
-  const [selectedNamespace, setSelectedNamespace] = useState('All Namespaces')
+  const [searchParams, setSearchParams] = useSearchParams()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
-  const handleSelectKind = (kind: string, apiGroup: string) => {
-    setSelectedKind(kind)
-    setSelectedApiGroup(apiGroup)
-  }
+  // Read initial state from URL params
+  const namespaceFromUrl = searchParams.get(PARAM_NAMESPACE)
+  const kindFromUrl = searchParams.get(PARAM_KIND)
+  const groupFromUrl = searchParams.get(PARAM_GROUP)
+  const versionFromUrl = searchParams.get(PARAM_VERSION)
+
+  // Derive state from URL params
+  const selectedNamespace = namespaceFromUrl || 'All Namespaces'
+  const selectedResource: ResourceKind | null = kindFromUrl && versionFromUrl
+    ? {
+        kind: kindFromUrl,
+        apiGroup: groupFromUrl || '',
+        apiVersion: versionFromUrl,
+        count: 0, // Count not needed for selection, will be fetched
+      }
+    : null
+
+  // Update URL when namespace changes
+  const handleNamespaceChange = useCallback((namespace: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (namespace === 'All Namespaces') {
+        next.delete(PARAM_NAMESPACE)
+      } else {
+        next.set(PARAM_NAMESPACE, namespace)
+      }
+      return next
+    })
+  }, [setSearchParams])
+
+  // Update URL when resource selection changes
+  const handleResourceSelect = useCallback((resource: ResourceKind) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set(PARAM_KIND, resource.kind)
+      next.set(PARAM_VERSION, resource.apiVersion)
+      if (resource.apiGroup) {
+        next.set(PARAM_GROUP, resource.apiGroup)
+      } else {
+        next.delete(PARAM_GROUP)
+      }
+      return next
+    })
+  }, [setSearchParams])
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -38,33 +83,33 @@ export function DashboardLayout() {
         </div>
         <NamespaceSelector
           value={selectedNamespace}
-          onChange={setSelectedNamespace}
+          onChange={handleNamespaceChange}
         />
       </header>
 
       {/* Main content with sidebar */}
       <div className="flex-1 flex overflow-hidden">
         <DashboardSidebar
-          selectedKind={selectedKind}
-          selectedApiGroup={selectedApiGroup}
-          onSelectKind={handleSelectKind}
+          selectedResource={selectedResource}
+          onSelectResource={handleResourceSelect}
+          namespace={selectedNamespace}
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
 
         {/* Content area */}
         <main className="flex-1 overflow-auto">
-          {selectedKind ? (
+          {selectedResource ? (
             <>
               {/* Content header */}
               <div className="border-b border-border px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h1 className="text-xl font-semibold text-foreground">
-                      {selectedKind}
-                      {selectedApiGroup && (
+                      {selectedResource.kind}
+                      {selectedResource.apiGroup && (
                         <span className="text-sm font-normal text-muted-foreground ml-2">
-                          ({selectedApiGroup})
+                          ({selectedResource.apiGroup})
                         </span>
                       )}
                     </h1>
@@ -124,7 +169,7 @@ export function DashboardLayout() {
               {/* Resource list */}
               <div className="p-6">
                 <div className="bg-muted/30 border border-border rounded-lg overflow-hidden">
-                  <ResourceList kind={selectedKind} namespace={selectedNamespace} />
+                  <ResourceList resourceKind={selectedResource} namespace={selectedNamespace} />
                 </div>
               </div>
             </>

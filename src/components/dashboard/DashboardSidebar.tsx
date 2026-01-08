@@ -7,9 +7,9 @@ import {
 } from '../../api/dashboard'
 
 interface DashboardSidebarProps {
-  selectedKind: string | null
-  selectedApiGroup: string | null
-  onSelectKind: (kind: string, apiGroup: string) => void
+  selectedResource: ResourceKind | null
+  onSelectResource: (resource: ResourceKind) => void
+  namespace: string
   isCollapsed: boolean
   onToggleCollapse: () => void
 }
@@ -103,9 +103,9 @@ function getGroupAbbreviation(groupName: string): string {
 }
 
 export function DashboardSidebar({
-  selectedKind,
-  selectedApiGroup,
-  onSelectKind,
+  selectedResource,
+  onSelectResource,
+  namespace,
   isCollapsed,
   onToggleCollapse,
 }: DashboardSidebarProps) {
@@ -120,13 +120,17 @@ export function DashboardSidebar({
       try {
         setLoading(true)
         setError(null)
-        const kinds = await getResourceKinds()
+        // Pass namespace filter (undefined for "All Namespaces")
+        const namespaceFilter = namespace === 'All Namespaces' ? undefined : namespace
+        const kinds = await getResourceKinds(namespaceFilter)
         const grouped = groupKindsByApiGroup(kinds)
         setKindsByGroup(grouped)
         const groups = sortApiGroups(Array.from(grouped.keys()))
         setSortedGroups(groups)
-        // Only expand "core" by default for a cleaner initial view
-        setExpandedGroups(new Set(['core']))
+        // Only expand "core" by default on initial load
+        if (expandedGroups.size === 0) {
+          setExpandedGroups(new Set(['core']))
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load resources')
       } finally {
@@ -134,7 +138,7 @@ export function DashboardSidebar({
       }
     }
     fetchKinds()
-  }, [])
+  }, [namespace])
 
   const toggleGroup = (groupName: string) => {
     setExpandedGroups((prev) => {
@@ -148,8 +152,13 @@ export function DashboardSidebar({
     })
   }
 
-  const isKindSelected = (kind: string, apiGroup: string) => {
-    return selectedKind === kind && selectedApiGroup === (apiGroup === 'core' ? '' : apiGroup)
+  const isResourceSelected = (resourceKind: ResourceKind) => {
+    if (!selectedResource) return false
+    return (
+      selectedResource.kind === resourceKind.kind &&
+      selectedResource.apiGroup === resourceKind.apiGroup &&
+      selectedResource.apiVersion === resourceKind.apiVersion
+    )
   }
 
   return (
@@ -197,7 +206,7 @@ export function DashboardSidebar({
               {/* Group header */}
               <button
                 onClick={() => !isCollapsed && toggleGroup(groupName)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors cursor-pointer ${
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors ${
                   isCollapsed ? 'justify-center' : ''
                 }`}
                 title={`${groupName} (${totalCount})`}
@@ -220,14 +229,13 @@ export function DashboardSidebar({
               {!isCollapsed && isExpanded && (
                 <div className="ml-4 border-l border-border">
                   {kinds.map((resourceKind) => {
-                    const apiGroupValue = groupName === 'core' ? '' : groupName
-                    const selected = isKindSelected(resourceKind.kind, groupName)
+                    const selected = isResourceSelected(resourceKind)
 
                     return (
                       <button
                         key={`${groupName}/${resourceKind.kind}`}
-                        onClick={() => onSelectKind(resourceKind.kind, apiGroupValue)}
-                        className={`w-full text-left px-4 py-1.5 text-sm transition-colors flex items-center justify-between cursor-pointer ${
+                        onClick={() => onSelectResource(resourceKind)}
+                        className={`w-full text-left px-4 py-1.5 text-sm transition-colors flex items-center justify-between ${
                           selected
                             ? 'text-primary bg-primary/10 border-l-2 border-primary -ml-px'
                             : 'text-muted-foreground hover:text-primary hover:bg-primary/10'

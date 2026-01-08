@@ -19,9 +19,18 @@ export interface ResourceKindsResponse {
 /**
  * Fetch all resource kinds available in the cluster
  * Groups resources by apiGroup for sidebar display
+ * @param namespace - Optional namespace to filter resource counts
  */
-export async function getResourceKinds(): Promise<ResourceKind[]> {
-  const response = await fetch(`${API_PATH}/resources/kinds`, {
+export async function getResourceKinds(namespace?: string): Promise<ResourceKind[]> {
+  const params = new URLSearchParams()
+  if (namespace) {
+    params.set('namespace', namespace)
+  }
+
+  const queryString = params.toString()
+  const url = `${API_PATH}/resources/kinds${queryString ? `?${queryString}` : ''}`
+
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -68,6 +77,33 @@ export function sortApiGroups(groups: string[]): string[] {
     if (b === 'core') return 1
     return a.localeCompare(b)
   })
+}
+
+// ============================================================================
+// Namespaces API
+// ============================================================================
+
+export interface NamespacesResponse {
+  namespaces: string[]
+}
+
+/**
+ * Fetch all namespaces available in the cluster
+ */
+export async function getNamespaces(): Promise<string[]> {
+  const response = await fetch(`${API_PATH}/namespaces`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch namespaces: ${response.status} ${response.statusText}`)
+  }
+
+  const json = await response.json()
+  return json.data?.namespaces || []
 }
 
 // ============================================================================
