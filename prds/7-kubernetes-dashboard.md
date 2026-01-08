@@ -133,7 +133,7 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 
 ### Milestone 1: MCP Integration (Resource Discovery)
 - [x] MCP client functions for `listResourceKinds` endpoint
-- [ ] MCP client functions for `listResources` endpoint
+- [x] MCP client functions for `listResources` endpoint
 - [ ] Replace mock data with MCP queries (resource list)
 - [x] Dynamic sidebar populated from `listResourceKinds`
 - [ ] Resource tables populated from `listResources`
@@ -250,4 +250,5 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 | 2025-01-08 | Milestone 0 (Mock UI Prototype) completed - dashboard layout, sidebar, resource tables with mock data |
 | 2025-01-08 | Architecture decision: hybrid Qdrant + K8s API approach |
 | 2025-01-08 | Milestone 1 partial - Sidebar now fetches live data from MCP `/api/v1/resources/kinds`, groups by apiGroup with counts, collapsed state abbreviations, hover effects |
+| 2025-01-08 | Milestone 1 partial - Added `getResources()` API client and `/api/v1/resources` proxy route for resource list endpoint |
 
