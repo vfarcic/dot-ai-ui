@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Home } from './pages/Home'
 import { Visualization } from './pages/Visualization'
+import { Dashboard } from './pages/Dashboard'
 import { Layout } from './components/Layout'
 
 function App() {
@@ -11,6 +12,7 @@ function App() {
           <Route index element={<Home />} />
           <Route path="v/:sessionId" element={<Visualization />} />
         </Route>
+        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </BrowserRouter>
   )

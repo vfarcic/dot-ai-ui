@@ -102,6 +102,48 @@ async function createServer() {
     }
   })
 
+  // Proxy dashboard resource API requests to MCP server
+  app.get('/api/v1/resources/kinds', apiLimiter, async (_req, res) => {
+    try {
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      }
+      if (AUTH_TOKEN) {
+        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
+
+      const url = `${MCP_BASE_URL}/api/v1/resources/kinds`
+      console.log(`[Proxy] Fetching resource kinds from MCP: ${url}`)
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to fetch resource kinds' })
+    }
+  })
+
   if (isDev) {
     // Development: use Vite middleware for HMR
     const { createServer: createViteServer } = await import('vite')
