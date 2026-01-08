@@ -167,9 +167,18 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 **Validation**: Can list and view details of any resource type (Pods, Deployments, CRDs)
 
 ### Milestone 5: AI Action Integration
-- [ ] `AIActionBar` component with Query, Remediate, Operate buttons
+
+#### Design Phase
+- [ ] Design: Query tool integration - what questions make sense from resource context?
+- [ ] Design: Remediate tool integration - how to present analysis and suggested fixes?
+- [ ] Design: Operate tool integration - what Day 2 operations to expose (scale, update, rollback)?
+- [ ] Design: Recommend tool integration - when/where to show deployment recommendations?
+
+#### Implementation
+- [ ] `AIActionBar` component with Query, Remediate, Operate, Recommend buttons
 - [ ] `AIResultsPanel` side panel for AI responses
-- [ ] MCP client functions for query/remediate/operate
+- [ ] MCP client functions for query/remediate/operate/recommend
+- [ ] Context passing - send resource details to MCP tools
 - [ ] Link to full visualization (`/v/{sessionId}`) for complex outputs
 
 **Validation**: Click "Remediate" on a resource, see AI analysis in side panel
