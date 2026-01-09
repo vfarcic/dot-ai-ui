@@ -169,7 +169,11 @@ export function DashboardLayout() {
               {/* Resource list */}
               <div className="p-6">
                 <div className="bg-muted/30 border border-border rounded-lg overflow-hidden">
-                  <ResourceList resourceKind={selectedResource} namespace={selectedNamespace} />
+                  <ResourceList
+                    resourceKind={selectedResource}
+                    namespace={selectedNamespace}
+                    onNamespaceClick={handleNamespaceChange}
+                  />
                 </div>
               </div>
             </>

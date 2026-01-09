@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   getResources,
   getCapabilities,
-  getCoreResourceColumns,
+  getBuiltinResourceColumns,
   DEFAULT_COLUMNS,
   type ResourceKind,
   type Resource,
@@ -12,6 +12,14 @@ import {
 interface ResourceListProps {
   resourceKind: ResourceKind
   namespace: string
+  onNamespaceClick?: (namespace: string) => void
+}
+
+type SortDirection = 'asc' | 'desc'
+
+interface SortState {
+  column: string // column name
+  direction: SortDirection
 }
 
 // ============================================================================
@@ -200,15 +208,47 @@ function StatusLoadingIndicator() {
   )
 }
 
-export function ResourceList({ resourceKind, namespace }: ResourceListProps) {
+function SortIcon({ direction, active }: { direction: SortDirection; active: boolean }) {
+  return (
+    <svg
+      className={`w-3 h-3 ml-1 inline-block transition-colors ${
+        active ? 'text-foreground' : 'text-muted-foreground/30'
+      }`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      {direction === 'asc' ? (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      ) : (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      )}
+    </svg>
+  )
+}
+
+export function ResourceList({ resourceKind, namespace, onNamespaceClick }: ResourceListProps) {
   const [resources, setResources] = useState<Resource[]>([])
   const [loading, setLoading] = useState(true)
   const [statusLoading, setStatusLoading] = useState(true) // Start as true - we'll fetch status after metadata
   const [error, setError] = useState<string | null>(null)
   const [printerColumns, setPrinterColumns] = useState<PrinterColumn[]>([])
   const [columnsLoaded, setColumnsLoaded] = useState(false)
+  const [sort, setSort] = useState<SortState>({ column: 'Name', direction: 'asc' })
 
   const namespaceParam = namespace === 'All Namespaces' ? undefined : namespace
+
+  // Handle column header click for sorting
+  const handleSort = useCallback((columnName: string) => {
+    setSort((prev) => {
+      if (prev.column === columnName) {
+        // Toggle direction if same column
+        return { column: columnName, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+      }
+      // New column - start with ascending
+      return { column: columnName, direction: 'asc' }
+    })
+  }, [])
 
   // Fetch capabilities (printer columns) for this resource kind
   // Priority: 1) Hardcoded core columns, 2) MCP, 3) Default fallback
@@ -224,10 +264,10 @@ export function ResourceList({ resourceKind, namespace }: ResourceListProps) {
           ? `${resourceKind.apiGroup}/${resourceKind.apiVersion}`
           : resourceKind.apiVersion
 
-      // 1) Check for hardcoded core resource columns first
-      const coreColumns = getCoreResourceColumns(resourceKind.kind, resourceKind.apiVersion)
-      if (coreColumns) {
-        setPrinterColumns(coreColumns)
+      // 1) Check for hardcoded built-in resource columns first
+      const builtinColumns = getBuiltinResourceColumns(resourceKind.kind, resourceKind.apiVersion)
+      if (builtinColumns) {
+        setPrinterColumns(builtinColumns)
         setColumnsLoaded(true)
         return
       }
@@ -242,7 +282,21 @@ export function ResourceList({ resourceKind, namespace }: ResourceListProps) {
         // MCP failed - use default fallback columns
         setPrinterColumns(DEFAULT_COLUMNS)
       } else if (result.data?.printerColumns && result.data.printerColumns.length > 0) {
-        setPrinterColumns(result.data.printerColumns)
+        // Filter out columns with empty jsonPath or .spec references (MCP doesn't return spec)
+        const validColumns = result.data.printerColumns.filter((col) => {
+          // Must have a non-empty jsonPath
+          if (!col.jsonPath || col.jsonPath.trim() === '') return false
+          // Filter out .spec references since MCP doesn't return spec data
+          if (col.jsonPath.startsWith('.spec')) return false
+          return true
+        })
+
+        if (validColumns.length > 0) {
+          setPrinterColumns(validColumns)
+        } else {
+          // All columns were filtered out - use default fallback
+          setPrinterColumns(DEFAULT_COLUMNS)
+        }
       } else {
         // 3) MCP returned empty - use default fallback columns
         setPrinterColumns(DEFAULT_COLUMNS)
@@ -298,6 +352,101 @@ export function ResourceList({ resourceKind, namespace }: ResourceListProps) {
     fetchResources()
   }, [fetchResources])
 
+  // Compute standard columns (must be before any early returns due to hooks rules)
+  const standardColumns = useMemo(() => {
+    // Filter printer columns to priority 0 only (standard kubectl get columns)
+    let cols = printerColumns.filter((col) => (col.priority ?? 0) === 0)
+
+    // When viewing "All Namespaces", always include Namespace column after Name
+    const showingAllNamespaces = namespace === 'All Namespaces'
+    const hasNamespaceColumn = cols.some(
+      (col) => col.name.toLowerCase() === 'namespace' || col.jsonPath === '.metadata.namespace'
+    )
+    if (showingAllNamespaces && !hasNamespaceColumn) {
+      const nameIndex = cols.findIndex((col) => col.name.toLowerCase() === 'name')
+      const namespaceColumn: PrinterColumn = {
+        name: 'Namespace',
+        type: 'string',
+        jsonPath: '.metadata.namespace',
+        priority: 0,
+      }
+      if (nameIndex >= 0) {
+        // Insert after Name column
+        cols = [
+          ...cols.slice(0, nameIndex + 1),
+          namespaceColumn,
+          ...cols.slice(nameIndex + 1),
+        ]
+      } else {
+        // Prepend if no Name column found
+        cols = [namespaceColumn, ...cols]
+      }
+    }
+    return cols
+  }, [printerColumns, namespace])
+
+  // Sort resources based on current sort state (must be before any early returns)
+  const sortedResources = useMemo(() => {
+    if (resources.length === 0) return resources
+
+    const sortColumn = standardColumns.find((col) => col.name === sort.column)
+    if (!sortColumn) return resources
+
+    return [...resources].sort((a, b) => {
+      // Build full resource objects for JSONPath extraction
+      const fullA = {
+        metadata: {
+          name: a.name,
+          namespace: a.namespace,
+          labels: a.labels,
+          creationTimestamp: a.createdAt,
+        },
+        spec: a.spec,
+        status: a.status,
+        ...a,
+      }
+      const fullB = {
+        metadata: {
+          name: b.name,
+          namespace: b.namespace,
+          labels: b.labels,
+          creationTimestamp: b.createdAt,
+        },
+        spec: b.spec,
+        status: b.status,
+        ...b,
+      }
+
+      const valueA = extractJsonPathValue(fullA, sortColumn.jsonPath)
+      const valueB = extractJsonPathValue(fullB, sortColumn.jsonPath)
+
+      // Handle null/undefined values - sort them to the end
+      if (valueA === null || valueA === undefined) return sort.direction === 'asc' ? 1 : -1
+      if (valueB === null || valueB === undefined) return sort.direction === 'asc' ? -1 : 1
+
+      let comparison = 0
+
+      // Type-aware comparison
+      if (sortColumn.type === 'date') {
+        const dateA = new Date(String(valueA)).getTime()
+        const dateB = new Date(String(valueB)).getTime()
+        comparison = dateA - dateB
+      } else if (sortColumn.type === 'integer' || sortColumn.type === 'number') {
+        const numA = Number(valueA) || 0
+        const numB = Number(valueB) || 0
+        comparison = numA - numB
+      } else {
+        // String comparison (case-insensitive)
+        comparison = String(valueA).toLowerCase().localeCompare(String(valueB).toLowerCase())
+      }
+
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }, [resources, standardColumns, sort])
+
+  const columnsLoading = !columnsLoaded
+
+  // Early returns after all hooks
   if (loading) {
     return <LoadingSkeleton />
   }
@@ -309,37 +458,6 @@ export function ResourceList({ resourceKind, namespace }: ResourceListProps) {
   if (resources.length === 0) {
     return <EmptyState kind={resourceKind.kind} namespace={namespace} />
   }
-
-  // Filter printer columns to priority 0 only (standard kubectl get columns)
-  let standardColumns = printerColumns.filter((col) => (col.priority ?? 0) === 0)
-
-  // When viewing "All Namespaces", always include Namespace column after Name
-  const showingAllNamespaces = namespace === 'All Namespaces'
-  const hasNamespaceColumn = standardColumns.some(
-    (col) => col.name.toLowerCase() === 'namespace' || col.jsonPath === '.metadata.namespace'
-  )
-  if (showingAllNamespaces && !hasNamespaceColumn) {
-    const nameIndex = standardColumns.findIndex((col) => col.name.toLowerCase() === 'name')
-    const namespaceColumn: PrinterColumn = {
-      name: 'Namespace',
-      type: 'string',
-      jsonPath: '.metadata.namespace',
-      priority: 0,
-    }
-    if (nameIndex >= 0) {
-      // Insert after Name column
-      standardColumns = [
-        ...standardColumns.slice(0, nameIndex + 1),
-        namespaceColumn,
-        ...standardColumns.slice(nameIndex + 1),
-      ]
-    } else {
-      // Prepend if no Name column found
-      standardColumns = [namespaceColumn, ...standardColumns]
-    }
-  }
-
-  const columnsLoading = !columnsLoaded
 
   // Show placeholder table while printer columns are loading
   if (columnsLoading) {
@@ -383,19 +501,27 @@ export function ResourceList({ resourceKind, namespace }: ResourceListProps) {
       <table className="w-full">
         <thead>
           <tr className="border-b border-border">
-            {standardColumns.map((col) => (
-              <th
-                key={col.name}
-                className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                title={col.description}
-              >
-                {col.name}
-              </th>
-            ))}
+            {standardColumns.map((col) => {
+              const isActive = sort.column === col.name
+              return (
+                <th
+                  key={col.name}
+                  className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-primary hover:bg-primary/10 transition-colors select-none"
+                  title={col.description || `Sort by ${col.name}`}
+                  onClick={() => handleSort(col.name)}
+                >
+                  {col.name}
+                  <SortIcon
+                    direction={isActive ? sort.direction : 'asc'}
+                    active={isActive}
+                  />
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {resources.map((resource) => {
+          {sortedResources.map((resource) => {
             // Build a resource object for JSONPath extraction
             const fullResource = {
               metadata: {
@@ -418,8 +544,10 @@ export function ResourceList({ resourceKind, namespace }: ResourceListProps) {
                   const value = extractJsonPathValue(fullResource, col.jsonPath)
                   const displayValue = formatColumnValue(value, col.type)
                   const isName = col.name.toLowerCase() === 'name'
+                  const isNamespace = col.name.toLowerCase() === 'namespace' || col.jsonPath === '.metadata.namespace'
                   const isStatusColumn = col.jsonPath.startsWith('.status')
                   const isLoading = isStatusColumn && statusLoading && (value === null || value === undefined)
+                  const namespaceValue = isNamespace && typeof value === 'string' ? value : null
 
                   return (
                     <td key={col.name} className="px-4 py-3 text-sm">
@@ -429,6 +557,14 @@ export function ResourceList({ resourceKind, namespace }: ResourceListProps) {
                         <span className="font-medium text-foreground hover:text-primary cursor-pointer">
                           {displayValue}
                         </span>
+                      ) : isNamespace && namespaceValue && onNamespaceClick ? (
+                        <button
+                          onClick={() => onNamespaceClick(namespaceValue)}
+                          className="text-muted-foreground hover:text-primary cursor-pointer transition-colors"
+                          title={`Filter by namespace "${namespaceValue}"`}
+                        >
+                          {displayValue}
+                        </button>
                       ) : (
                         <span className="text-muted-foreground">{displayValue}</span>
                       )}

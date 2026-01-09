@@ -281,4 +281,10 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 | 2025-01-09 | Milestone 4 partial - ResourceList with dynamic printer columns, JSONPath extraction, status formatting |
 | 2025-01-09 | Fixed apiVersion duplication bug, added dynamic Namespace column for "All Namespaces" view |
 | 2025-01-09 | Improved collapsed sidebar UX - clicking group expands sidebar and opens group |
+| 2025-01-09 | Added comprehensive BUILTIN_RESOURCE_COLUMNS for all built-in K8s resources (core, apps, batch, networking, rbac, storage, flowcontrol, etc.) with correct jsonPaths |
+| 2025-01-09 | Added filtering for MCP columns with empty jsonPath or .spec references (MCP doesn't return spec data) |
+| 2025-01-09 | Fixed apiVersion key format for built-in resources - uses full apiVersion format (e.g., `apps/v1`, `rbac.authorization.k8s.io/v1`) |
+| 2025-01-09 | Verified all built-in resources display correct columns: Pod (Status), Deployment (Ready/Available), DaemonSet (Desired/Current), ReplicaSet (Desired/Ready), etc. |
+| 2025-01-09 | Added table sorting - default by Name ascending, clickable column headers with sort icons, toggle asc/desc, type-aware comparison (strings, numbers, dates) |
+| 2025-01-09 | Added namespace click-to-filter - clicking namespace value in table filters to that namespace, updates URL and dropdown |
 
