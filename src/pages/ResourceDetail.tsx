@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { stringify as yamlStringify } from 'yaml'
+import Prism from 'prismjs'
+import 'prismjs/components/prism-yaml'
 import { CollapsibleTree } from '../components/dashboard/CollapsibleTree'
 import { ExpandableDescription } from '../components/dashboard/ExpandableDescription'
 import {
@@ -111,8 +114,83 @@ function formatColumnValue(value: unknown, columnType: string): string {
 }
 
 // ============================================================================
+// YAML Conversion
+// ============================================================================
+
+/**
+ * Convert a Kubernetes resource to YAML with canonical field ordering
+ * Order: apiVersion, kind, metadata, spec, status (matching kubectl output)
+ */
+function resourceToYaml(resource: KubernetesResource): string {
+  // Build object with explicit field ordering
+  const ordered: Record<string, unknown> = {
+    apiVersion: resource.apiVersion,
+    kind: resource.kind,
+    metadata: resource.metadata,
+  }
+
+  // Only include spec/status if they exist
+  if (resource.spec !== undefined) {
+    ordered.spec = resource.spec
+  }
+  if (resource.status !== undefined) {
+    ordered.status = resource.status
+  }
+
+  return yamlStringify(ordered, {
+    indent: 2,
+    lineWidth: 0, // Don't wrap lines
+    nullStr: 'null',
+  })
+}
+
+// ============================================================================
 // Components
 // ============================================================================
+
+interface YamlViewProps {
+  yaml: string
+}
+
+function YamlView({ yaml }: YamlViewProps) {
+  const codeRef = useRef<HTMLElement>(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (codeRef.current) {
+      Prism.highlightElement(codeRef.current)
+    }
+  }, [yaml])
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(yaml)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
+  return (
+    <div className="relative group max-w-5xl">
+      <div className="absolute top-3 right-3 z-10">
+        <button
+          onClick={handleCopy}
+          className="text-xs text-muted-foreground bg-muted hover:bg-muted/80 px-3 py-1.5 rounded transition-colors"
+          title="Copy to clipboard"
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
+      <pre className="rounded-lg bg-[#1a1a1a] p-4 overflow-auto text-sm !m-0 max-h-[70vh]">
+        <code ref={codeRef} className="language-yaml">
+          {yaml}
+        </code>
+      </pre>
+    </div>
+  )
+}
 
 interface PrinterColumn {
   name: string
@@ -396,8 +474,8 @@ export function ResourceDetail() {
               </div>
             )}
 
-            {activeTab === 'yaml' && (
-              <div className="text-muted-foreground">YAML tab coming soon...</div>
+            {activeTab === 'yaml' && resource && (
+              <YamlView yaml={resourceToYaml(resource)} />
             )}
 
             {activeTab === 'events' && (

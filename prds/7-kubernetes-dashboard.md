@@ -167,7 +167,7 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [x] Metadata tab with real resource metadata
 - [x] Spec tab with real resource spec
 - [x] Status tab with real resource status
-- [ ] YAML tab (currently disabled)
+- [x] YAML tab with syntax highlighting and copy-to-clipboard
 - [ ] Events tab (currently disabled)
 - [ ] Pod-specific Logs tab (currently disabled)
 
@@ -323,4 +323,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-09 | PRD accuracy update - Split ResourceDetailPage checkbox into granular items to accurately track: API connection, each tab implementation, header description. Previous checkbox was premature. |
 | 2025-01-09 | Milestone 4 partial - ResourceDetailPage now fetches capabilities from MCP (description, useCase, printerColumns) with multi-item cache. Resource data (metadata, spec, status) still uses mock data pending MCP single-resource endpoint. Added Development Setup section to PRD. Created cross-project skills (query-dot-ai, request-dot-ai-feature) for dot-ai ecosystem collaboration. |
 | 2025-01-09 | Milestone 4 major - ResourceDetailPage now connected to real MCP API via new `/api/v1/resource` endpoint. Added `getResource()` API client. Overview, Metadata, Spec, Status tabs all show real K8s data. Added `includeSpec` option to `getBuiltinResourceColumns()` - detail page shows all columns (IP, Node, Host IP, Service Account, etc.) while list view remains minimal. |
+| 2025-01-09 | Milestone 4 - YAML tab implemented. Added `yaml` package, `resourceToYaml()` function with canonical K8s field ordering (apiVersion → kind → metadata → spec → status), `YamlView` component with Prism syntax highlighting and copy-to-clipboard. Verified MCP returns identical data to kubectl (queries K8s API directly, not Qdrant). |
 
