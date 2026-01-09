@@ -1,9 +1,16 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { DashboardSidebar } from './DashboardSidebar'
 import { NamespaceSelector } from './NamespaceSelector'
 import { ResourceList } from './ResourceList'
-import type { ResourceKind } from '../../api/dashboard'
+import { ExpandableDescription } from './ExpandableDescription'
+import {
+  getCapabilities,
+  getBuiltinResourceColumns,
+  DEFAULT_COLUMNS,
+  type ResourceKind,
+  type ResourceCapabilities,
+} from '../../api/dashboard'
 
 // URL param keys (short for cleaner URLs)
 const PARAM_NAMESPACE = 'ns'
@@ -31,6 +38,85 @@ export function DashboardLayout() {
         count: 0, // Count not needed for selection, will be fetched
       }
     : null
+
+  // Capabilities state for resource description and printer columns
+  const [capabilities, setCapabilities] = useState<ResourceCapabilities | null>(null)
+  const [capabilitiesLoading, setCapabilitiesLoading] = useState(false)
+
+  // Fetch capabilities when selected resource changes
+  useEffect(() => {
+    if (!selectedResource) {
+      setCapabilities(null)
+      setCapabilitiesLoading(false)
+      return
+    }
+
+    const fetchCapabilities = async () => {
+      setCapabilitiesLoading(true)
+
+      // Build apiVersion: may already be full (e.g., "postgresql.cnpg.io/v1") or just version (e.g., "v1")
+      const apiVersion = selectedResource.apiVersion.includes('/')
+        ? selectedResource.apiVersion
+        : selectedResource.apiGroup
+          ? `${selectedResource.apiGroup}/${selectedResource.apiVersion}`
+          : selectedResource.apiVersion
+
+      // Check for hardcoded built-in resource columns first
+      const builtinColumns = getBuiltinResourceColumns(
+        selectedResource.kind,
+        selectedResource.apiVersion
+      )
+
+      if (builtinColumns) {
+        // For built-in resources, we still fetch from MCP for description/useCase
+        // but use hardcoded columns
+        const result = await getCapabilities({
+          kind: selectedResource.kind,
+          apiVersion,
+        })
+
+        setCapabilities({
+          kind: selectedResource.kind,
+          apiVersion,
+          printerColumns: builtinColumns,
+          description: result.data?.description,
+          useCase: result.data?.useCase,
+        })
+        setCapabilitiesLoading(false)
+        return
+      }
+
+      // Fetch from MCP for CRDs and other resources
+      const result = await getCapabilities({
+        kind: selectedResource.kind,
+        apiVersion,
+      })
+
+      if (result.error || !result.data) {
+        // MCP failed - use default fallback columns
+        setCapabilities({
+          kind: selectedResource.kind,
+          apiVersion,
+          printerColumns: DEFAULT_COLUMNS,
+        })
+      } else {
+        // Filter out columns with empty jsonPath or .spec references
+        const validColumns = (result.data.printerColumns || []).filter((col) => {
+          if (!col.jsonPath || col.jsonPath.trim() === '') return false
+          if (col.jsonPath.startsWith('.spec')) return false
+          return true
+        })
+
+        setCapabilities({
+          ...result.data,
+          printerColumns: validColumns.length > 0 ? validColumns : DEFAULT_COLUMNS,
+        })
+      }
+      setCapabilitiesLoading(false)
+    }
+
+    fetchCapabilities()
+  }, [selectedResource?.kind, selectedResource?.apiGroup, selectedResource?.apiVersion])
 
   // Update URL when namespace changes
   const handleNamespaceChange = useCallback((namespace: string) => {
@@ -113,55 +199,13 @@ export function DashboardLayout() {
                         </span>
                       )}
                     </h1>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      {selectedNamespace === 'All Namespaces'
-                        ? 'Showing resources across all namespaces'
-                        : `Showing resources in ${selectedNamespace}`}
-                    </p>
-                  </div>
-
-                  {/* AI Actions placeholder - will be functional later */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-not-allowed opacity-50"
-                      disabled
-                      title="Coming soon: Ask AI about these resources"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      Query
-                    </button>
-                    <button
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-not-allowed opacity-50"
-                      disabled
-                      title="Coming soon: AI-powered remediation"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
-                        />
-                      </svg>
-                      Remediate
-                    </button>
+                    <div className="mt-1">
+                      <ExpandableDescription
+                        description={capabilities?.description}
+                        useCase={capabilities?.useCase}
+                        loading={capabilitiesLoading}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -173,6 +217,8 @@ export function DashboardLayout() {
                     resourceKind={selectedResource}
                     namespace={selectedNamespace}
                     onNamespaceClick={handleNamespaceChange}
+                    capabilities={capabilities}
+                    capabilitiesLoading={capabilitiesLoading}
                   />
                 </div>
               </div>

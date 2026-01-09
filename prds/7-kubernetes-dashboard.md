@@ -160,7 +160,7 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 
 ### Milestone 4: Resource List & Detail Views
 - [x] Generic `ResourceListPage` with dynamic columns
-- [ ] Generic `ResourceDetailPage` with tabs (Overview, YAML, Events)
+- [x] Generic `ResourceDetailPage` with tabs (Overview, Metadata, Spec, Status, YAML, Events, Logs)
 - [ ] Pod-specific Logs tab
 - [x] Status badges and age formatting
 
@@ -288,4 +288,5 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 | 2025-01-09 | Added table sorting - default by Name ascending, clickable column headers with sort icons, toggle asc/desc, type-aware comparison (strings, numbers, dates) |
 | 2025-01-09 | Added namespace click-to-filter - clicking namespace value in table filters to that namespace, updates URL and dropdown |
 | 2025-01-09 | Added pattern-based status coloring - green for healthy states (Running, Succeeded, Active), yellow for warnings (Pending, Terminating), red for errors (Failed, CrashLoopBackOff) via new `src/utils/statusColors.ts` utility |
+| 2025-01-09 | Milestone 4 partial - ResourceDetailPage with tabs (Overview, Metadata, Spec, Status, YAML, Events, Logs), CollapsibleTree component for nested data, ExpandableDescription for resource descriptions, clickable resource names linking to detail view |
 

@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import {
   getResources,
-  getCapabilities,
-  getBuiltinResourceColumns,
   DEFAULT_COLUMNS,
   type ResourceKind,
   type Resource,
+  type ResourceCapabilities,
   type PrinterColumn,
 } from '../../api/dashboard'
 import {
@@ -18,6 +18,8 @@ interface ResourceListProps {
   resourceKind: ResourceKind
   namespace: string
   onNamespaceClick?: (namespace: string) => void
+  capabilities: ResourceCapabilities | null
+  capabilitiesLoading: boolean
 }
 
 type SortDirection = 'asc' | 'desc'
@@ -232,14 +234,22 @@ function SortIcon({ direction, active }: { direction: SortDirection; active: boo
   )
 }
 
-export function ResourceList({ resourceKind, namespace, onNamespaceClick }: ResourceListProps) {
+export function ResourceList({
+  resourceKind,
+  namespace,
+  onNamespaceClick,
+  capabilities,
+  capabilitiesLoading,
+}: ResourceListProps) {
   const [resources, setResources] = useState<Resource[]>([])
   const [loading, setLoading] = useState(true)
   const [statusLoading, setStatusLoading] = useState(true) // Start as true - we'll fetch status after metadata
   const [error, setError] = useState<string | null>(null)
-  const [printerColumns, setPrinterColumns] = useState<PrinterColumn[]>([])
-  const [columnsLoaded, setColumnsLoaded] = useState(false)
   const [sort, setSort] = useState<SortState>({ column: 'Name', direction: 'asc' })
+
+  // Get printer columns from capabilities prop (or fallback to defaults)
+  const printerColumns = capabilities?.printerColumns || DEFAULT_COLUMNS
+  const columnsLoaded = !capabilitiesLoading
 
   const namespaceParam = namespace === 'All Namespaces' ? undefined : namespace
 
@@ -254,62 +264,6 @@ export function ResourceList({ resourceKind, namespace, onNamespaceClick }: Reso
       return { column: columnName, direction: 'asc' }
     })
   }, [])
-
-  // Fetch capabilities (printer columns) for this resource kind
-  // Priority: 1) Hardcoded core columns, 2) MCP, 3) Default fallback
-  useEffect(() => {
-    const fetchCapabilities = async () => {
-      setColumnsLoaded(false)
-      setPrinterColumns([])
-
-      // apiVersion may already be full (e.g., "dot-ai.devopstoolkit.live/v1alpha1") or just version (e.g., "v1")
-      const apiVersion = resourceKind.apiVersion.includes('/')
-        ? resourceKind.apiVersion
-        : resourceKind.apiGroup
-          ? `${resourceKind.apiGroup}/${resourceKind.apiVersion}`
-          : resourceKind.apiVersion
-
-      // 1) Check for hardcoded built-in resource columns first
-      const builtinColumns = getBuiltinResourceColumns(resourceKind.kind, resourceKind.apiVersion)
-      if (builtinColumns) {
-        setPrinterColumns(builtinColumns)
-        setColumnsLoaded(true)
-        return
-      }
-
-      // 2) Fetch from MCP for CRDs and other resources
-      const result = await getCapabilities({
-        kind: resourceKind.kind,
-        apiVersion,
-      })
-
-      if (result.error) {
-        // MCP failed - use default fallback columns
-        setPrinterColumns(DEFAULT_COLUMNS)
-      } else if (result.data?.printerColumns && result.data.printerColumns.length > 0) {
-        // Filter out columns with empty jsonPath or .spec references (MCP doesn't return spec)
-        const validColumns = result.data.printerColumns.filter((col) => {
-          // Must have a non-empty jsonPath
-          if (!col.jsonPath || col.jsonPath.trim() === '') return false
-          // Filter out .spec references since MCP doesn't return spec data
-          if (col.jsonPath.startsWith('.spec')) return false
-          return true
-        })
-
-        if (validColumns.length > 0) {
-          setPrinterColumns(validColumns)
-        } else {
-          // All columns were filtered out - use default fallback
-          setPrinterColumns(DEFAULT_COLUMNS)
-        }
-      } else {
-        // 3) MCP returned empty - use default fallback columns
-        setPrinterColumns(DEFAULT_COLUMNS)
-      }
-      setColumnsLoaded(true)
-    }
-    fetchCapabilities()
-  }, [resourceKind.kind, resourceKind.apiGroup, resourceKind.apiVersion])
 
   // Fetch resources without status (fast), then with status (slower)
   const fetchResources = useCallback(async () => {
@@ -560,14 +514,22 @@ export function ResourceList({ resourceKind, namespace, onNamespaceClick }: Reso
                     ? getStatusColorClasses(classifyStatus(displayValue))
                     : 'text-muted-foreground'
 
+                  // Build detail page URL for name column
+                  const detailUrl = isName
+                    ? `/dashboard/${resourceKind.apiGroup || '_core'}/${resourceKind.apiVersion}/${resourceKind.kind}/${resource.namespace || '_cluster'}/${resource.name}`
+                    : null
+
                   return (
                     <td key={col.name} className="px-4 py-3 text-sm">
                       {isLoading ? (
                         <StatusLoadingIndicator />
-                      ) : isName ? (
-                        <span className="font-medium text-foreground hover:text-primary cursor-pointer">
+                      ) : isName && detailUrl ? (
+                        <Link
+                          to={detailUrl}
+                          className="font-medium text-foreground hover:text-primary transition-colors"
+                        >
                           {displayValue}
-                        </span>
+                        </Link>
                       ) : isNamespace && namespaceValue && onNamespaceClick ? (
                         <button
                           onClick={() => onNamespaceClick(namespaceValue)}

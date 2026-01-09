@@ -511,6 +511,8 @@ export interface ResourceCapabilities {
   kind: string
   apiVersion: string
   printerColumns?: PrinterColumn[]
+  description?: string
+  useCase?: string
 }
 
 export interface GetCapabilitiesParams {
@@ -557,13 +559,19 @@ export async function getCapabilities(params: GetCapabilitiesParams): Promise<Ge
       return { data: null, error: true }
     }
 
-    // Extract printer columns from MCP response structure
-    const printerColumns = json.data?.result?.data?.printerColumns || []
+    // Extract data from MCP response structure
+    const mcpData = json.data?.result?.data
+    const printerColumns = mcpData?.printerColumns || []
+    const description = mcpData?.description || undefined
+    const useCase = mcpData?.useCase || undefined
+
     return {
       data: {
         kind,
         apiVersion,
         printerColumns,
+        description,
+        useCase,
       },
       error: false,
     }

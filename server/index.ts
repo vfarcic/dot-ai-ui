@@ -6,9 +6,11 @@ import rateLimit from 'express-rate-limit'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Rate limiting configuration
+// Dashboard makes ~5 requests per resource view (namespaces, kinds, resources, capabilities, status)
+// Allow enough for active dashboard exploration
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 60, // 60 requests per minute per IP
+  max: 200, // 200 requests per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later' },
