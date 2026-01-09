@@ -515,8 +515,12 @@ export function ResourceList({
                     : 'text-muted-foreground'
 
                   // Build detail page URL for name column
+                  // Extract just the version part if apiVersion includes the group (e.g., "apps/v1" -> "v1")
+                  const versionOnly = resourceKind.apiVersion.includes('/')
+                    ? resourceKind.apiVersion.split('/').pop()
+                    : resourceKind.apiVersion
                   const detailUrl = isName
-                    ? `/dashboard/${resourceKind.apiGroup || '_core'}/${resourceKind.apiVersion}/${resourceKind.kind}/${resource.namespace || '_cluster'}/${resource.name}`
+                    ? `/dashboard/${resourceKind.apiGroup || '_core'}/${versionOnly}/${resourceKind.kind}/${resource.namespace || '_cluster'}/${resource.name}`
                     : null
 
                   return (
