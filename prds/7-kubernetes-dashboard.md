@@ -160,9 +160,16 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 
 ### Milestone 4: Resource List & Detail Views
 - [x] Generic `ResourceListPage` with dynamic columns
-- [x] Generic `ResourceDetailPage` with tabs (Overview, Metadata, Spec, Status, YAML, Events, Logs)
-- [ ] Pod-specific Logs tab
 - [x] Status badges and age formatting
+- [ ] `ResourceDetailPage` connected to real MCP API (currently uses mock data)
+- [ ] Resource header with description from MCP capabilities
+- [ ] Overview tab with real printer column data
+- [ ] Metadata tab with real resource metadata
+- [ ] Spec tab with real resource spec
+- [ ] Status tab with real resource status
+- [ ] YAML tab (currently disabled)
+- [ ] Events tab (currently disabled)
+- [ ] Pod-specific Logs tab (currently disabled)
 
 **Validation**: Can list and view details of any resource type (Pods, Deployments, CRDs)
 
@@ -288,5 +295,6 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 | 2025-01-09 | Added table sorting - default by Name ascending, clickable column headers with sort icons, toggle asc/desc, type-aware comparison (strings, numbers, dates) |
 | 2025-01-09 | Added namespace click-to-filter - clicking namespace value in table filters to that namespace, updates URL and dropdown |
 | 2025-01-09 | Added pattern-based status coloring - green for healthy states (Running, Succeeded, Active), yellow for warnings (Pending, Terminating), red for errors (Failed, CrashLoopBackOff) via new `src/utils/statusColors.ts` utility |
-| 2025-01-09 | Milestone 4 partial - ResourceDetailPage with tabs (Overview, Metadata, Spec, Status, YAML, Events, Logs), CollapsibleTree component for nested data, ExpandableDescription for resource descriptions, clickable resource names linking to detail view |
+| 2025-01-09 | Milestone 4 partial - ResourceDetailPage UI structure with tabs, CollapsibleTree component for nested data, ExpandableDescription for resource descriptions, clickable resource names linking to detail view. NOTE: Page uses mock data, not connected to real MCP API yet |
+| 2025-01-09 | PRD accuracy update - Split ResourceDetailPage checkbox into granular items to accurately track: API connection, each tab implementation, header description. Previous checkbox was premature. |
 
