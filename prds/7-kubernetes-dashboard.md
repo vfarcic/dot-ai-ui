@@ -168,7 +168,7 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [x] Spec tab with real resource spec
 - [x] Status tab with real resource status
 - [x] YAML tab with syntax highlighting and copy-to-clipboard
-- [ ] Events tab (currently disabled)
+- [x] Events tab with lazy loading and URL state persistence
 - [ ] Pod-specific Logs tab (currently disabled)
 
 **Validation**: Can list and view details of any resource type (Pods, Deployments, CRDs)
@@ -324,4 +324,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-09 | Milestone 4 partial - ResourceDetailPage now fetches capabilities from MCP (description, useCase, printerColumns) with multi-item cache. Resource data (metadata, spec, status) still uses mock data pending MCP single-resource endpoint. Added Development Setup section to PRD. Created cross-project skills (query-dot-ai, request-dot-ai-feature) for dot-ai ecosystem collaboration. |
 | 2025-01-09 | Milestone 4 major - ResourceDetailPage now connected to real MCP API via new `/api/v1/resource` endpoint. Added `getResource()` API client. Overview, Metadata, Spec, Status tabs all show real K8s data. Added `includeSpec` option to `getBuiltinResourceColumns()` - detail page shows all columns (IP, Node, Host IP, Service Account, etc.) while list view remains minimal. |
 | 2025-01-09 | Milestone 4 - YAML tab implemented. Added `yaml` package, `resourceToYaml()` function with canonical K8s field ordering (apiVersion → kind → metadata → spec → status), `YamlView` component with Prism syntax highlighting and copy-to-clipboard. Verified MCP returns identical data to kubectl (queries K8s API directly, not Qdrant). |
+| 2025-01-10 | Milestone 4 - Events tab implemented. Added `/api/v1/events` proxy endpoint (server/index.ts), `getResourceEvents()` API client, `EventsView` component with table display (Type, Reason, Age, Source, Message). Events lazy-loaded when tab selected. Tab state persists in URL via `?tab=` param. Verified with Playwright for Normal and Warning event types. Required new MCP endpoint `/api/v1/events` in dot-ai. |
 

@@ -817,3 +817,94 @@ export async function getResource(params: GetResourceParams): Promise<GetResourc
     return { resource: null, error: 'Failed to connect to server' }
   }
 }
+
+// ============================================================================
+// Events API
+// ============================================================================
+
+export interface KubernetesEvent {
+  reason: string
+  message: string
+  type: 'Normal' | 'Warning'
+  count?: number
+  firstTimestamp?: string
+  lastTimestamp?: string
+  source?: {
+    component?: string
+    host?: string
+  }
+  involvedObject: {
+    kind: string
+    name: string
+    namespace?: string
+    uid?: string
+    apiVersion?: string
+  }
+}
+
+export interface GetResourceEventsParams {
+  /** Resource name */
+  name: string
+  /** Resource kind (e.g., "Pod", "Deployment") */
+  kind: string
+  /** Resource namespace (optional for cluster-scoped resources) */
+  namespace?: string
+  /** Resource UID for more precise filtering (optional) */
+  uid?: string
+}
+
+export interface GetResourceEventsResult {
+  events: KubernetesEvent[]
+  count: number
+  error: string | null
+}
+
+/**
+ * Fetch Kubernetes events for a specific resource
+ * Events are filtered by involvedObject fields (name, kind, namespace)
+ */
+export async function getResourceEvents(
+  params: GetResourceEventsParams
+): Promise<GetResourceEventsResult> {
+  const { name, kind, namespace, uid } = params
+
+  const queryParams = new URLSearchParams({ name, kind })
+  if (namespace) {
+    queryParams.set('namespace', namespace)
+  }
+  if (uid) {
+    queryParams.set('uid', uid)
+  }
+
+  try {
+    const response = await fetch(`${API_PATH}/events?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      return {
+        events: [],
+        count: 0,
+        error: `Failed to fetch events: ${response.status} ${response.statusText}`,
+      }
+    }
+
+    const json = await response.json()
+
+    // Handle MCP response format: { success: true, data: { events: [...], count: N } }
+    if (json.success === false) {
+      return { events: [], count: 0, error: json.error || 'Failed to fetch events' }
+    }
+
+    const events = json.data?.events || []
+    const count = json.data?.count || events.length
+
+    return { events, count, error: null }
+  } catch (err) {
+    console.error('Failed to fetch events:', err)
+    return { events: [], count: 0, error: 'Failed to connect to server' }
+  }
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { stringify as yamlStringify } from 'yaml'
 import Prism from 'prismjs'
 import 'prismjs/components/prism-yaml'
@@ -14,9 +14,11 @@ import {
   getCapabilities,
   getBuiltinResourceColumns,
   getResource,
+  getResourceEvents,
   DEFAULT_COLUMNS,
   type ResourceCapabilities,
   type KubernetesResource,
+  type KubernetesEvent,
 } from '../api/dashboard'
 
 type TabId = 'overview' | 'metadata' | 'spec' | 'status' | 'yaml' | 'events' | 'logs'
@@ -33,7 +35,7 @@ const TABS: Tab[] = [
   { id: 'spec', label: 'Spec' },
   { id: 'status', label: 'Status' },
   { id: 'yaml', label: 'YAML' },
-  { id: 'events', label: 'Events', disabled: true },
+  { id: 'events', label: 'Events' },
   { id: 'logs', label: 'Logs', disabled: true },
 ]
 
@@ -192,6 +194,89 @@ function YamlView({ yaml }: YamlViewProps) {
   )
 }
 
+interface EventsViewProps {
+  events: KubernetesEvent[]
+  loading: boolean
+  error: string | null
+}
+
+function EventsView({ events, loading, error }: EventsViewProps) {
+  if (loading) {
+    return <div className="text-muted-foreground">Loading events...</div>
+  }
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>
+  }
+
+  if (events.length === 0) {
+    return (
+      <div className="text-muted-foreground text-center py-8">
+        No events found for this resource
+      </div>
+    )
+  }
+
+  // Sort events by lastTimestamp (most recent first)
+  const sortedEvents = [...events].sort((a, b) => {
+    const timeA = a.lastTimestamp || a.firstTimestamp || ''
+    const timeB = b.lastTimestamp || b.firstTimestamp || ''
+    return new Date(timeB).getTime() - new Date(timeA).getTime()
+  })
+
+  return (
+    <div className="max-w-6xl">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border text-left">
+            <th className="py-2 pr-4 font-medium text-muted-foreground w-20">Type</th>
+            <th className="py-2 pr-4 font-medium text-muted-foreground w-32">Reason</th>
+            <th className="py-2 pr-4 font-medium text-muted-foreground w-24">Age</th>
+            <th className="py-2 pr-4 font-medium text-muted-foreground w-32">Source</th>
+            <th className="py-2 font-medium text-muted-foreground">Message</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedEvents.map((event, index) => {
+            const timestamp = event.lastTimestamp || event.firstTimestamp || ''
+            const age = timestamp ? formatAge(timestamp) : '-'
+            const source = event.source?.component || '-'
+            const typeClass = event.type === 'Warning'
+              ? 'text-yellow-500'
+              : 'text-green-500'
+
+            return (
+              <tr
+                key={`${event.reason}-${event.message}-${index}`}
+                className="border-b border-border/50 hover:bg-muted/30"
+              >
+                <td className={`py-2 pr-4 font-medium ${typeClass}`}>
+                  {event.type}
+                </td>
+                <td className="py-2 pr-4 text-foreground font-medium">
+                  {event.reason}
+                </td>
+                <td className="py-2 pr-4 text-muted-foreground">
+                  {age}
+                  {event.count && event.count > 1 && (
+                    <span className="ml-1 text-xs">({event.count}x)</span>
+                  )}
+                </td>
+                <td className="py-2 pr-4 text-muted-foreground truncate max-w-[128px]" title={source}>
+                  {source}
+                </td>
+                <td className="py-2 text-foreground break-words">
+                  {event.message}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 interface PrinterColumn {
   name: string
   type: string
@@ -221,14 +306,40 @@ function OverviewCard({ column, value }: OverviewCardProps) {
   )
 }
 
+const VALID_TABS: TabId[] = ['overview', 'metadata', 'spec', 'status', 'yaml', 'events', 'logs']
+
 export function ResourceDetail() {
   const { group, version, kind, namespace, name } = useParams()
-  const [activeTab, setActiveTab] = useState<TabId>('overview')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Get active tab from URL, default to 'overview'
+  const tabParam = searchParams.get('tab')
+  const activeTab: TabId = tabParam && VALID_TABS.includes(tabParam as TabId)
+    ? (tabParam as TabId)
+    : 'overview'
+
+  // Update URL when tab changes
+  const setActiveTab = (tab: TabId) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (tab === 'overview') {
+        next.delete('tab') // Don't clutter URL for default tab
+      } else {
+        next.set('tab', tab)
+      }
+      return next
+    })
+  }
+
   const [capabilities, setCapabilities] = useState<ResourceCapabilities | null>(null)
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(true)
   const [resource, setResource] = useState<KubernetesResource | null>(null)
   const [resourceLoading, setResourceLoading] = useState(true)
   const [resourceError, setResourceError] = useState<string | null>(null)
+  const [events, setEvents] = useState<KubernetesEvent[]>([])
+  const [eventsLoading, setEventsLoading] = useState(false)
+  const [eventsError, setEventsError] = useState<string | null>(null)
+  const [eventsFetched, setEventsFetched] = useState(false)
 
   // Fetch capabilities when component mounts or resource type changes
   useEffect(() => {
@@ -325,6 +436,39 @@ export function ResourceDetail() {
 
     fetchResourceData()
   }, [kind, version, group, namespace, name])
+
+  // Fetch events when Events tab is selected (lazy loading)
+  useEffect(() => {
+    if (activeTab !== 'events' || eventsFetched || !kind || !name) {
+      return
+    }
+
+    const fetchEvents = async () => {
+      setEventsLoading(true)
+      setEventsError(null)
+
+      // For cluster-scoped resources, namespace is '_cluster' in URL
+      const ns = namespace === '_cluster' ? undefined : namespace
+
+      const result = await getResourceEvents({
+        name,
+        kind,
+        namespace: ns,
+        uid: resource?.metadata?.uid,
+      })
+
+      if (result.error) {
+        setEventsError(result.error)
+        setEvents([])
+      } else {
+        setEvents(result.events)
+      }
+      setEventsLoading(false)
+      setEventsFetched(true)
+    }
+
+    fetchEvents()
+  }, [activeTab, eventsFetched, kind, name, namespace, resource?.metadata?.uid])
 
   // Build back link preserving current filters
   const backParams = new URLSearchParams()
@@ -479,7 +623,11 @@ export function ResourceDetail() {
             )}
 
             {activeTab === 'events' && (
-              <div className="text-muted-foreground">Events tab coming soon...</div>
+              <EventsView
+                events={events}
+                loading={eventsLoading}
+                error={eventsError}
+              />
             )}
 
             {activeTab === 'logs' && (
