@@ -205,7 +205,15 @@ export function DashboardSidebar({
             <div key={groupName} className="mb-1">
               {/* Group header */}
               <button
-                onClick={() => !isCollapsed && toggleGroup(groupName)}
+                onClick={() => {
+                  if (isCollapsed) {
+                    // When collapsed, expand sidebar and open this group
+                    onToggleCollapse()
+                    setExpandedGroups((prev) => new Set(prev).add(groupName))
+                  } else {
+                    toggleGroup(groupName)
+                  }
+                }}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors ${
                   isCollapsed ? 'justify-center' : ''
                 }`}

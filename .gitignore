@@ -33,4 +33,4 @@ vite.config.d.ts
 
 # Playwright MCP screenshots
 .playwright-mcp
-kubeconfig-test.yaml
+kubeconfig*.yaml

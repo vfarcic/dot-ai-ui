@@ -187,6 +187,65 @@ async function createServer() {
     }
   })
 
+  // Proxy capabilities API requests to MCP server
+  // Used to get printer columns for dynamic table columns
+  // MCP uses POST /api/v1/tools/manageOrgData with JSON body
+  app.get('/api/v1/capabilities', apiLimiter, async (req, res) => {
+    try {
+      const { kind, apiVersion } = req.query as { kind?: string; apiVersion?: string }
+
+      if (!kind || !apiVersion) {
+        return res.status(400).json({ error: 'Missing required parameters: kind, apiVersion' })
+      }
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+      if (AUTH_TOKEN) {
+        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
+
+      const url = `${MCP_BASE_URL}/api/v1/tools/manageOrgData`
+      const body = {
+        dataType: 'capabilities',
+        operation: 'get',
+        id: JSON.stringify({ kind, apiVersion }),
+      }
+
+      console.log(`[Proxy] Fetching capabilities from MCP: ${url}`)
+      console.log(`[Proxy] Body: ${JSON.stringify(body)}`)
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to fetch capabilities' })
+    }
+  })
+
   // Proxy dashboard resource kinds API requests to MCP server
   app.get('/api/v1/resources/kinds', apiLimiter, async (req, res) => {
     try {

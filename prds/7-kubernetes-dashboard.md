@@ -159,10 +159,10 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 **Validation**: Hooks successfully fetch, cache, and merge data from both sources
 
 ### Milestone 4: Resource List & Detail Views
-- [ ] Generic `ResourceListPage` with dynamic columns
+- [x] Generic `ResourceListPage` with dynamic columns
 - [ ] Generic `ResourceDetailPage` with tabs (Overview, YAML, Events)
 - [ ] Pod-specific Logs tab
-- [ ] Status badges and age formatting
+- [x] Status badges and age formatting
 
 **Validation**: Can list and view details of any resource type (Pods, Deployments, CRDs)
 
@@ -173,13 +173,15 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [ ] Design: Remediate tool integration - how to present analysis and suggested fixes?
 - [ ] Design: Operate tool integration - what Day 2 operations to expose (scale, update, rollback)?
 - [ ] Design: Recommend tool integration - when/where to show deployment recommendations?
+- [ ] Design: Capabilities tool integration - how to display cluster resource capabilities and operators?
 
 #### Implementation
 - [ ] `AIActionBar` component with Query, Remediate, Operate, Recommend buttons
 - [ ] `AIResultsPanel` side panel for AI responses
-- [ ] MCP client functions for query/remediate/operate/recommend
+- [ ] MCP client functions for query/remediate/operate/recommend/capabilities
 - [ ] Context passing - send resource details to MCP tools
 - [ ] Link to full visualization (`/v/{sessionId}`) for complex outputs
+- [ ] Capabilities view - show discovered cluster capabilities and installed operators
 
 **Validation**: Click "Remediate" on a resource, see AI analysis in side panel
 
@@ -190,6 +192,23 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [ ] Mobile-responsive sidebar
 
 **Validation**: Dashboard handles edge cases gracefully (no cluster, empty namespace, errors)
+
+### Milestone 7: Search & Agentic Chat (To Be Designed)
+
+#### Search
+- [ ] Design: Search UX - global search bar? keyboard shortcut? scope (current namespace vs all)?
+- [ ] Design: Search backend - Qdrant semantic search? text matching? filters?
+- [ ] Design: Search results presentation - inline dropdown? dedicated page? resource type grouping?
+- [ ] Implementation: Search component and API integration
+
+#### Agentic Chat
+- [ ] Design: Chat UX - side panel? modal? persistent drawer? conversation history?
+- [ ] Design: Chat context - how to pass current resource/namespace context to agent?
+- [ ] Design: Action execution - how should chat-suggested actions be presented and executed?
+- [ ] Design: Chat backend - streaming responses? conversation memory? tool calling UI?
+- [ ] Implementation: Chat component and MCP integration
+
+**Validation**: Users can search resources and have natural language conversations with AI about their cluster
 
 ---
 
@@ -257,4 +276,9 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 | 2025-01-08 | Added URL query params for state persistence (`?ns=`, `?kind=`, `?group=`, `?version=`) |
 | 2025-01-08 | Added loading skeletons and empty states (Milestone 6 partial) |
 | 2025-01-08 | Added global cursor:pointer CSS, redirect `/` to `/dashboard` |
+| 2025-01-09 | Added printer columns integration - hardcoded columns for core resources, MCP capabilities for CRDs, default fallback |
+| 2025-01-09 | Added Milestone 7: Search & Agentic Chat (design phase) |
+| 2025-01-09 | Milestone 4 partial - ResourceList with dynamic printer columns, JSONPath extraction, status formatting |
+| 2025-01-09 | Fixed apiVersion duplication bug, added dynamic Namespace column for "All Namespaces" view |
+| 2025-01-09 | Improved collapsed sidebar UX - clicking group expands sidebar and opens group |
 
