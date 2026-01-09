@@ -161,12 +161,12 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 ### Milestone 4: Resource List & Detail Views
 - [x] Generic `ResourceListPage` with dynamic columns
 - [x] Status badges and age formatting
-- [ ] `ResourceDetailPage` connected to real MCP API (currently uses mock data)
+- [x] `ResourceDetailPage` connected to real MCP API
 - [x] Resource header with description from MCP capabilities
-- [ ] Overview tab with real printer column data
-- [ ] Metadata tab with real resource metadata
-- [ ] Spec tab with real resource spec
-- [ ] Status tab with real resource status
+- [x] Overview tab with real printer column data
+- [x] Metadata tab with real resource metadata
+- [x] Spec tab with real resource spec
+- [x] Status tab with real resource status
 - [ ] YAML tab (currently disabled)
 - [ ] Events tab (currently disabled)
 - [ ] Pod-specific Logs tab (currently disabled)
@@ -322,4 +322,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-09 | Milestone 4 partial - ResourceDetailPage UI structure with tabs, CollapsibleTree component for nested data, ExpandableDescription for resource descriptions, clickable resource names linking to detail view. NOTE: Page uses mock data, not connected to real MCP API yet |
 | 2025-01-09 | PRD accuracy update - Split ResourceDetailPage checkbox into granular items to accurately track: API connection, each tab implementation, header description. Previous checkbox was premature. |
 | 2025-01-09 | Milestone 4 partial - ResourceDetailPage now fetches capabilities from MCP (description, useCase, printerColumns) with multi-item cache. Resource data (metadata, spec, status) still uses mock data pending MCP single-resource endpoint. Added Development Setup section to PRD. Created cross-project skills (query-dot-ai, request-dot-ai-feature) for dot-ai ecosystem collaboration. |
+| 2025-01-09 | Milestone 4 major - ResourceDetailPage now connected to real MCP API via new `/api/v1/resource` endpoint. Added `getResource()` API client. Overview, Metadata, Spec, Status tabs all show real K8s data. Added `includeSpec` option to `getBuiltinResourceColumns()` - detail page shows all columns (IP, Node, Host IP, Service Account, etc.) while list view remains minimal. |
 

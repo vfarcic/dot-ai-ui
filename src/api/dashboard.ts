@@ -136,12 +136,20 @@ export const BUILTIN_RESOURCE_COLUMNS: Record<string, PrinterColumn[]> = {
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
     { name: 'Status', type: 'string', jsonPath: '.status.phase', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Ready, Restarts, IP, Node - need status.containerStatuses computation or spec
+    // spec/status fields - only shown on detail page
+    { name: 'IP', type: 'string', jsonPath: '.status.podIP', priority: 1 },
+    { name: 'Node', type: 'string', jsonPath: '.spec.nodeName', priority: 1 },
+    { name: 'Host IP', type: 'string', jsonPath: '.status.hostIP', priority: 1 },
+    { name: 'Service Account', type: 'string', jsonPath: '.spec.serviceAccountName', priority: 1 },
+    { name: 'Restart Policy', type: 'string', jsonPath: '.spec.restartPolicy', priority: 1 },
   ],
   'Service/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Type, Cluster-IP, External-IP, Ports - need spec
+    // spec fields - only shown on detail page
+    { name: 'Type', type: 'string', jsonPath: '.spec.type', priority: 1 },
+    { name: 'Cluster IP', type: 'string', jsonPath: '.spec.clusterIP', priority: 1 },
+    { name: 'Session Affinity', type: 'string', jsonPath: '.spec.sessionAffinity', priority: 1 },
   ],
   'ConfigMap/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
@@ -151,13 +159,18 @@ export const BUILTIN_RESOURCE_COLUMNS: Record<string, PrinterColumn[]> = {
   'Secret/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Type, Data - need type and data field count
+    // spec fields - only shown on detail page
+    { name: 'Type', type: 'string', jsonPath: '.type', priority: 1 },
   ],
   'Node/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
     { name: 'Version', type: 'string', jsonPath: '.status.nodeInfo.kubeletVersion', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Status, Roles, Internal-IP - need status.conditions computation
+    // status fields - only shown on detail page
+    { name: 'OS Image', type: 'string', jsonPath: '.status.nodeInfo.osImage', priority: 1 },
+    { name: 'Kernel', type: 'string', jsonPath: '.status.nodeInfo.kernelVersion', priority: 1 },
+    { name: 'Container Runtime', type: 'string', jsonPath: '.status.nodeInfo.containerRuntimeVersion', priority: 1 },
+    { name: 'Architecture', type: 'string', jsonPath: '.status.nodeInfo.architecture', priority: 1 },
   ],
   'Namespace/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
@@ -210,7 +223,10 @@ export const BUILTIN_RESOURCE_COLUMNS: Record<string, PrinterColumn[]> = {
     { name: 'Up-to-date', type: 'integer', jsonPath: '.status.updatedReplicas', priority: 0 },
     { name: 'Available', type: 'integer', jsonPath: '.status.availableReplicas', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Containers, Images, Selector - need spec
+    // spec fields - only shown on detail page
+    { name: 'Replicas', type: 'integer', jsonPath: '.spec.replicas', priority: 1 },
+    { name: 'Strategy', type: 'string', jsonPath: '.spec.strategy.type', priority: 1 },
+    { name: 'Revision History', type: 'integer', jsonPath: '.spec.revisionHistoryLimit', priority: 1 },
   ],
   'DaemonSet/apps/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
@@ -220,7 +236,8 @@ export const BUILTIN_RESOURCE_COLUMNS: Record<string, PrinterColumn[]> = {
     { name: 'Up-to-date', type: 'integer', jsonPath: '.status.updatedNumberScheduled', priority: 0 },
     { name: 'Available', type: 'integer', jsonPath: '.status.numberAvailable', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Node Selector, Containers, Images, Selector - need spec
+    // spec fields - only shown on detail page
+    { name: 'Update Strategy', type: 'string', jsonPath: '.spec.updateStrategy.type', priority: 1 },
   ],
   'ReplicaSet/apps/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
@@ -228,13 +245,17 @@ export const BUILTIN_RESOURCE_COLUMNS: Record<string, PrinterColumn[]> = {
     { name: 'Current', type: 'integer', jsonPath: '.status.fullyLabeledReplicas', priority: 0 },
     { name: 'Ready', type: 'integer', jsonPath: '.status.readyReplicas', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Containers, Images, Selector - need spec
+    // spec fields - only shown on detail page
+    { name: 'Replicas', type: 'integer', jsonPath: '.spec.replicas', priority: 1 },
   ],
   'StatefulSet/apps/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
     { name: 'Ready', type: 'integer', jsonPath: '.status.readyReplicas', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Containers, Images - need spec
+    // spec fields - only shown on detail page
+    { name: 'Replicas', type: 'integer', jsonPath: '.spec.replicas', priority: 1 },
+    { name: 'Service Name', type: 'string', jsonPath: '.spec.serviceName', priority: 1 },
+    { name: 'Pod Management', type: 'string', jsonPath: '.spec.podManagementPolicy', priority: 1 },
   ],
   'ControllerRevision/apps/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
@@ -249,14 +270,22 @@ export const BUILTIN_RESOURCE_COLUMNS: Record<string, PrinterColumn[]> = {
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
     { name: 'Status', type: 'string', jsonPath: '.status.succeeded', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Completions, Duration, Containers, Images, Selector - need spec or computation
+    // spec fields - only shown on detail page
+    { name: 'Completions', type: 'integer', jsonPath: '.spec.completions', priority: 1 },
+    { name: 'Parallelism', type: 'integer', jsonPath: '.spec.parallelism', priority: 1 },
+    { name: 'Backoff Limit', type: 'integer', jsonPath: '.spec.backoffLimit', priority: 1 },
+    { name: 'Active Deadline', type: 'integer', jsonPath: '.spec.activeDeadlineSeconds', priority: 1 },
   ],
   'CronJob/batch/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
     { name: 'Active', type: 'integer', jsonPath: '.status.active', priority: 0 },
     { name: 'Last Schedule', type: 'date', jsonPath: '.status.lastScheduleTime', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Schedule, Suspend, Timezone, Containers, Images, Selector - need spec
+    // spec fields - only shown on detail page
+    { name: 'Schedule', type: 'string', jsonPath: '.spec.schedule', priority: 1 },
+    { name: 'Suspend', type: 'boolean', jsonPath: '.spec.suspend', priority: 1 },
+    { name: 'Concurrency', type: 'string', jsonPath: '.spec.concurrencyPolicy', priority: 1 },
+    { name: 'History Limit', type: 'integer', jsonPath: '.spec.successfulJobsHistoryLimit', priority: 1 },
   ],
 
   // ============================================================================
@@ -265,12 +294,14 @@ export const BUILTIN_RESOURCE_COLUMNS: Record<string, PrinterColumn[]> = {
   'Ingress/networking.k8s.io/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Class, Hosts, Address, Ports - need spec
+    // spec fields - only shown on detail page
+    { name: 'Class', type: 'string', jsonPath: '.spec.ingressClassName', priority: 1 },
   ],
   'IngressClass/networking.k8s.io/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
     { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
-    // Excluded: Controller, Parameters - need spec
+    // spec fields - only shown on detail page
+    { name: 'Controller', type: 'string', jsonPath: '.spec.controller', priority: 1 },
   ],
   'NetworkPolicy/networking.k8s.io/v1': [
     { name: 'Name', type: 'string', jsonPath: '.metadata.name', priority: 0 },
@@ -498,13 +529,41 @@ export const DEFAULT_COLUMNS: PrinterColumn[] = [
   { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp', priority: 0 },
 ]
 
+export interface GetBuiltinColumnsOptions {
+  /**
+   * Include columns that require spec data (priority > 0)
+   * - false (default): Only return columns usable in list view (metadata/status only)
+   * - true: Return all columns including spec fields (for detail view)
+   */
+  includeSpec?: boolean
+}
+
 /**
  * Get printer columns for a built-in Kubernetes resource
  * Returns hardcoded columns for built-in resources, or null to fetch from MCP (for CRDs)
+ *
+ * @param kind - Resource kind (e.g., "Pod", "Deployment")
+ * @param apiVersion - API version (e.g., "v1", "apps/v1")
+ * @param options - Options for filtering columns
+ * @returns Filtered columns array, or null if not a built-in resource
  */
-export function getBuiltinResourceColumns(kind: string, apiVersion: string): PrinterColumn[] | null {
+export function getBuiltinResourceColumns(
+  kind: string,
+  apiVersion: string,
+  options?: GetBuiltinColumnsOptions
+): PrinterColumn[] | null {
   const key = `${kind}/${apiVersion}`
-  return BUILTIN_RESOURCE_COLUMNS[key] || null
+  const columns = BUILTIN_RESOURCE_COLUMNS[key]
+
+  if (!columns) return null
+
+  // If includeSpec is true, return all columns (for detail view)
+  if (options?.includeSpec) {
+    return columns
+  }
+
+  // Otherwise, filter out columns that need spec data (priority > 0)
+  return columns.filter(col => col.priority === 0)
 }
 
 export interface ResourceCapabilities {
@@ -679,5 +738,82 @@ export async function getResources(params: GetResourcesParams): Promise<Resource
   return {
     resources: json.data?.resources || [],
     total: json.data?.total || 0,
+  }
+}
+
+// ============================================================================
+// Single Resource API
+// ============================================================================
+
+export interface KubernetesResource {
+  apiVersion: string
+  kind: string
+  metadata: {
+    name: string
+    namespace?: string
+    uid?: string
+    creationTimestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+    ownerReferences?: Array<{
+      apiVersion: string
+      kind: string
+      name: string
+      uid: string
+      controller?: boolean
+    }>
+    [key: string]: unknown
+  }
+  spec?: Record<string, unknown>
+  status?: Record<string, unknown>
+  [key: string]: unknown
+}
+
+export interface GetResourceParams {
+  kind: string
+  apiVersion: string
+  name: string
+  namespace?: string
+}
+
+export interface GetResourceResult {
+  resource: KubernetesResource | null
+  error: string | null
+}
+
+/**
+ * Fetch a single Kubernetes resource by name
+ * Returns full resource data including metadata, spec, and status
+ */
+export async function getResource(params: GetResourceParams): Promise<GetResourceResult> {
+  const { kind, apiVersion, name, namespace } = params
+
+  const queryParams = new URLSearchParams({ kind, apiVersion, name })
+  if (namespace) {
+    queryParams.set('namespace', namespace)
+  }
+
+  try {
+    const response = await fetch(`${API_PATH}/resource?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { resource: null, error: 'Resource not found' }
+      }
+      return { resource: null, error: `Failed to fetch resource: ${response.status} ${response.statusText}` }
+    }
+
+    const json = await response.json()
+    const resource = json.data?.resource || null
+
+    return { resource, error: null }
+  } catch (err) {
+    console.error('Failed to fetch resource:', err)
+    return { resource: null, error: 'Failed to connect to server' }
   }
 }

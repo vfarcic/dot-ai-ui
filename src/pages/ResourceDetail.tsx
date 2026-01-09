@@ -10,98 +10,11 @@ import {
 import {
   getCapabilities,
   getBuiltinResourceColumns,
+  getResource,
   DEFAULT_COLUMNS,
   type ResourceCapabilities,
+  type KubernetesResource,
 } from '../api/dashboard'
-
-// Mock data for a Pod resource - will be replaced with real API calls
-const MOCK_RESOURCE = {
-  metadata: {
-    name: 'nginx-7d9b8c6f5-abc12',
-    namespace: 'default',
-    uid: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    creationTimestamp: '2025-01-07T10:30:00Z',
-    labels: {
-      app: 'nginx',
-      'pod-template-hash': '7d9b8c6f5',
-      environment: 'production',
-    },
-    annotations: {
-      'kubernetes.io/created-by': 'deployment-controller',
-      'prometheus.io/scrape': 'true',
-      'prometheus.io/port': '9090',
-    },
-    ownerReferences: [
-      {
-        apiVersion: 'apps/v1',
-        kind: 'ReplicaSet',
-        name: 'nginx-7d9b8c6f5',
-        uid: 'rs-uid-12345',
-        controller: true,
-      },
-    ],
-  },
-  spec: {
-    containers: [
-      {
-        name: 'nginx',
-        image: 'nginx:1.21',
-        ports: [{ containerPort: 80, protocol: 'TCP' }],
-        resources: {
-          requests: { cpu: '100m', memory: '128Mi' },
-          limits: { cpu: '500m', memory: '512Mi' },
-        },
-        volumeMounts: [
-          { name: 'config', mountPath: '/etc/nginx/conf.d', readOnly: true },
-        ],
-      },
-      {
-        name: 'sidecar',
-        image: 'busybox:latest',
-        command: ['sh', '-c', 'while true; do echo hello; sleep 10; done'],
-      },
-    ],
-    volumes: [
-      {
-        name: 'config',
-        configMap: { name: 'nginx-config' },
-      },
-    ],
-    restartPolicy: 'Always',
-    serviceAccountName: 'default',
-    nodeName: 'worker-node-1',
-  },
-  status: {
-    phase: 'Running',
-    conditions: [
-      { type: 'Initialized', status: 'True', lastTransitionTime: '2025-01-07T10:30:05Z' },
-      { type: 'Ready', status: 'True', lastTransitionTime: '2025-01-07T10:30:15Z' },
-      { type: 'ContainersReady', status: 'True', lastTransitionTime: '2025-01-07T10:30:15Z' },
-      { type: 'PodScheduled', status: 'True', lastTransitionTime: '2025-01-07T10:30:00Z' },
-    ],
-    containerStatuses: [
-      {
-        name: 'nginx',
-        state: { running: { startedAt: '2025-01-07T10:30:10Z' } },
-        ready: true,
-        restartCount: 0,
-        image: 'nginx:1.21',
-        imageID: 'docker-pullable://nginx@sha256:abc123',
-      },
-      {
-        name: 'sidecar',
-        state: { running: { startedAt: '2025-01-07T10:30:12Z' } },
-        ready: true,
-        restartCount: 2,
-        image: 'busybox:latest',
-        imageID: 'docker-pullable://busybox@sha256:def456',
-      },
-    ],
-    hostIP: '192.168.1.10',
-    podIP: '10.244.0.15',
-    startTime: '2025-01-07T10:30:00Z',
-  },
-}
 
 type TabId = 'overview' | 'metadata' | 'spec' | 'status' | 'yaml' | 'events' | 'logs'
 
@@ -116,7 +29,7 @@ const TABS: Tab[] = [
   { id: 'metadata', label: 'Metadata' },
   { id: 'spec', label: 'Spec' },
   { id: 'status', label: 'Status' },
-  { id: 'yaml', label: 'YAML', disabled: true },
+  { id: 'yaml', label: 'YAML' },
   { id: 'events', label: 'Events', disabled: true },
   { id: 'logs', label: 'Logs', disabled: true },
 ]
@@ -235,6 +148,9 @@ export function ResourceDetail() {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [capabilities, setCapabilities] = useState<ResourceCapabilities | null>(null)
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(true)
+  const [resource, setResource] = useState<KubernetesResource | null>(null)
+  const [resourceLoading, setResourceLoading] = useState(true)
+  const [resourceError, setResourceError] = useState<string | null>(null)
 
   // Fetch capabilities when component mounts or resource type changes
   useEffect(() => {
@@ -252,7 +168,8 @@ export function ResourceDetail() {
         : version
 
       // Check for hardcoded built-in resource columns first
-      const builtinColumns = getBuiltinResourceColumns(kind, apiVersion)
+      // On detail page, include all columns (includeSpec: true) since we have full resource data
+      const builtinColumns = getBuiltinResourceColumns(kind, apiVersion, { includeSpec: true })
 
       if (builtinColumns) {
         // For built-in resources, fetch from MCP for description/useCase but use hardcoded columns
@@ -274,10 +191,10 @@ export function ResourceDetail() {
             printerColumns: DEFAULT_COLUMNS,
           })
         } else {
-          // Filter out columns with empty jsonPath or .spec references
+          // On detail page, include all columns (including .spec) since we have full resource data
+          // Only filter out columns with empty jsonPath
           const validColumns = (result.data.printerColumns || []).filter((col) => {
             if (!col.jsonPath || col.jsonPath.trim() === '') return false
-            if (col.jsonPath.startsWith('.spec')) return false
             return true
           })
           setCapabilities({
@@ -292,6 +209,45 @@ export function ResourceDetail() {
     fetchCaps()
   }, [kind, version, group])
 
+  // Fetch resource data when component mounts or resource changes
+  useEffect(() => {
+    if (!kind || !version || !name) {
+      setResourceLoading(false)
+      setResourceError('Missing required resource parameters')
+      return
+    }
+
+    const fetchResourceData = async () => {
+      setResourceLoading(true)
+      setResourceError(null)
+
+      // Build apiVersion: handle both "v1" and "apps/v1" formats
+      const apiVersion = group && group !== '_core'
+        ? `${group}/${version}`
+        : version
+
+      // For cluster-scoped resources, namespace is '_cluster' in URL
+      const ns = namespace === '_cluster' ? undefined : namespace
+
+      const result = await getResource({
+        kind,
+        apiVersion,
+        name,
+        namespace: ns,
+      })
+
+      if (result.error) {
+        setResourceError(result.error)
+        setResource(null)
+      } else {
+        setResource(result.resource)
+      }
+      setResourceLoading(false)
+    }
+
+    fetchResourceData()
+  }, [kind, version, group, namespace, name])
+
   // Build back link preserving current filters
   const backParams = new URLSearchParams()
   if (namespace && namespace !== '_cluster') {
@@ -302,15 +258,12 @@ export function ResourceDetail() {
   if (group && group !== '_core') backParams.set('group', group)
   const backLink = `/dashboard?${backParams.toString()}`
 
-  // For now, use mock data - will be replaced with API call for resource data
-  const resource = MOCK_RESOURCE
-
   // Build full resource object for JSONPath extraction
-  const fullResource = {
+  const fullResource = resource ? {
     metadata: resource.metadata,
     spec: resource.spec,
     status: resource.status,
-  }
+  } : null
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -389,62 +342,72 @@ export function ResourceDetail() {
 
       {/* Tab content */}
       <main className="flex-1 p-6 overflow-auto">
-        {activeTab === 'overview' && (
-          <div className="max-w-5xl">
-            {capabilitiesLoading ? (
-              <div className="text-muted-foreground">Loading...</div>
-            ) : (
-              <div className="flex flex-wrap gap-4">
-                {(capabilities?.printerColumns || DEFAULT_COLUMNS).map((column) => {
-                  const rawValue = extractJsonPathValue(fullResource, column.jsonPath)
-                  const displayValue = formatColumnValue(rawValue, column.type)
-                  return (
-                    <OverviewCard
-                      key={column.name}
-                      column={column}
-                      value={displayValue}
-                    />
-                  )
-                })}
+        {resourceLoading ? (
+          <div className="text-muted-foreground">Loading resource...</div>
+        ) : resourceError ? (
+          <div className="text-red-500">{resourceError}</div>
+        ) : !resource ? (
+          <div className="text-muted-foreground">No resource data available</div>
+        ) : (
+          <>
+            {activeTab === 'overview' && (
+              <div className="max-w-5xl">
+                {capabilitiesLoading ? (
+                  <div className="text-muted-foreground">Loading...</div>
+                ) : (
+                  <div className="flex flex-wrap gap-4">
+                    {(capabilities?.printerColumns || DEFAULT_COLUMNS).map((column) => {
+                      const rawValue = extractJsonPathValue(fullResource, column.jsonPath)
+                      const displayValue = formatColumnValue(rawValue, column.type)
+                      return (
+                        <OverviewCard
+                          key={column.name}
+                          column={column}
+                          value={displayValue}
+                        />
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
 
-        {activeTab === 'metadata' && (
-          <div className="max-w-5xl">
-            <div className="p-4 bg-muted/30 rounded-lg border border-border">
-              <CollapsibleTree data={resource.metadata} initialExpandLevel={2} />
-            </div>
-          </div>
-        )}
+            {activeTab === 'metadata' && (
+              <div className="max-w-5xl">
+                <div className="p-4 bg-muted/30 rounded-lg border border-border">
+                  <CollapsibleTree data={resource.metadata} initialExpandLevel={2} />
+                </div>
+              </div>
+            )}
 
-        {activeTab === 'spec' && (
-          <div className="max-w-5xl">
-            <div className="p-4 bg-muted/30 rounded-lg border border-border">
-              <CollapsibleTree data={resource.spec} initialExpandLevel={2} />
-            </div>
-          </div>
-        )}
+            {activeTab === 'spec' && (
+              <div className="max-w-5xl">
+                <div className="p-4 bg-muted/30 rounded-lg border border-border">
+                  <CollapsibleTree data={resource.spec || {}} initialExpandLevel={2} />
+                </div>
+              </div>
+            )}
 
-        {activeTab === 'status' && (
-          <div className="max-w-5xl">
-            <div className="p-4 bg-muted/30 rounded-lg border border-border">
-              <CollapsibleTree data={resource.status} initialExpandLevel={2} />
-            </div>
-          </div>
-        )}
+            {activeTab === 'status' && (
+              <div className="max-w-5xl">
+                <div className="p-4 bg-muted/30 rounded-lg border border-border">
+                  <CollapsibleTree data={resource.status || {}} initialExpandLevel={2} />
+                </div>
+              </div>
+            )}
 
-        {activeTab === 'yaml' && (
-          <div className="text-muted-foreground">YAML tab coming soon...</div>
-        )}
+            {activeTab === 'yaml' && (
+              <div className="text-muted-foreground">YAML tab coming soon...</div>
+            )}
 
-        {activeTab === 'events' && (
-          <div className="text-muted-foreground">Events tab coming soon...</div>
-        )}
+            {activeTab === 'events' && (
+              <div className="text-muted-foreground">Events tab coming soon...</div>
+            )}
 
-        {activeTab === 'logs' && (
-          <div className="text-muted-foreground">Logs tab coming soon...</div>
+            {activeTab === 'logs' && (
+              <div className="text-muted-foreground">Logs tab coming soon...</div>
+            )}
+          </>
         )}
       </main>
     </div>
