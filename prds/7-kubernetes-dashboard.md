@@ -162,7 +162,7 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [x] Generic `ResourceListPage` with dynamic columns
 - [x] Status badges and age formatting
 - [ ] `ResourceDetailPage` connected to real MCP API (currently uses mock data)
-- [ ] Resource header with description from MCP capabilities
+- [x] Resource header with description from MCP capabilities
 - [ ] Overview tab with real printer column data
 - [ ] Metadata tab with real resource metadata
 - [ ] Spec tab with real resource spec
@@ -225,6 +225,30 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - Real-time WebSocket updates (polling is sufficient for v1)
 - Multi-cluster support
 - User authentication/RBAC in dashboard (uses cluster credentials)
+
+---
+
+## Development Setup
+
+### Connecting to MCP Server
+
+The dashboard requires a running MCP server. For development with the test cluster:
+
+```bash
+# 1. Set kubeconfig to test cluster
+export KUBECONFIG=kubeconfig-test.yaml
+
+# 2. Get auth token from cluster secret
+export DOT_AI_AUTH_TOKEN=$(kubectl get secret -n dot-ai dot-ai-secrets -o jsonpath='{.data.auth-token}' | base64 -d)
+
+# 3. Set MCP URL (from Ingress - kind maps port 80 to 8180)
+export DOT_AI_MCP_URL="http://dot-ai.127.0.0.1.nip.io:8180"
+
+# 4. Start dev server
+npm run dev
+```
+
+The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 
 ---
 
@@ -297,4 +321,5 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 | 2025-01-09 | Added pattern-based status coloring - green for healthy states (Running, Succeeded, Active), yellow for warnings (Pending, Terminating), red for errors (Failed, CrashLoopBackOff) via new `src/utils/statusColors.ts` utility |
 | 2025-01-09 | Milestone 4 partial - ResourceDetailPage UI structure with tabs, CollapsibleTree component for nested data, ExpandableDescription for resource descriptions, clickable resource names linking to detail view. NOTE: Page uses mock data, not connected to real MCP API yet |
 | 2025-01-09 | PRD accuracy update - Split ResourceDetailPage checkbox into granular items to accurately track: API connection, each tab implementation, header description. Previous checkbox was premature. |
+| 2025-01-09 | Milestone 4 partial - ResourceDetailPage now fetches capabilities from MCP (description, useCase, printerColumns) with multi-item cache. Resource data (metadata, spec, status) still uses mock data pending MCP single-resource endpoint. Added Development Setup section to PRD. Created cross-project skills (query-dot-ai, request-dot-ai-feature) for dot-ai ecosystem collaboration. |
 

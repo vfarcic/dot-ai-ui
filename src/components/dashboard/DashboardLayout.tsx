@@ -190,7 +190,7 @@ export function DashboardLayout() {
               {/* Content header */}
               <div className="border-b border-border px-6 py-4">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="overflow-hidden">
                     <h1 className="text-xl font-semibold text-foreground">
                       {selectedResource.kind}
                       {selectedResource.apiGroup && (

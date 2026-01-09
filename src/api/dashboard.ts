@@ -525,13 +525,31 @@ export interface GetCapabilitiesResult {
   error: boolean
 }
 
+// In-memory cache for capabilities (keyed by "kind/apiVersion")
+const capabilitiesCache = new Map<string, GetCapabilitiesResult>()
+
+/**
+ * Get cache key for capabilities
+ */
+function getCapabilitiesCacheKey(kind: string, apiVersion: string): string {
+  return `${kind}/${apiVersion}`
+}
+
 /**
  * Fetch capabilities for a resource kind
  * Returns printer columns if available (from CRD additionalPrinterColumns or K8s Table API)
  * Returns { data, error } to distinguish between API errors and empty results
+ * Results are cached in memory to avoid redundant fetches (e.g., list → detail navigation)
  */
 export async function getCapabilities(params: GetCapabilitiesParams): Promise<GetCapabilitiesResult> {
   const { kind, apiVersion } = params
+  const cacheKey = getCapabilitiesCacheKey(kind, apiVersion)
+
+  // Check cache first
+  const cached = capabilitiesCache.get(cacheKey)
+  if (cached) {
+    return cached
+  }
 
   const queryParams = new URLSearchParams({
     kind,
@@ -565,7 +583,7 @@ export async function getCapabilities(params: GetCapabilitiesParams): Promise<Ge
     const description = mcpData?.description || undefined
     const useCase = mcpData?.useCase || undefined
 
-    return {
+    const result: GetCapabilitiesResult = {
       data: {
         kind,
         apiVersion,
@@ -575,6 +593,10 @@ export async function getCapabilities(params: GetCapabilitiesParams): Promise<Ge
       },
       error: false,
     }
+
+    // Cache successful results
+    capabilitiesCache.set(cacheKey, result)
+    return result
   } catch (err) {
     console.warn('Failed to fetch capabilities:', err)
     return { data: null, error: true }

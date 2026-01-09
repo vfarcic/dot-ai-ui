@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { CollapsibleTree } from '../components/dashboard/CollapsibleTree'
 import { ExpandableDescription } from '../components/dashboard/ExpandableDescription'
@@ -7,20 +7,12 @@ import {
   getStatusColorClasses,
   isStatusColumn,
 } from '../utils/statusColors'
-
-// Mock capabilities data - will be replaced with real API call
-const MOCK_CAPABILITIES = {
-  description: 'Pod is the fundamental Kubernetes resource that defines and manages one or more containers running together on a node. It handles container orchestration, resource allocation, health monitoring, and lifecycle management with extensive configuration options for networking, storage, security, and scheduling.',
-  useCase: 'Running containerized applications in Kubernetes with granular control over container lifecycle, resource allocation, placement constraints, and operational behavior.',
-  printerColumns: [
-    { name: 'Name', type: 'string', jsonPath: '.metadata.name' },
-    { name: 'Namespace', type: 'string', jsonPath: '.metadata.namespace' },
-    { name: 'Status', type: 'string', jsonPath: '.status.phase' },
-    { name: 'Pod IP', type: 'string', jsonPath: '.status.podIP' },
-    { name: 'Node', type: 'string', jsonPath: '.spec.nodeName' },
-    { name: 'Age', type: 'date', jsonPath: '.metadata.creationTimestamp' },
-  ],
-}
+import {
+  getCapabilities,
+  getBuiltinResourceColumns,
+  DEFAULT_COLUMNS,
+  type ResourceCapabilities,
+} from '../api/dashboard'
 
 // Mock data for a Pod resource - will be replaced with real API calls
 const MOCK_RESOURCE = {
@@ -241,6 +233,64 @@ function OverviewCard({ column, value }: OverviewCardProps) {
 export function ResourceDetail() {
   const { group, version, kind, namespace, name } = useParams()
   const [activeTab, setActiveTab] = useState<TabId>('overview')
+  const [capabilities, setCapabilities] = useState<ResourceCapabilities | null>(null)
+  const [capabilitiesLoading, setCapabilitiesLoading] = useState(true)
+
+  // Fetch capabilities when component mounts or resource type changes
+  useEffect(() => {
+    if (!kind || !version) {
+      setCapabilitiesLoading(false)
+      return
+    }
+
+    const fetchCaps = async () => {
+      setCapabilitiesLoading(true)
+
+      // Build apiVersion: handle both "v1" and "apps/v1" formats
+      const apiVersion = group && group !== '_core'
+        ? `${group}/${version}`
+        : version
+
+      // Check for hardcoded built-in resource columns first
+      const builtinColumns = getBuiltinResourceColumns(kind, apiVersion)
+
+      if (builtinColumns) {
+        // For built-in resources, fetch from MCP for description/useCase but use hardcoded columns
+        const result = await getCapabilities({ kind, apiVersion })
+        setCapabilities({
+          kind,
+          apiVersion,
+          printerColumns: builtinColumns,
+          description: result.data?.description,
+          useCase: result.data?.useCase,
+        })
+      } else {
+        // Fetch from MCP for CRDs and other resources
+        const result = await getCapabilities({ kind, apiVersion })
+        if (result.error || !result.data) {
+          setCapabilities({
+            kind,
+            apiVersion,
+            printerColumns: DEFAULT_COLUMNS,
+          })
+        } else {
+          // Filter out columns with empty jsonPath or .spec references
+          const validColumns = (result.data.printerColumns || []).filter((col) => {
+            if (!col.jsonPath || col.jsonPath.trim() === '') return false
+            if (col.jsonPath.startsWith('.spec')) return false
+            return true
+          })
+          setCapabilities({
+            ...result.data,
+            printerColumns: validColumns.length > 0 ? validColumns : DEFAULT_COLUMNS,
+          })
+        }
+      }
+      setCapabilitiesLoading(false)
+    }
+
+    fetchCaps()
+  }, [kind, version, group])
 
   // Build back link preserving current filters
   const backParams = new URLSearchParams()
@@ -252,9 +302,8 @@ export function ResourceDetail() {
   if (group && group !== '_core') backParams.set('group', group)
   const backLink = `/dashboard?${backParams.toString()}`
 
-  // For now, use mock data - will be replaced with API call
+  // For now, use mock data - will be replaced with API call for resource data
   const resource = MOCK_RESOURCE
-  const capabilities = MOCK_CAPABILITIES
 
   // Build full resource object for JSONPath extraction
   const fullResource = {
@@ -309,8 +358,9 @@ export function ResourceDetail() {
         {/* Resource description from capabilities */}
         <div className="mb-4">
           <ExpandableDescription
-            description={capabilities.description}
-            useCase={capabilities.useCase}
+            description={capabilities?.description}
+            useCase={capabilities?.useCase}
+            loading={capabilitiesLoading}
           />
         </div>
       </div>
@@ -341,19 +391,23 @@ export function ResourceDetail() {
       <main className="flex-1 p-6 overflow-auto">
         {activeTab === 'overview' && (
           <div className="max-w-5xl">
-            <div className="flex flex-wrap gap-4">
-              {capabilities.printerColumns.map((column) => {
-                const rawValue = extractJsonPathValue(fullResource, column.jsonPath)
-                const displayValue = formatColumnValue(rawValue, column.type)
-                return (
-                  <OverviewCard
-                    key={column.name}
-                    column={column}
-                    value={displayValue}
-                  />
-                )
-              })}
-            </div>
+            {capabilitiesLoading ? (
+              <div className="text-muted-foreground">Loading...</div>
+            ) : (
+              <div className="flex flex-wrap gap-4">
+                {(capabilities?.printerColumns || DEFAULT_COLUMNS).map((column) => {
+                  const rawValue = extractJsonPathValue(fullResource, column.jsonPath)
+                  const displayValue = formatColumnValue(rawValue, column.type)
+                  return (
+                    <OverviewCard
+                      key={column.name}
+                      column={column}
+                      value={displayValue}
+                    />
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
