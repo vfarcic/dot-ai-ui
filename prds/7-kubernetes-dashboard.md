@@ -287,4 +287,5 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 | 2025-01-09 | Verified all built-in resources display correct columns: Pod (Status), Deployment (Ready/Available), DaemonSet (Desired/Current), ReplicaSet (Desired/Ready), etc. |
 | 2025-01-09 | Added table sorting - default by Name ascending, clickable column headers with sort icons, toggle asc/desc, type-aware comparison (strings, numbers, dates) |
 | 2025-01-09 | Added namespace click-to-filter - clicking namespace value in table filters to that namespace, updates URL and dropdown |
+| 2025-01-09 | Added pattern-based status coloring - green for healthy states (Running, Succeeded, Active), yellow for warnings (Pending, Terminating), red for errors (Failed, CrashLoopBackOff) via new `src/utils/statusColors.ts` utility |
 

@@ -8,6 +8,11 @@ import {
   type Resource,
   type PrinterColumn,
 } from '../../api/dashboard'
+import {
+  classifyStatus,
+  getStatusColorClasses,
+  isStatusColumn,
+} from '../../utils/statusColors'
 
 interface ResourceListProps {
   resourceKind: ResourceKind
@@ -545,9 +550,15 @@ export function ResourceList({ resourceKind, namespace, onNamespaceClick }: Reso
                   const displayValue = formatColumnValue(value, col.type)
                   const isName = col.name.toLowerCase() === 'name'
                   const isNamespace = col.name.toLowerCase() === 'namespace' || col.jsonPath === '.metadata.namespace'
-                  const isStatusColumn = col.jsonPath.startsWith('.status')
-                  const isLoading = isStatusColumn && statusLoading && (value === null || value === undefined)
+                  const isStatusField = col.jsonPath.startsWith('.status')
+                  const isLoading = isStatusField && statusLoading && (value === null || value === undefined)
                   const namespaceValue = isNamespace && typeof value === 'string' ? value : null
+
+                  // Apply status coloring for status-like columns
+                  const shouldColorStatus = isStatusColumn(col.name, col.jsonPath)
+                  const statusClass = shouldColorStatus
+                    ? getStatusColorClasses(classifyStatus(displayValue))
+                    : 'text-muted-foreground'
 
                   return (
                     <td key={col.name} className="px-4 py-3 text-sm">
@@ -566,7 +577,7 @@ export function ResourceList({ resourceKind, namespace, onNamespaceClick }: Reso
                           {displayValue}
                         </button>
                       ) : (
-                        <span className="text-muted-foreground">{displayValue}</span>
+                        <span className={statusClass}>{displayValue}</span>
                       )}
                     </td>
                   )
