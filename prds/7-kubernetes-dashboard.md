@@ -169,7 +169,7 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [x] Status tab with real resource status
 - [x] YAML tab with syntax highlighting and copy-to-clipboard
 - [x] Events tab with lazy loading and URL state persistence
-- [ ] Pod-specific Logs tab (currently disabled)
+- [x] Pod-specific Logs tab with container selector, Tail polling, and auto-scroll
 
 **Validation**: Can list and view details of any resource type (Pods, Deployments, CRDs)
 
@@ -325,4 +325,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-09 | Milestone 4 major - ResourceDetailPage now connected to real MCP API via new `/api/v1/resource` endpoint. Added `getResource()` API client. Overview, Metadata, Spec, Status tabs all show real K8s data. Added `includeSpec` option to `getBuiltinResourceColumns()` - detail page shows all columns (IP, Node, Host IP, Service Account, etc.) while list view remains minimal. |
 | 2025-01-09 | Milestone 4 - YAML tab implemented. Added `yaml` package, `resourceToYaml()` function with canonical K8s field ordering (apiVersion → kind → metadata → spec → status), `YamlView` component with Prism syntax highlighting and copy-to-clipboard. Verified MCP returns identical data to kubectl (queries K8s API directly, not Qdrant). |
 | 2025-01-10 | Milestone 4 - Events tab implemented. Added `/api/v1/events` proxy endpoint (server/index.ts), `getResourceEvents()` API client, `EventsView` component with table display (Type, Reason, Age, Source, Message). Events lazy-loaded when tab selected. Tab state persists in URL via `?tab=` param. Verified with Playwright for Normal and Warning event types. Required new MCP endpoint `/api/v1/events` in dot-ai. |
+| 2025-01-10 | Milestone 4 COMPLETED - Logs tab implemented for Pod resources. Added `/api/v1/logs` proxy endpoint, `getPodLogs()` API client, `LogsView` component with container selector, Tail button for live polling (3s interval), auto-scroll to bottom on refresh. Logs tab conditionally shown only for Pod kind via `getTabsForKind()`. Required new MCP endpoint `/api/v1/logs` in dot-ai. Updated CLAUDE.md with MCP integration guidance. |
 

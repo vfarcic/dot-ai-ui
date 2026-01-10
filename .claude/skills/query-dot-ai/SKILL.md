@@ -7,6 +7,7 @@ allowed-tools:
   - Read
   - Glob
   - Grep
+  - Bash(grep:*)
 ---
 
 # Query dot-ai Projects

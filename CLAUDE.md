@@ -27,6 +27,10 @@ The dev scripts handle port cleanup. Required environment variables (must be set
 
 The API client (`src/api/client.ts`) classifies errors by type. Important: "session-expired" errors are ONLY triggered by the explicit `SESSION_NOT_FOUND` error code from MCP, not generic 404s. This prevents false "session expired" errors during Vite HMR restarts.
 
+## MCP Integration
+
+This UI communicates with the dot-ai MCP server via **HTTP REST endpoints only** (e.g., `/api/v1/resources`, `/api/v1/events`, `/api/v1/logs`). When searching for MCP capabilities or requesting new features, always look for or request **HTTP REST endpoints**, not MCP tools. The Express backend proxies these REST calls to the MCP server with authentication.
+
 ## Testing Requirements
 
 **Always verify new UI features with Playwright before considering them complete.**

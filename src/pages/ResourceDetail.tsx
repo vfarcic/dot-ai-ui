@@ -15,10 +15,12 @@ import {
   getBuiltinResourceColumns,
   getResource,
   getResourceEvents,
+  getPodLogs,
   DEFAULT_COLUMNS,
   type ResourceCapabilities,
   type KubernetesResource,
   type KubernetesEvent,
+  type GetPodLogsResult,
 } from '../api/dashboard'
 
 type TabId = 'overview' | 'metadata' | 'spec' | 'status' | 'yaml' | 'events' | 'logs'
@@ -29,15 +31,27 @@ interface Tab {
   disabled?: boolean
 }
 
-const TABS: Tab[] = [
+const BASE_TABS: Tab[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'metadata', label: 'Metadata' },
   { id: 'spec', label: 'Spec' },
   { id: 'status', label: 'Status' },
   { id: 'yaml', label: 'YAML' },
   { id: 'events', label: 'Events' },
-  { id: 'logs', label: 'Logs', disabled: true },
 ]
+
+const LOGS_TAB: Tab = { id: 'logs', label: 'Logs' }
+
+/**
+ * Get tabs for a resource kind
+ * Logs tab only appears for Pod resources
+ */
+function getTabsForKind(kind: string | undefined): Tab[] {
+  if (kind === 'Pod') {
+    return [...BASE_TABS, LOGS_TAB]
+  }
+  return BASE_TABS
+}
 
 // ============================================================================
 // JSONPath Value Extraction (same as ResourceList)
@@ -277,6 +291,130 @@ function EventsView({ events, loading, error }: EventsViewProps) {
   )
 }
 
+interface LogsViewProps {
+  logs: GetPodLogsResult | null
+  loading: boolean
+  selectedContainer: string | null
+  onContainerChange: (container: string) => void
+  onRefresh: () => void
+  isTailing: boolean
+  onTailToggle: () => void
+}
+
+function LogsView({ logs, loading, selectedContainer, onContainerChange, onRefresh, isTailing, onTailToggle }: LogsViewProps) {
+  const logsEndRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to bottom when logs change
+  useEffect(() => {
+    if (logs?.logs && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [logs?.logs])
+
+  if (loading && !logs) {
+    return <div className="text-muted-foreground">Loading logs...</div>
+  }
+
+  // Handle container selection required
+  if (logs?.availableContainers && logs.availableContainers.length > 0) {
+    return (
+      <div className="max-w-4xl">
+        <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg mb-4">
+          <p className="text-yellow-500 font-medium mb-2">
+            This pod has multiple containers. Please select one:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {logs.availableContainers.map((container) => (
+              <button
+                key={container}
+                onClick={() => onContainerChange(container)}
+                className="px-3 py-1.5 text-sm bg-muted hover:bg-muted/80 rounded border border-border transition-colors"
+              >
+                {container}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (logs?.error) {
+    return <div className="text-red-500">{logs.error}</div>
+  }
+
+  if (!logs?.logs) {
+    return (
+      <div className="text-muted-foreground text-center py-8">
+        No logs available for this pod
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-6xl">
+      {/* Header with container info and controls */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          {logs.container && (
+            <span className="text-sm text-muted-foreground">
+              Container: <span className="text-foreground font-medium">{logs.container}</span>
+            </span>
+          )}
+          {logs.containerCount > 1 && selectedContainer && (
+            <button
+              onClick={() => onContainerChange('')}
+              className="text-xs text-primary hover:underline"
+            >
+              Change container
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Tail toggle button */}
+          <button
+            onClick={onTailToggle}
+            className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded border transition-colors ${
+              isTailing
+                ? 'bg-green-500/20 text-green-400 border-green-500/50 hover:bg-green-500/30'
+                : 'bg-muted/50 text-foreground border-border hover:bg-muted'
+            }`}
+          >
+            {isTailing && (
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+            )}
+            {isTailing ? 'Tailing...' : 'Tail'}
+          </button>
+          {/* Refresh button */}
+          <button
+            onClick={onRefresh}
+            disabled={isTailing}
+            className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded border transition-colors ${
+              isTailing
+                ? 'bg-muted/30 text-muted-foreground/50 border-border/50 cursor-not-allowed'
+                : 'bg-muted/50 text-foreground border-border hover:bg-muted'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Log output */}
+      <pre className="rounded-lg bg-[#1a1a1a] p-4 overflow-auto text-sm !m-0 max-h-[70vh] font-mono text-gray-300 whitespace-pre-wrap break-all">
+        {logs.logs || 'No logs available'}
+        <div ref={logsEndRef} />
+      </pre>
+    </div>
+  )
+}
+
 interface PrinterColumn {
   name: string
   type: string
@@ -306,15 +444,17 @@ function OverviewCard({ column, value }: OverviewCardProps) {
   )
 }
 
-const VALID_TABS: TabId[] = ['overview', 'metadata', 'spec', 'status', 'yaml', 'events', 'logs']
-
 export function ResourceDetail() {
   const { group, version, kind, namespace, name } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
 
+  // Get tabs available for this resource kind
+  const tabs = getTabsForKind(kind)
+  const validTabIds = tabs.map(t => t.id)
+
   // Get active tab from URL, default to 'overview'
   const tabParam = searchParams.get('tab')
-  const activeTab: TabId = tabParam && VALID_TABS.includes(tabParam as TabId)
+  const activeTab: TabId = tabParam && validTabIds.includes(tabParam as TabId)
     ? (tabParam as TabId)
     : 'overview'
 
@@ -340,6 +480,11 @@ export function ResourceDetail() {
   const [eventsLoading, setEventsLoading] = useState(false)
   const [eventsError, setEventsError] = useState<string | null>(null)
   const [eventsFetched, setEventsFetched] = useState(false)
+  const [logs, setLogs] = useState<GetPodLogsResult | null>(null)
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [logsFetched, setLogsFetched] = useState(false)
+  const [selectedContainer, setSelectedContainer] = useState<string | null>(null)
+  const [isTailing, setIsTailing] = useState(false)
 
   // Fetch capabilities when component mounts or resource type changes
   useEffect(() => {
@@ -470,6 +615,87 @@ export function ResourceDetail() {
     fetchEvents()
   }, [activeTab, eventsFetched, kind, name, namespace, resource?.metadata?.uid])
 
+  // Fetch logs when Logs tab is selected (lazy loading, Pod only)
+  useEffect(() => {
+    if (activeTab !== 'logs' || kind !== 'Pod' || !name || !namespace) {
+      return
+    }
+
+    // Skip if already fetched and no container change
+    if (logsFetched && !selectedContainer) {
+      return
+    }
+
+    const fetchLogs = async () => {
+      setLogsLoading(true)
+
+      // For cluster-scoped resources, namespace is '_cluster' in URL
+      const ns = namespace === '_cluster' ? 'default' : namespace
+
+      const result = await getPodLogs({
+        name,
+        namespace: ns,
+        container: selectedContainer || undefined,
+        tailLines: 500,
+      })
+
+      setLogs(result)
+      setLogsLoading(false)
+      setLogsFetched(true)
+    }
+
+    fetchLogs()
+  }, [activeTab, kind, name, namespace, selectedContainer, logsFetched])
+
+  // Handle container selection change
+  const handleContainerChange = (container: string) => {
+    setSelectedContainer(container || null)
+    setLogsFetched(false) // Force re-fetch with new container
+  }
+
+  // Handle logs refresh
+  const handleLogsRefresh = () => {
+    setLogsFetched(false) // Force re-fetch
+  }
+
+  // Handle tail toggle
+  const handleTailToggle = () => {
+    setIsTailing((prev) => !prev)
+  }
+
+  // Polling effect for tailing logs
+  useEffect(() => {
+    if (!isTailing || activeTab !== 'logs' || kind !== 'Pod' || !name || !namespace) {
+      return
+    }
+
+    const pollLogs = async () => {
+      const ns = namespace === '_cluster' ? 'default' : namespace
+
+      const result = await getPodLogs({
+        name,
+        namespace: ns,
+        container: selectedContainer || undefined,
+        tailLines: 500,
+      })
+
+      setLogs(result)
+    }
+
+    // Poll every 3 seconds
+    const intervalId = setInterval(pollLogs, 3000)
+
+    // Cleanup on unmount or when tailing stops
+    return () => clearInterval(intervalId)
+  }, [isTailing, activeTab, kind, name, namespace, selectedContainer])
+
+  // Stop tailing when leaving logs tab
+  useEffect(() => {
+    if (activeTab !== 'logs' && isTailing) {
+      setIsTailing(false)
+    }
+  }, [activeTab, isTailing])
+
   // Build back link preserving current filters
   const backParams = new URLSearchParams()
   if (namespace && namespace !== '_cluster') {
@@ -543,7 +769,7 @@ export function ResourceDetail() {
       {/* Tabs */}
       <div className="border-b border-border px-6">
         <div className="flex gap-1 overflow-x-auto">
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => !tab.disabled && setActiveTab(tab.id)}
@@ -631,7 +857,15 @@ export function ResourceDetail() {
             )}
 
             {activeTab === 'logs' && (
-              <div className="text-muted-foreground">Logs tab coming soon...</div>
+              <LogsView
+                logs={logs}
+                loading={logsLoading}
+                selectedContainer={selectedContainer}
+                onContainerChange={handleContainerChange}
+                onRefresh={handleLogsRefresh}
+                isTailing={isTailing}
+                onTailToggle={handleTailToggle}
+              />
             )}
           </>
         )}

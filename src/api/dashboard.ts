@@ -908,3 +908,90 @@ export async function getResourceEvents(
     return { events: [], count: 0, error: 'Failed to connect to server' }
   }
 }
+
+// ============================================================================
+// Pod Logs API
+// ============================================================================
+
+export interface GetPodLogsParams {
+  /** Pod name */
+  name: string
+  /** Pod namespace */
+  namespace: string
+  /** Container name (required for multi-container pods) */
+  container?: string
+  /** Number of lines to return (default: 100) */
+  tailLines?: number
+}
+
+export interface GetPodLogsResult {
+  logs: string | null
+  container: string | null
+  containerCount: number
+  error: string | null
+  /** Available containers when CONTAINER_REQUIRED error */
+  availableContainers?: string[]
+}
+
+/**
+ * Fetch logs for a Kubernetes pod
+ * For multi-container pods, specify the container name
+ */
+export async function getPodLogs(params: GetPodLogsParams): Promise<GetPodLogsResult> {
+  const { name, namespace, container, tailLines = 500 } = params
+
+  const queryParams = new URLSearchParams({ name, namespace, tailLines: String(tailLines) })
+  if (container) {
+    queryParams.set('container', container)
+  }
+
+  try {
+    const response = await fetch(`${API_PATH}/logs?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    const json = await response.json()
+
+    // Handle MCP error responses
+    if (!response.ok || json.success === false) {
+      const errorCode = json.error?.code
+      const errorMessage = json.error?.message || `Failed to fetch logs: ${response.status}`
+
+      // Special handling for CONTAINER_REQUIRED error
+      if (errorCode === 'CONTAINER_REQUIRED') {
+        return {
+          logs: null,
+          container: null,
+          containerCount: json.error?.details?.containers?.length || 0,
+          error: errorMessage,
+          availableContainers: json.error?.details?.containers || [],
+        }
+      }
+
+      return {
+        logs: null,
+        container: null,
+        containerCount: 0,
+        error: errorMessage,
+      }
+    }
+
+    return {
+      logs: json.data?.logs || '',
+      container: json.data?.container || null,
+      containerCount: json.data?.containerCount || 1,
+      error: null,
+    }
+  } catch (err) {
+    console.error('Failed to fetch logs:', err)
+    return {
+      logs: null,
+      container: null,
+      containerCount: 0,
+      error: 'Failed to connect to server',
+    }
+  }
+}

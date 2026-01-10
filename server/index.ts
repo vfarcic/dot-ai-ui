@@ -374,6 +374,70 @@ async function createServer() {
     }
   })
 
+  // Proxy pod logs API request to MCP server
+  app.get('/api/v1/logs', apiLimiter, async (req, res) => {
+    try {
+      const { namespace, name, container, tailLines } = req.query as {
+        namespace?: string
+        name?: string
+        container?: string
+        tailLines?: string
+      }
+
+      if (!name || !namespace) {
+        return res
+          .status(400)
+          .json({ error: 'Missing required parameters: name, namespace' })
+      }
+
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      }
+      if (AUTH_TOKEN) {
+        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 60000) // 60s timeout for logs
+
+      // Build query params for MCP's /api/v1/logs endpoint
+      const queryParams = new URLSearchParams({ name, namespace })
+      if (container) {
+        queryParams.set('container', container)
+      }
+      if (tailLines) {
+        queryParams.set('tailLines', tailLines)
+      }
+
+      const url = `${MCP_BASE_URL}/api/v1/logs?${queryParams}`
+      console.log(`[Proxy] Fetching logs from MCP: ${url}`)
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to fetch logs' })
+    }
+  })
+
   // Proxy dashboard resource kinds API requests to MCP server
   app.get('/api/v1/resources/kinds', apiLimiter, async (req, res) => {
     try {
