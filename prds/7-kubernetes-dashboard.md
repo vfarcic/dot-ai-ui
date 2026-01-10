@@ -90,7 +90,7 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 | Resource kinds discovery | MCP Server | New `listResourceKinds` tool → Qdrant |
 | Resource list (metadata) | MCP Server | New `listResources` tool → Qdrant |
 | Namespace list | MCP Server | New `listNamespaces` tool → Qdrant |
-| Live status (pod phase, replicas) | Kubernetes API | Direct via `@kubernetes/client-node` |
+| Live status (pod phase, replicas) | MCP Server | Via `/api/v1/resource` endpoint (MCP queries K8s API) |
 | AI Query/Remediate/Operate | MCP Server | Existing proxy pattern |
 
 ### New MCP Endpoints Required (in dot-ai)
@@ -142,13 +142,15 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 
 **Dependency**: Requires dot-ai MCP to implement the new endpoints first
 
-### Milestone 2: K8s Status Enrichment
-- [ ] K8s client initialization with auto-detection (kubeconfig/in-cluster)
-- [ ] Status endpoint for enriching displayed resources (`/api/k8s/status/:kind/:namespace/:name`)
-- [ ] Merge MCP metadata with K8s live status in frontend
-- [ ] Pod logs endpoint (special case)
+### Milestone 2: Live Data via MCP (COMPLETED)
+- [x] Single resource endpoint (`/api/v1/resource`) returns live K8s data (metadata, spec, status)
+- [x] Events endpoint (`/api/v1/events`) fetches live events from K8s API
+- [x] Pod logs endpoint (`/api/v1/logs`) streams logs from K8s API
+- [x] List endpoint supports `includeStatus` param for live status enrichment
 
-**Validation**: Resource tables show live status (Running, CrashLoopBackOff, replica counts)
+**Validation**: Detail views show live status, events, and logs from K8s API via MCP
+
+**Architecture Note**: Original plan assumed UI would use `@kubernetes/client-node` directly. Actual implementation: MCP server handles all K8s API communication; UI only talks to MCP.
 
 ### Milestone 3: Frontend Infrastructure
 - [ ] React Query setup for data fetching
@@ -255,9 +257,8 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 ## Dependencies
 
 ### UI Dependencies
-- `@tanstack/react-query` - Server state management
-- `@kubernetes/client-node` - Kubernetes API client (for status enrichment only)
-- Existing MCP proxy infrastructure
+- `@tanstack/react-query` - Server state management (planned, using useState/useEffect currently)
+- Existing MCP proxy infrastructure (all K8s data flows through MCP)
 
 ### External Dependencies (dot-ai MCP)
 - New `listResourceKinds` MCP tool - for sidebar population
@@ -289,6 +290,7 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-08 | New MCP tools required | `listResourceKinds`, `listResources`, `listNamespaces` to expose Qdrant data in structured format | External dependency on dot-ai changes |
 | 2025-01-08 | Group sidebar by `apiGroup` instead of hardcoded categories | Dynamic grouping works with any CRDs without code changes; matches K8s API structure | Sidebar shows "core", "apps", "networking.k8s.io", custom CRD groups automatically |
 | 2025-01-08 | Only expand "core" group by default | Cleaner initial view for clusters with many resource types | Better UX - users expand other groups as needed |
+| 2025-01-10 | MCP handles all K8s API communication | Original plan had UI using `@kubernetes/client-node` directly. MCP already has K8s client and returns live data via `/api/v1/resource`, `/api/v1/events`, `/api/v1/logs` | Simplified architecture - removed `@kubernetes/client-node` dependency from UI; all K8s auth handled by MCP |
 
 ---
 
@@ -326,4 +328,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-09 | Milestone 4 - YAML tab implemented. Added `yaml` package, `resourceToYaml()` function with canonical K8s field ordering (apiVersion → kind → metadata → spec → status), `YamlView` component with Prism syntax highlighting and copy-to-clipboard. Verified MCP returns identical data to kubectl (queries K8s API directly, not Qdrant). |
 | 2025-01-10 | Milestone 4 - Events tab implemented. Added `/api/v1/events` proxy endpoint (server/index.ts), `getResourceEvents()` API client, `EventsView` component with table display (Type, Reason, Age, Source, Message). Events lazy-loaded when tab selected. Tab state persists in URL via `?tab=` param. Verified with Playwright for Normal and Warning event types. Required new MCP endpoint `/api/v1/events` in dot-ai. |
 | 2025-01-10 | Milestone 4 COMPLETED - Logs tab implemented for Pod resources. Added `/api/v1/logs` proxy endpoint, `getPodLogs()` API client, `LogsView` component with container selector, Tail button for live polling (3s interval), auto-scroll to bottom on refresh. Logs tab conditionally shown only for Pod kind via `getTabsForKind()`. Required new MCP endpoint `/api/v1/logs` in dot-ai. Updated CLAUDE.md with MCP integration guidance. |
+| 2025-01-10 | Milestone 2 COMPLETED - Rewrote milestone to reflect actual architecture. Original plan assumed `@kubernetes/client-node` in UI; actual implementation uses MCP for all K8s communication. Live data endpoints (`/api/v1/resource`, `/api/v1/events`, `/api/v1/logs`) all proxy to MCP which queries K8s API directly. |
 
