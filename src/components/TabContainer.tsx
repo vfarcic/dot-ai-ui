@@ -1,9 +1,35 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import type { Visualization } from '@/types'
+import type { Visualization, StatusIndicator } from '@/types'
 
 interface TabContainerProps {
   visualizations: Visualization[]
   renderContent: (visualization: Visualization) => React.ReactNode
+}
+
+// Derive aggregate status from visualization content
+function getVisualizationStatus(viz: Visualization): StatusIndicator | undefined {
+  if (viz.type === 'cards') {
+    const statuses = viz.content.map((card) => card.status).filter(Boolean) as StatusIndicator[]
+    if (statuses.includes('error')) return 'error'
+    if (statuses.includes('warning')) return 'warning'
+    if (statuses.includes('ok')) return 'ok'
+  } else if (viz.type === 'table' && viz.content.rowStatuses) {
+    const statuses = viz.content.rowStatuses.filter(Boolean) as StatusIndicator[]
+    if (statuses.includes('error')) return 'error'
+    if (statuses.includes('warning')) return 'warning'
+    if (statuses.includes('ok')) return 'ok'
+  }
+  return undefined
+}
+
+function StatusDot({ status }: { status: StatusIndicator }) {
+  const colorClass = {
+    error: 'bg-red-500',
+    warning: 'bg-yellow-500',
+    ok: 'bg-green-500',
+  }[status]
+
+  return <span className={`w-2 h-2 rounded-full ${colorClass}`} />
 }
 
 export function TabContainer({ visualizations, renderContent }: TabContainerProps) {
@@ -91,19 +117,23 @@ export function TabContainer({ visualizations, renderContent }: TabContainerProp
           ref={scrollRef}
           className="flex overflow-x-auto scrollbar-thin"
         >
-          {visualizations.map((viz) => (
-            <button
-              key={viz.id}
-              onClick={() => setActiveTabId(viz.id)}
-              className={`px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 cursor-pointer ${
-                activeTabId === viz.id
-                  ? 'border-b-2 border-primary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {viz.label}
-            </button>
-          ))}
+          {visualizations.map((viz) => {
+            const status = getVisualizationStatus(viz)
+            return (
+              <button
+                key={viz.id}
+                onClick={() => setActiveTabId(viz.id)}
+                className={`px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 cursor-pointer flex items-center gap-2 ${
+                  activeTabId === viz.id
+                    ? 'border-b-2 border-primary text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {viz.label}
+                {status && status !== 'ok' && <StatusDot status={status} />}
+              </button>
+            )
+          })}
         </div>
       </div>
 

@@ -2,53 +2,66 @@
 name: request-dot-ai-feature
 description: Generate a feature request prompt for another dot-ai project. Use when you need a feature implemented in a sibling project (MCP server, controller, etc.) to unblock work in the current project.
 allowed-tools:
+  - Read
   - Grep
-  - Bash(grep:*)
+  - Glob
 ---
 
 # Request Feature in dot-ai Project
 
-Generate a prompt that the user can copy/paste to the Claude agent in another dot-ai project.
+Write a feature request to a file in the target dot-ai project's tmp directory. The user will review and approve the write operation.
 
 ## Projects
 
-- **dot-ai** - Main MCP server (API endpoints, tools, handlers)
-- **dot-ai-ui** - Web UI for visualizations and dashboard
-- **dot-ai-controller** - Kubernetes controller
-- **dot-ai-stack** - Stack deployment configs
-- **dot-ai-website** - Documentation website
+| Project | Directory | Description |
+|---------|-----------|-------------|
+| dot-ai | `/Users/viktorfarcic/code/dot-ai` | Main MCP server (API endpoints, tools, handlers) |
+| dot-ai-ui | `/Users/viktorfarcic/code/dot-ai-ui` | Web UI for visualizations and dashboard |
+| dot-ai-controller | `/Users/viktorfarcic/code/dot-ai-controller` | Kubernetes controller |
+| dot-ai-stack | `/Users/viktorfarcic/code/dot-ai-stack` | Stack deployment configs |
+| dot-ai-website | `/Users/viktorfarcic/code/dot-ai-website` | Documentation website |
 
 **Important:** Do NOT use this skill to request features in the project you're currently working in. Just implement them directly.
 
-## Output Format
+## Process
 
-Generate output in this exact format:
+1. Determine the target project from the user's request
+2. Write the feature request to: `/Users/viktorfarcic/code/[target-project]/tmp/feature-request.md`
+3. Tell the user to open the target project and run `/process-feature-request`
 
-```
-## Feature Request for [PROJECT_NAME]
+## File Format
 
-Copy the prompt below and paste it into the Claude agent running in:
-📁 /Users/viktorfarcic/code/[project-directory]
+Write the feature request file with this content:
 
----
+```markdown
+# Feature Request from [CURRENT_PROJECT]
 
-### Prompt to copy:
+**Requesting project directory:** /Users/viktorfarcic/code/[current-project]
 
-**Request from [CURRENT_PROJECT]:**
+## What We Need
 
 [DESCRIPTION OF WHAT WE NEED AND WHY]
 
-**Our suggestion** (you decide the best approach):
+## Our Suggestion
+
+(You decide the best approach)
+
 - [Suggested approach or implementation idea]
 
-**What we're trying to accomplish:**
-[Context about what this unblocks in our project]
+## Context
 
-Note: You're the expert on this codebase. Feel free to implement this differently if there's a better approach, or push back if this doesn't make sense.
+[What this unblocks in our project]
 
----
+## Notes
 
-After the feature is implemented, return here and continue with the integration.
+You're the expert on this codebase. Feel free to implement this differently if there's a better approach, or push back if this doesn't make sense.
+
+## Response Instructions
+
+After implementing this feature, write a response file to help the requesting project integrate:
+
+1. Write to: `/Users/viktorfarcic/code/[requesting-project]/tmp/feature-response.md`
+2. Include: what was implemented, how to use it (API signatures, endpoints, types), and any usage examples
 ```
 
 ## Guidelines
@@ -57,3 +70,4 @@ After the feature is implemented, return here and continue with the integration.
 2. Suggestions are just suggestions - the receiving agent decides the approach
 3. The receiving agent is the authority on their codebase
 4. Keep the request focused on the problem, not the solution
+5. The user will review the write operation before it's accepted

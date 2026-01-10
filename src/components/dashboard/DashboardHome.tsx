@@ -248,7 +248,7 @@ export function DashboardHome() {
   // Show loading state
   if (queryLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center h-full">
+      <div className="flex-1 flex items-center pt-16 sm:pt-24 flex-col">
         <div className="text-center">
           <LoadingSpinner />
           <p className="mt-4 text-muted-foreground">Analyzing cluster health...</p>
@@ -260,7 +260,7 @@ export function DashboardHome() {
 
   // Default state - show "Analyze Cluster Health" button
   return (
-    <div className="flex-1 flex items-center justify-center h-full">
+    <div className="flex-1 flex items-center pt-16 sm:pt-24 flex-col">
       <div className="text-center">
         {hasResources === false ? (
           // No resources indexed state

@@ -3,11 +3,14 @@
  * Based on GET /api/v1/visualize/{sessionId} response format
  */
 
+export type StatusIndicator = 'error' | 'warning' | 'ok'
+
 export interface Card {
   id: string
   title: string
   description?: string
   tags?: string[]
+  status?: StatusIndicator
 }
 
 export interface CodeContent {
@@ -18,6 +21,7 @@ export interface CodeContent {
 export interface TableContent {
   headers: string[]
   rows: string[][]
+  rowStatuses?: (StatusIndicator | null)[]
 }
 
 export type VisualizationType = 'mermaid' | 'cards' | 'code' | 'table'
