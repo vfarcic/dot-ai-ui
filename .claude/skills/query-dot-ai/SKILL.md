@@ -1,6 +1,6 @@
 ---
 name: query-dot-ai
-description: Query sibling dot-ai project codebases to find API details, types, implementations, and patterns. Use when you need information about the MCP server, controller, or other dot-ai projects.
+description: "Query sibling dot-ai projects to verify features are USABLE (not just defined). IMPORTANT: When calling this skill, explain HOW you plan to use the feature (e.g., 'I need to call X via REST API from the UI' or 'I need to import Y function'). This helps verify the full chain from definition to exposure."
 context: fork
 agent: Explore
 allowed-tools:
@@ -15,7 +15,7 @@ Explore the dot-ai ecosystem codebases to find the requested information.
 
 ## Project Locations
 
-All projects at `/Users/viktorfarcic/code/`:
+Sibling projects are located in the parent directory of the current working directory (`../`):
 
 - **dot-ai** - Main MCP server (API endpoints, tools, handlers)
 - **dot-ai-ui** - Web UI for visualizations and dashboard
@@ -30,3 +30,17 @@ Default to **dot-ai** (MCP server) if the target project is unclear.
 ## Excluded
 
 **dot-ai-infra** - Production infrastructure. Only query if user explicitly requests it.
+
+## Verification Mindset
+
+**Don't just find that something EXISTS - prove it's USABLE.**
+
+- Finding a type/interface is NOT enough
+- Finding internal code is NOT enough
+- You must trace from definition → implementation → exposure
+
+When asked "does X exist?", answer:
+- "Yes, and here's how to use it: [concrete usage]" OR
+- "It exists internally but is NOT exposed for external use"
+
+**Go deep, not wide.** Follow the code path until you can prove how the caller would actually use the feature.
