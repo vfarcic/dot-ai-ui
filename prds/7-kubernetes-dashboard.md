@@ -177,22 +177,40 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 
 ### Milestone 5: AI Action Integration
 
-#### Design Phase
-- [ ] Design: Query tool integration - what questions make sense from resource context?
+#### Design Decisions (Resolved)
+
+**Query Tool - Dashboard Home (First Priority)**
+- [x] Design: Query tool for dashboard home - "Analyze Cluster Health" button replaces empty body
+- Decision: No auto-trigger (avoids unexpected token costs); explicit button click required
+- Decision: Query analyzes entire cluster (not namespace-scoped); namespace-specific queries deferred
+- Decision: Results rendered inline using existing visualization components (no navigation to `/v/{sessionId}`)
+- Decision: Reuse `LoadingSpinner`, `VisualizationRenderer`, `TabContainer`, `ErrorDisplay` from visualization page
+- New code needed: ~60-90 lines (dashboard home orchestration + API client function)
+
+**Unified Layout Architecture**
+- [x] Design: Merge visualization page and dashboard into shared layout
+- Decision: Keep separate routes (`/v/{sessionId}` and `/dashboard/*`) but share sidebar layout
+- Decision: Sidebar collapsed by default for visualization, expanded for resource views
+- Decision: No MCP URL changes needed - existing `/v/{sessionId}` links continue to work
+- MCP requirement: Query tool needs `inline: true` parameter to return visualization data directly
+
+**Other Tools (To Be Designed)**
 - [ ] Design: Remediate tool integration - how to present analysis and suggested fixes?
 - [ ] Design: Operate tool integration - what Day 2 operations to expose (scale, update, rollback)?
 - [ ] Design: Recommend tool integration - when/where to show deployment recommendations?
 - [ ] Design: Capabilities tool integration - how to display cluster resource capabilities and operators?
 
 #### Implementation
-- [ ] `AIActionBar` component with Query, Remediate, Operate, Recommend buttons
+- [ ] Shared `DashboardLayout` component with collapsible sidebar
+- [ ] Dashboard home with "Analyze Cluster Health" button
+- [ ] API client for Query tool with `inline` parameter
+- [ ] Visualization page uses shared layout (sidebar collapsed)
+- [ ] `AIActionBar` component with Query, Remediate, Operate, Recommend buttons (for resource detail views)
 - [ ] `AIResultsPanel` side panel for AI responses
-- [ ] MCP client functions for query/remediate/operate/recommend/capabilities
+- [ ] MCP client functions for remediate/operate/recommend/capabilities
 - [ ] Context passing - send resource details to MCP tools
-- [ ] Link to full visualization (`/v/{sessionId}`) for complex outputs
-- [ ] Capabilities view - show discovered cluster capabilities and installed operators
 
-**Validation**: Click "Remediate" on a resource, see AI analysis in side panel
+**Validation**: Click "Analyze Cluster Health" on dashboard home, see AI analysis rendered inline
 
 ### Milestone 6: Polish & Error Handling
 - [x] Loading skeletons for resource lists
@@ -211,6 +229,24 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [ ] Implementation: Search component and API integration
 
 #### Agentic Chat
+
+**Architectural Decisions (Resolved)**
+- [x] Decision: No generic free-form chat for v1 - focus on tool-specific integrations instead
+- [x] Decision: LLM communication stays in MCP server (API keys never exposed to browser)
+- [x] Decision: UI maintains conversation context for tool workflows (stateless MCP for chat)
+- Rationale: Generic chat without tool access provides limited value (just ChatGPT in a sidebar); tool-specific integrations deliver immediate cluster-aware value
+
+**Architecture**
+```
+UI (dot-ai-ui)          Express Proxy           MCP Server (dot-ai)
++-------------+         +-------------+         +------------------+
+| Tool UI     |  HTTP   | /api/...    |  HTTP   | Tool endpoints   |
+| - Context   |-------->| (proxy)     |-------->| - LLM API keys   |
+| - History   |<--------|             |<--------| - Tool execution |
++-------------+         +-------------+         +------------------+
+```
+
+**Deferred Design Questions**
 - [ ] Design: Chat UX - side panel? modal? persistent drawer? conversation history?
 - [ ] Design: Chat context - how to pass current resource/namespace context to agent?
 - [ ] Design: Action execution - how should chat-suggested actions be presented and executed?
@@ -291,6 +327,13 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-08 | Group sidebar by `apiGroup` instead of hardcoded categories | Dynamic grouping works with any CRDs without code changes; matches K8s API structure | Sidebar shows "core", "apps", "networking.k8s.io", custom CRD groups automatically |
 | 2025-01-08 | Only expand "core" group by default | Cleaner initial view for clusters with many resource types | Better UX - users expand other groups as needed |
 | 2025-01-10 | MCP handles all K8s API communication | Original plan had UI using `@kubernetes/client-node` directly. MCP already has K8s client and returns live data via `/api/v1/resource`, `/api/v1/events`, `/api/v1/logs` | Simplified architecture - removed `@kubernetes/client-node` dependency from UI; all K8s auth handled by MCP |
+| 2025-01-10 | Query tool for dashboard home with explicit button | Auto-trigger would spend tokens without user consent; explicit "Analyze Cluster Health" button respects user choice and avoids unexpected costs | Dashboard home shows button instead of empty body; no auto-AI toggle needed |
+| 2025-01-10 | Query analyzes entire cluster, not namespace-scoped | Dashboard home is entry point before user selects namespace; cluster-wide analysis provides immediate value | Namespace-specific queries deferred to resource-context usage of Query tool |
+| 2025-01-10 | Unified layout: shared sidebar for visualization and dashboard | Users coming from coding agent links should have same navigation as dashboard users; unified experience | Keep separate routes (`/v/{sessionId}` and `/dashboard/*`) but extract shared `DashboardLayout` component |
+| 2025-01-10 | Sidebar collapsed for visualization, expanded for resources | Visualizations need more horizontal space for diagrams/tables; resource browsing needs navigation | Sidebar state determined by route/context, user can manually toggle |
+| 2025-01-10 | Query tool needs `inline` parameter for direct visualization data | Currently Query returns JSON + link to `/v/{sessionId}`; dashboard needs visualization data directly without redirect | MCP change required: `inline: true` parameter returns visualization payload instead of session link |
+| 2025-01-10 | No generic agentic chat for v1 | Generic chat without tool access is just ChatGPT in sidebar - limited value; tool-specific integrations (Query, Remediate, Operate) provide cluster-aware value | Focus on tool integrations; defer free-form chat to future milestone |
+| 2025-01-10 | LLM API keys stay in MCP server | Exposing API keys to browser is security risk; MCP already handles authenticated communication | All AI features proxy through MCP; UI never has direct LLM access |
 
 ---
 
@@ -329,4 +372,6 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-10 | Milestone 4 - Events tab implemented. Added `/api/v1/events` proxy endpoint (server/index.ts), `getResourceEvents()` API client, `EventsView` component with table display (Type, Reason, Age, Source, Message). Events lazy-loaded when tab selected. Tab state persists in URL via `?tab=` param. Verified with Playwright for Normal and Warning event types. Required new MCP endpoint `/api/v1/events` in dot-ai. |
 | 2025-01-10 | Milestone 4 COMPLETED - Logs tab implemented for Pod resources. Added `/api/v1/logs` proxy endpoint, `getPodLogs()` API client, `LogsView` component with container selector, Tail button for live polling (3s interval), auto-scroll to bottom on refresh. Logs tab conditionally shown only for Pod kind via `getTabsForKind()`. Required new MCP endpoint `/api/v1/logs` in dot-ai. Updated CLAUDE.md with MCP integration guidance. |
 | 2025-01-10 | Milestone 2 COMPLETED - Rewrote milestone to reflect actual architecture. Original plan assumed `@kubernetes/client-node` in UI; actual implementation uses MCP for all K8s communication. Live data endpoints (`/api/v1/resource`, `/api/v1/events`, `/api/v1/logs`) all proxy to MCP which queries K8s API directly. |
+| 2025-01-10 | Milestone 5 design phase - Query tool integration designed for dashboard home. Key decisions: explicit "Analyze Cluster Health" button (no auto-trigger), cluster-wide analysis, inline visualization rendering using existing components. Unified layout architecture: shared sidebar between `/v/{sessionId}` and `/dashboard/*` routes, sidebar collapsed for visualizations. MCP requirement identified: `inline` parameter for Query tool to return visualization data directly. |
+| 2025-01-10 | Milestone 7 architecture - Decided against generic agentic chat for v1. LLM communication stays in MCP server (security). Focus on tool-specific integrations (Query, Remediate, Operate) which provide cluster-aware value. Generic chat deferred. |
 
