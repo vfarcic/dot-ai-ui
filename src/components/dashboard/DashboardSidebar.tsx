@@ -12,6 +12,7 @@ interface DashboardSidebarProps {
   namespace: string
   isCollapsed: boolean
   onToggleCollapse: () => void
+  onResourcesLoaded?: (hasResources: boolean) => void
 }
 
 function ChevronIcon({
@@ -108,6 +109,7 @@ export function DashboardSidebar({
   namespace,
   isCollapsed,
   onToggleCollapse,
+  onResourcesLoaded,
 }: DashboardSidebarProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [kindsByGroup, setKindsByGroup] = useState<Map<string, ResourceKind[]>>(new Map())
@@ -131,6 +133,8 @@ export function DashboardSidebar({
         if (expandedGroups.size === 0) {
           setExpandedGroups(new Set(['core']))
         }
+        // Notify parent about resources state
+        onResourcesLoaded?.(groups.length > 0)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load resources')
       } finally {
@@ -196,7 +200,26 @@ export function DashboardSidebar({
           </div>
         )}
 
-        {!loading && !error && sortedGroups.map((groupName) => {
+        {!loading && !error && sortedGroups.length === 0 && (
+          <div className="px-3 py-4 text-sm">
+            <div className="text-yellow-500 font-medium mb-2">
+              No resources indexed
+            </div>
+            <p className="text-muted-foreground text-xs mb-3">
+              The dot-ai-controller may not be running or hasn't synced resources yet.
+            </p>
+            <a
+              href="https://devopstoolkit.ai/docs/controller/resource-sync-guide"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline text-xs"
+            >
+              View resource sync guide →
+            </a>
+          </div>
+        )}
+
+        {!loading && !error && sortedGroups.length > 0 && sortedGroups.map((groupName) => {
           const kinds = kindsByGroup.get(groupName) || []
           const isExpanded = expandedGroups.has(groupName)
           const totalCount = kinds.reduce((sum, k) => sum + k.count, 0)

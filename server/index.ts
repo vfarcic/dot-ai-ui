@@ -438,6 +438,63 @@ async function createServer() {
     }
   })
 
+  // Proxy Query tool API requests to MCP server
+  // Used for AI-powered cluster analysis with inline visualization mode
+  app.post('/api/v1/tools/query', apiLimiter, async (req, res) => {
+    try {
+      const { intent } = req.body as { intent?: string }
+
+      if (!intent) {
+        return res.status(400).json({ error: 'Missing required parameter: intent' })
+      }
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+      if (AUTH_TOKEN) {
+        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      }
+
+      const controller = new AbortController()
+      // 30 minute timeout for complex AI queries
+      const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000)
+
+      const url = `${MCP_BASE_URL}/api/v1/tools/query`
+      console.log(`[Proxy] Sending query to MCP: ${url}`)
+      console.log(`[Proxy] Intent: ${intent.substring(0, 100)}...`)
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ intent }),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('Query timeout')
+        return res.status(408).json({ error: 'Query timeout - request took too long' })
+      }
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to execute query' })
+    }
+  })
+
   // Proxy dashboard resource kinds API requests to MCP server
   app.get('/api/v1/resources/kinds', apiLimiter, async (req, res) => {
     try {

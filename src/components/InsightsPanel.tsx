@@ -1,8 +1,22 @@
 import { useState } from 'react'
 
+// Insight can be a string or an object with text/message property
+type Insight = string | { text?: string; message?: string; [key: string]: unknown }
+
 interface InsightsPanelProps {
-  sessionId: string
-  insights?: string[]
+  sessionId?: string
+  insights?: Insight[]
+}
+
+/**
+ * Extract text from an insight (handles both string and object formats)
+ */
+function getInsightText(insight: Insight): string {
+  if (typeof insight === 'string') {
+    return insight
+  }
+  // Try common property names for the text content
+  return insight.text || insight.message || JSON.stringify(insight)
 }
 
 export function InsightsPanel({ sessionId, insights }: InsightsPanelProps) {
@@ -31,7 +45,7 @@ export function InsightsPanel({ sessionId, insights }: InsightsPanelProps) {
             />
           </svg>
           <span className="text-sm font-medium text-foreground">
-            Session & Insights
+            {sessionId ? 'Session & Insights' : 'Insights'}
           </span>
         </div>
         <svg
@@ -51,10 +65,12 @@ export function InsightsPanel({ sessionId, insights }: InsightsPanelProps) {
 
       {isExpanded && (
         <div className="px-4 pb-4 border-t border-border pt-3">
-          <div className="mb-3">
-            <span className="text-xs text-muted-foreground">Session: </span>
-            <code className="bg-muted px-2 py-1 rounded text-xs">{sessionId}</code>
-          </div>
+          {sessionId && (
+            <div className="mb-3">
+              <span className="text-xs text-muted-foreground">Session: </span>
+              <code className="bg-muted px-2 py-1 rounded text-xs">{sessionId}</code>
+            </div>
+          )}
 
           {hasInsights && (
             <div>
@@ -66,7 +82,7 @@ export function InsightsPanel({ sessionId, insights }: InsightsPanelProps) {
                     className="text-sm text-muted-foreground flex items-start gap-2"
                   >
                     <span className="text-primary mt-0.5">•</span>
-                    <span>{insight}</span>
+                    <span>{getInsightText(insight)}</span>
                   </li>
                 ))}
               </ul>

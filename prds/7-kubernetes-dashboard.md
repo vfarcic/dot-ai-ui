@@ -189,10 +189,30 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 
 **Unified Layout Architecture**
 - [x] Design: Merge visualization page and dashboard into shared layout
+- [x] Implementation: SharedDashboardLayout component with collapsible sidebar
 - Decision: Keep separate routes (`/v/{sessionId}` and `/dashboard/*`) but share sidebar layout
 - Decision: Sidebar collapsed by default for visualization, expanded for resource views
-- Decision: No MCP URL changes needed - existing `/v/{sessionId}` links continue to work
-- MCP requirement: Query tool needs `inline: true` parameter to return visualization data directly
+- Decision: Sidebar state preserved via `sb` URL parameter (`sb=1` collapsed, `sb=0` expanded)
+- Decision: After "Analyze Cluster Health" completes, navigate to `/v/{sessionId}?sb=0|1` for URL caching
+- MCP requirement: Query tool visualization mode (`[visualization]` prefix) returns `sessionId` in response
+
+**Enhanced Visualizations (Agreed Design)**
+
+*Problem Indication - AI-driven styling*
+- [x] Design: AI indicates problems via native styling (no additional UI metadata parsing)
+- Decision: Mermaid - AI uses `style NodeId fill:#ef4444,stroke:#dc2626` for error nodes
+- Decision: Cards/Tables - AI adds `status: 'error' | 'warning' | 'ok'` field, UI renders with appropriate colors/icons
+- Decision: Fully AI-driven approach keeps UI simple and gives flexibility
+- MCP requirement: Update prompts to instruct AI to use red styling in Mermaid for problems, add status field guidance
+
+*Bar Charts for Resource Metrics*
+- [x] Design: Add bar charts as new visualization type for resource usage
+- Decision: Start with ONE chart type (bar chart) - prove it works before adding others
+- Decision: Use case is resource metrics (used vs available memory, CPU across nodes/namespaces)
+- Decision: Schema: `{ type: 'bar-chart', title, data: [{label, value, max?, status?}], unit?, orientation? }`
+- Decision: `status` field per bar enables color-coding (ties into problem indication)
+- UI implementation needed: BarChartRenderer component
+- MCP implementation needed: Add bar-chart as new visualization type
 
 **Other Tools (To Be Designed)**
 - [ ] Design: Remediate tool integration - how to present analysis and suggested fixes?
@@ -201,10 +221,14 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [ ] Design: Capabilities tool integration - how to display cluster resource capabilities and operators?
 
 #### Implementation
-- [ ] Shared `DashboardLayout` component with collapsible sidebar
-- [ ] Dashboard home with "Analyze Cluster Health" button
-- [ ] API client for Query tool with `inline` parameter
-- [ ] Visualization page uses shared layout (sidebar collapsed)
+- [x] Shared `SharedDashboardLayout` component with collapsible sidebar (completed)
+- [x] Dashboard home with "Analyze Cluster Health" button (completed)
+- [x] API client for Query tool (`src/api/query.ts`) with `[visualization]` prefix (completed)
+- [x] Visualization page uses shared layout with sidebar collapsed by default (completed)
+- [x] Sidebar state preserved via URL param across navigation (completed)
+- [x] Navigate to `/v/{sessionId}` after query completes for URL caching (completed)
+- [ ] Status-based styling in existing renderers (cards, tables) for problem indication
+- [ ] `BarChartRenderer` component for resource metrics visualization
 - [ ] `AIActionBar` component with Query, Remediate, Operate, Recommend buttons (for resource detail views)
 - [ ] `AIResultsPanel` side panel for AI responses
 - [ ] MCP client functions for remediate/operate/recommend/capabilities
@@ -374,4 +398,8 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-10 | Milestone 2 COMPLETED - Rewrote milestone to reflect actual architecture. Original plan assumed `@kubernetes/client-node` in UI; actual implementation uses MCP for all K8s communication. Live data endpoints (`/api/v1/resource`, `/api/v1/events`, `/api/v1/logs`) all proxy to MCP which queries K8s API directly. |
 | 2025-01-10 | Milestone 5 design phase - Query tool integration designed for dashboard home. Key decisions: explicit "Analyze Cluster Health" button (no auto-trigger), cluster-wide analysis, inline visualization rendering using existing components. Unified layout architecture: shared sidebar between `/v/{sessionId}` and `/dashboard/*` routes, sidebar collapsed for visualizations. MCP requirement identified: `inline` parameter for Query tool to return visualization data directly. |
 | 2025-01-10 | Milestone 7 architecture - Decided against generic agentic chat for v1. LLM communication stays in MCP server (security). Focus on tool-specific integrations (Query, Remediate, Operate) which provide cluster-aware value. Generic chat deferred. |
+| 2025-01-10 | Milestone 5 implementation - SharedDashboardLayout, DashboardHome with Analyze Cluster Health button, Query API client, sidebar state preservation via URL param (`sb=0|1`), navigation to `/v/{sessionId}` after query for URL caching. |
+| 2025-01-10 | Problem indication via AI-driven styling | Let AI handle problem visualization fully - Mermaid uses native `style` directives for red coloring, Cards/Tables use `status` field. Keeps UI simple, gives AI flexibility. | MCP prompt changes needed; minimal UI changes (respect status field) |
+| 2025-01-10 | Bar charts for resource metrics | Add bar chart as first graph type for resource usage (memory, CPU). Start with ONE chart type, prove it works before adding others. Pie charts excluded (poor data viz). | New BarChartRenderer component; MCP needs bar-chart visualization type |
+| 2025-01-10 | Sidebar state preservation via URL | Use `sb` URL param (`sb=1` collapsed, `sb=0` expanded) to preserve sidebar state across navigation between dashboard and visualization pages. | Consistent UX when navigating; sidebar preference persists |
 
