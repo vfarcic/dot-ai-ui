@@ -34,3 +34,5 @@ vite.config.d.ts
 # Playwright MCP screenshots
 .playwright-mcp
 kubeconfig*.yaml
+
+/tmp

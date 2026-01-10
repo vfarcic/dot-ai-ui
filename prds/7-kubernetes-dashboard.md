@@ -227,7 +227,7 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [x] Visualization page uses shared layout with sidebar collapsed by default (completed)
 - [x] Sidebar state preserved via URL param across navigation (completed)
 - [x] Navigate to `/v/{sessionId}` after query completes for URL caching (completed)
-- [ ] Status-based styling in existing renderers (cards, tables) for problem indication
+- [x] Status-based styling in existing renderers (cards, tables) for problem indication
 - [ ] `BarChartRenderer` component for resource metrics visualization
 - [ ] `AIActionBar` component with Query, Remediate, Operate, Recommend buttons (for resource detail views)
 - [ ] `AIResultsPanel` side panel for AI responses
@@ -402,4 +402,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-10 | Problem indication via AI-driven styling | Let AI handle problem visualization fully - Mermaid uses native `style` directives for red coloring, Cards/Tables use `status` field. Keeps UI simple, gives AI flexibility. | MCP prompt changes needed; minimal UI changes (respect status field) |
 | 2025-01-10 | Bar charts for resource metrics | Add bar chart as first graph type for resource usage (memory, CPU). Start with ONE chart type, prove it works before adding others. Pie charts excluded (poor data viz). | New BarChartRenderer component; MCP needs bar-chart visualization type |
 | 2025-01-10 | Sidebar state preservation via URL | Use `sb` URL param (`sb=1` collapsed, `sb=0` expanded) to preserve sidebar state across navigation between dashboard and visualization pages. | Consistent UX when navigating; sidebar preference persists |
+| 2025-01-11 | Milestone 5 partial - Status-based problem indication complete for all visualization types. UI: Cards/Tables use `status`/`rowStatuses` fields with colored left borders (red=error, yellow=warning, green=ok). MCP: Mermaid prompts updated to use red styling for error nodes only, no colors for healthy nodes. Added tab status indicators as bonus UX (red/yellow dots on tabs with issues). Dashboard home alignment fixed (top-aligned vs vertically centered). Cross-project skills created (request-dot-ai-feature, process-feature-request) for file-based feature request workflow. |
 
