@@ -5,6 +5,7 @@ import Prism from 'prismjs'
 import 'prismjs/components/prism-yaml'
 import { CollapsibleTree } from '../components/dashboard/CollapsibleTree'
 import { ExpandableDescription } from '../components/dashboard/ExpandableDescription'
+import { ActionBar } from '../components/dashboard/ActionBar'
 import {
   classifyStatus,
   getStatusColorClasses,
@@ -789,7 +790,7 @@ export function ResourceDetail() {
       </div>
 
       {/* Tab content */}
-      <main className="flex-1 p-6 overflow-auto">
+      <main className="flex-1 p-6 pb-20 overflow-auto">
         {resourceLoading ? (
           <div className="text-muted-foreground">Loading resource...</div>
         ) : resourceError ? (
@@ -870,6 +871,9 @@ export function ResourceDetail() {
           </>
         )}
       </main>
+
+      {/* Global ActionBar */}
+      <ActionBar />
     </div>
   )
 }

@@ -25,12 +25,18 @@ export interface QueryResponse {
  * Uses visualization mode to get structured data for UI rendering
  *
  * @param intent - Natural language query about the cluster
+ * @param signal - Optional AbortSignal to cancel the request
  * @returns Visualization data with title, visualizations, and insights
  * @throws APIError for network errors, timeouts, or server errors
  */
-export async function queryCluster(intent: string): Promise<QueryResponse> {
+export async function queryCluster(intent: string, signal?: AbortSignal): Promise<QueryResponse> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), QUERY_TIMEOUT)
+
+  // If external signal is provided, listen for abort and forward it
+  if (signal) {
+    signal.addEventListener('abort', () => controller.abort())
+  }
 
   try {
     const startTime = performance.now()
@@ -93,6 +99,10 @@ export async function queryCluster(intent: string): Promise<QueryResponse> {
     }
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
+        // Check if it was user-initiated cancellation vs timeout
+        if (signal?.aborted) {
+          throw new APIError('Request cancelled', 0, 'Cancelled')
+        }
         throw new APIError('Request timeout - query took too long', 408, 'Request Timeout')
       }
       throw new APIError(error.message, 0, 'Network Error')

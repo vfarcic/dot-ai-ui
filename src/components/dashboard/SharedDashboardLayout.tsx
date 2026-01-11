@@ -2,6 +2,7 @@ import { useState, useCallback, createContext, useContext } from 'react'
 import { Link, Outlet, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { DashboardSidebar } from './DashboardSidebar'
 import { NamespaceSelector } from './NamespaceSelector'
+import { ActionBar } from './ActionBar'
 import type { ResourceKind } from '../../api/dashboard'
 
 // URL param keys (short for cleaner URLs)
@@ -146,12 +147,6 @@ export function SharedDashboardLayout({
                 DevOps AI Toolkit
               </span>
             </Link>
-            {showSidebar && (
-              <>
-                <span className="text-border">|</span>
-                <span className="text-sm font-medium text-foreground">Dashboard</span>
-              </>
-            )}
           </div>
           {showSidebar && (
             <NamespaceSelector
@@ -175,10 +170,13 @@ export function SharedDashboardLayout({
           )}
 
           {/* Content area - renders child routes */}
-          <main className={`flex-1 overflow-auto ${!showSidebar ? 'px-3 sm:px-4 md:px-6 py-3 sm:py-4' : ''}`}>
+          <main className={`flex-1 overflow-auto pb-16 ${!showSidebar ? 'px-3 sm:px-4 md:px-6 py-3 sm:py-4' : ''}`}>
             <Outlet />
           </main>
         </div>
+
+        {/* Action Bar - fixed at bottom */}
+        <ActionBar />
       </div>
     </DashboardContext.Provider>
   )

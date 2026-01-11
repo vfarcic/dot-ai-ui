@@ -229,10 +229,16 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [x] Navigate to `/v/{sessionId}` after query completes for URL caching (completed)
 - [x] Status-based styling in existing renderers (cards, tables) for problem indication
 - [x] `BarChartRenderer` component for resource metrics visualization
-- [ ] `AIActionBar` component with Query, Remediate, Operate, Recommend buttons (for resource detail views)
-- [ ] `AIResultsPanel` side panel for AI responses
-- [ ] MCP client functions for remediate/operate/recommend/capabilities
-- [ ] Context passing - send resource details to MCP tools
+- [x] Context-aware `ActionBar` with tool selector on all pages (resource list, resource detail, visualization)
+- [x] Multi-select Query icons in ResourceList rows with cumulative selection and YAML-format intent
+- [x] Query tool fully integrated (ActionBar defaults to Query, navigates to `/v/{sessionId}` on submit)
+
+**Remaining Tools (one at a time, each needs design then implementation):**
+- [ ] Remediate tool integration (design pending - see "Other Tools" section above)
+- [ ] Operate tool integration (design pending)
+- [ ] Recommend tool integration (design pending)
+- [ ] MCP client functions for each tool as implemented
+- [ ] `AIResultsPanel` side panel for tool responses (if needed - may navigate to visualization instead)
 
 **Validation**: Click "Analyze Cluster Health" on dashboard home, see AI analysis rendered inline
 
@@ -279,6 +285,17 @@ UI (dot-ai-ui)          Express Proxy           MCP Server (dot-ai)
 
 **Validation**: Users can search resources and have natural language conversations with AI about their cluster
 
+### Milestone 8: Basic Authentication
+
+**Note**: This is a minimal authentication implementation to secure the dashboard. A separate PRD should be created for comprehensive authentication (OAuth/OIDC, RBAC, audit logging, etc.).
+
+- [ ] Design: Simple auth mechanism (bearer token? basic auth? environment-based?)
+- [ ] Implementation: Protect dashboard routes from unauthenticated access
+- [ ] Implementation: Protect API proxy endpoints
+- [ ] Documentation: How to configure authentication
+
+**Validation**: Dashboard requires authentication; unauthenticated users cannot access resources or trigger AI operations
+
 ---
 
 ## Out of Scope (Future Considerations)
@@ -286,7 +303,7 @@ UI (dot-ai-ui)          Express Proxy           MCP Server (dot-ai)
 - Resource creation/editing (read-only for v1)
 - Real-time WebSocket updates (polling is sufficient for v1)
 - Multi-cluster support
-- User authentication/RBAC in dashboard (uses cluster credentials)
+- Advanced authentication (OAuth/OIDC, SSO, RBAC integration) - separate PRD after Milestone 8
 
 ---
 
@@ -404,4 +421,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-10 | Sidebar state preservation via URL | Use `sb` URL param (`sb=1` collapsed, `sb=0` expanded) to preserve sidebar state across navigation between dashboard and visualization pages. | Consistent UX when navigating; sidebar preference persists |
 | 2025-01-11 | Milestone 5 partial - Status-based problem indication complete for all visualization types. UI: Cards/Tables use `status`/`rowStatuses` fields with colored left borders (red=error, yellow=warning, green=ok). MCP: Mermaid prompts updated to use red styling for error nodes only, no colors for healthy nodes. Added tab status indicators as bonus UX (red/yellow dots on tabs with issues). Dashboard home alignment fixed (top-aligned vs vertically centered). Cross-project skills created (request-dot-ai-feature, process-feature-request) for file-based feature request workflow. |
 | 2025-01-11 | Milestone 5 - BarChartRenderer implemented. New visualization type for resource metrics (memory, CPU usage). Types added (BarChartBar, BarChartContent, BarChartVisualization), horizontal/vertical orientations supported, status-based coloring (red=error, yellow=warning, green=ok, blue=default). Integrated into VisualizationRenderer switch. Added bar-chart support to TabContainer for tab status indicators. Coordinated with MCP via cross-project feature request workflow. Verified rendering with Playwright - bars display correctly with status colors. |
+| 2025-01-11 | Milestone 5 - Query tool integration complete. ActionBar now context-aware: extracts kind/group/namespace/name from URL. Added multi-select Query icons to ResourceList with ActionSelectionContext. YAML-format intent for readability. ActionBar on all pages. Remaining tools (Remediate, Operate, Recommend) pending design - will implement one at a time. |
 

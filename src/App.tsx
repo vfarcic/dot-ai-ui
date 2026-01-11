@@ -3,10 +3,12 @@ import { Visualization } from './pages/Visualization'
 import { ResourceDetail } from './pages/ResourceDetail'
 import { SharedDashboardLayout } from './components/dashboard/SharedDashboardLayout'
 import { DashboardHome } from './components/dashboard/DashboardHome'
+import { ActionSelectionProvider } from './context/ActionSelectionContext'
 
 function App() {
   return (
     <BrowserRouter>
+      <ActionSelectionProvider>
       <Routes>
         {/* Redirect home to dashboard until home page is implemented */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -25,6 +27,7 @@ function App() {
           <Route path="/v/:sessionId" element={<Visualization />} />
         </Route>
       </Routes>
+      </ActionSelectionProvider>
     </BrowserRouter>
   )
 }

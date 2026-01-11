@@ -13,6 +13,26 @@ import {
   getStatusColorClasses,
   isStatusColumn,
 } from '../../utils/statusColors'
+import { useActionSelection, type SelectedResource } from '../../context/ActionSelectionContext'
+
+// Query icon for action column
+function QueryIcon({ selected }: { selected: boolean }) {
+  return (
+    <svg
+      className={`w-4 h-4 transition-colors ${selected ? 'text-primary' : 'text-muted-foreground hover:text-primary'}`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+    </svg>
+  )
+}
 
 interface ResourceListProps {
   resourceKind: ResourceKind
@@ -247,6 +267,22 @@ export function ResourceList({
   const [error, setError] = useState<string | null>(null)
   const [sort, setSort] = useState<SortState>({ column: 'Name', direction: 'asc' })
 
+  // Action selection for Query/Remediate/etc
+  const { toggleItem, isSelected } = useActionSelection()
+
+  // Build apiVersion for selection context
+  const apiVersion = resourceKind.apiGroup
+    ? `${resourceKind.apiGroup}/${resourceKind.apiVersion}`
+    : resourceKind.apiVersion
+
+  // Helper to build SelectedResource from a resource
+  const buildSelectedResource = useCallback((resource: Resource): SelectedResource => ({
+    kind: resourceKind.kind,
+    apiVersion,
+    namespace: resource.namespace,
+    name: resource.name,
+  }), [resourceKind.kind, apiVersion])
+
   // Get printer columns from capabilities prop (or fallback to defaults)
   const printerColumns = capabilities?.printerColumns || DEFAULT_COLUMNS
   const columnsLoaded = !capabilitiesLoading
@@ -477,6 +513,10 @@ export function ResourceList({
                 </th>
               )
             })}
+            {/* Action column header */}
+            <th className="w-12 px-2 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-center">
+              AI
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -494,10 +534,18 @@ export function ResourceList({
               ...resource,
             }
 
+            // Check if this row is selected for action
+            const selectedResource = buildSelectedResource(resource)
+            const rowSelected = isSelected(selectedResource)
+
             return (
               <tr
                 key={`${resource.namespace || 'cluster'}/${resource.name}`}
-                className="hover:bg-muted/30 transition-colors"
+                className={`transition-colors ${
+                  rowSelected
+                    ? 'bg-primary/10 hover:bg-primary/15'
+                    : 'hover:bg-muted/30'
+                }`}
               >
                 {standardColumns.map((col) => {
                   const value = extractJsonPathValue(fullResource, col.jsonPath)
@@ -548,6 +596,23 @@ export function ResourceList({
                     </td>
                   )
                 })}
+                {/* Action icon cell */}
+                <td className="px-2 py-3 text-center">
+                  <button
+                    onClick={() => toggleItem(selectedResource)}
+                    className={`p-1.5 rounded-md transition-all ${
+                      rowSelected
+                        ? 'bg-primary/20 ring-2 ring-primary/50'
+                        : 'hover:bg-muted/50'
+                    }`}
+                    title={rowSelected
+                      ? `Remove from query: ${resource.name}`
+                      : `Add to query: Analyze kind ${resourceKind.kind}, namespace ${resource.namespace || 'cluster'}, name ${resource.name}`
+                    }
+                  >
+                    <QueryIcon selected={rowSelected} />
+                  </button>
+                </td>
               </tr>
             )
           })}
