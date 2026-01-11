@@ -24,7 +24,21 @@ export interface TableContent {
   rowStatuses?: (StatusIndicator | null)[]
 }
 
-export type VisualizationType = 'mermaid' | 'cards' | 'code' | 'table'
+export interface BarChartBar {
+  label: string
+  value: number
+  max?: number
+  status?: StatusIndicator
+}
+
+export interface BarChartContent {
+  title?: string
+  data: BarChartBar[]
+  unit?: string
+  orientation?: 'horizontal' | 'vertical'
+}
+
+export type VisualizationType = 'mermaid' | 'cards' | 'code' | 'table' | 'bar-chart'
 
 export interface MermaidVisualization {
   id: string
@@ -54,11 +68,19 @@ export interface TableVisualization {
   content: TableContent
 }
 
+export interface BarChartVisualization {
+  id: string
+  label: string
+  type: 'bar-chart'
+  content: BarChartContent
+}
+
 export type Visualization =
   | MermaidVisualization
   | CardsVisualization
   | CodeVisualization
   | TableVisualization
+  | BarChartVisualization
 
 export interface VisualizationResponse {
   title: string

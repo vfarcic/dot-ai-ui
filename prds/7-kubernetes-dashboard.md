@@ -228,7 +228,7 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [x] Sidebar state preserved via URL param across navigation (completed)
 - [x] Navigate to `/v/{sessionId}` after query completes for URL caching (completed)
 - [x] Status-based styling in existing renderers (cards, tables) for problem indication
-- [ ] `BarChartRenderer` component for resource metrics visualization
+- [x] `BarChartRenderer` component for resource metrics visualization
 - [ ] `AIActionBar` component with Query, Remediate, Operate, Recommend buttons (for resource detail views)
 - [ ] `AIResultsPanel` side panel for AI responses
 - [ ] MCP client functions for remediate/operate/recommend/capabilities
@@ -403,4 +403,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-10 | Bar charts for resource metrics | Add bar chart as first graph type for resource usage (memory, CPU). Start with ONE chart type, prove it works before adding others. Pie charts excluded (poor data viz). | New BarChartRenderer component; MCP needs bar-chart visualization type |
 | 2025-01-10 | Sidebar state preservation via URL | Use `sb` URL param (`sb=1` collapsed, `sb=0` expanded) to preserve sidebar state across navigation between dashboard and visualization pages. | Consistent UX when navigating; sidebar preference persists |
 | 2025-01-11 | Milestone 5 partial - Status-based problem indication complete for all visualization types. UI: Cards/Tables use `status`/`rowStatuses` fields with colored left borders (red=error, yellow=warning, green=ok). MCP: Mermaid prompts updated to use red styling for error nodes only, no colors for healthy nodes. Added tab status indicators as bonus UX (red/yellow dots on tabs with issues). Dashboard home alignment fixed (top-aligned vs vertically centered). Cross-project skills created (request-dot-ai-feature, process-feature-request) for file-based feature request workflow. |
+| 2025-01-11 | Milestone 5 - BarChartRenderer implemented. New visualization type for resource metrics (memory, CPU usage). Types added (BarChartBar, BarChartContent, BarChartVisualization), horizontal/vertical orientations supported, status-based coloring (red=error, yellow=warning, green=ok, blue=default). Integrated into VisualizationRenderer switch. Added bar-chart support to TabContainer for tab status indicators. Coordinated with MCP via cross-project feature request workflow. Verified rendering with Playwright - bars display correctly with status colors. |
 

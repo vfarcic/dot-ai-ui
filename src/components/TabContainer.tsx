@@ -18,6 +18,11 @@ function getVisualizationStatus(viz: Visualization): StatusIndicator | undefined
     if (statuses.includes('error')) return 'error'
     if (statuses.includes('warning')) return 'warning'
     if (statuses.includes('ok')) return 'ok'
+  } else if (viz.type === 'bar-chart') {
+    const statuses = viz.content.data.map((bar) => bar.status).filter(Boolean) as StatusIndicator[]
+    if (statuses.includes('error')) return 'error'
+    if (statuses.includes('warning')) return 'warning'
+    if (statuses.includes('ok')) return 'ok'
   }
   return undefined
 }

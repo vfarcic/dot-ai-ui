@@ -3,6 +3,7 @@ import { MermaidRenderer } from './MermaidRenderer'
 import { CardRenderer } from './CardRenderer'
 import { CodeRenderer } from './CodeRenderer'
 import { TableRenderer } from './TableRenderer'
+import { BarChartRenderer } from './BarChartRenderer'
 
 interface VisualizationRendererProps {
   visualization: Visualization
@@ -21,6 +22,9 @@ export function VisualizationRenderer({ visualization }: VisualizationRendererPr
 
     case 'table':
       return <TableRenderer content={visualization.content} />
+
+    case 'bar-chart':
+      return <BarChartRenderer content={visualization.content} />
 
     default: {
       // TypeScript exhaustiveness check - this should never happen
