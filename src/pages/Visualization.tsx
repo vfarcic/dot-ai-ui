@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
 import { TabContainer } from '@/components/TabContainer'
 import { InsightsPanel } from '@/components/InsightsPanel'
@@ -45,6 +45,9 @@ export function Visualization() {
   const [isRemediateLoading, setIsRemediateLoading] = useState(false)
   const [isExecuting, setIsExecuting] = useState(false)
 
+  // Track which session we've fetched to prevent duplicate fetches from React StrictMode
+  const fetchedSessionRef = useRef<string | null>(null)
+
   const isRemediate = sessionId ? isRemediateSession(sessionId) : false
 
   // Fetch visualization data
@@ -54,6 +57,8 @@ export function Visualization() {
 
       try {
         if (reload) {
+          // Clear existing viz data and show loading state for reloads
+          setVizData(null)
           setIsReloading(true)
         } else {
           setIsVizLoading(true)
@@ -77,11 +82,9 @@ export function Visualization() {
 
   // Fetch remediate data (for page refresh/shared URLs)
   // Uses cached session data from MCP
+  // Note: intentionally NOT including remediateData in deps to prevent re-fetch loops
   const fetchRemediateData = useCallback(async () => {
     if (!sessionId || !isRemediate) return
-
-    // If we already have data from navigation state, don't fetch
-    if (remediateData) return
 
     setIsRemediateLoading(true)
     setRemediateError(null)
@@ -98,7 +101,8 @@ export function Visualization() {
     } finally {
       setIsRemediateLoading(false)
     }
-  }, [sessionId, isRemediate, remediateData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, isRemediate])
 
   // Handle execution choice
   const handleExecuteChoice = useCallback(
@@ -112,8 +116,8 @@ export function Visualization() {
         const result = await executeRemediation(sessionId, choiceId)
         setRemediateData(result)
 
-        // Refresh visualization to get updated data
-        fetchVizData(true)
+        // Refresh visualization to get updated data after execution
+        await fetchVizData(true)
       } catch (err) {
         setRemediateError(err instanceof Error ? err.message : 'Execution failed')
       } finally {
@@ -127,7 +131,8 @@ export function Visualization() {
     fetchVizData(true)
   }, [fetchVizData])
 
-  // Initial fetch
+  // Initial fetch - runs once on mount
+  // Uses ref to prevent duplicate fetches from React StrictMode double-mounting
   useEffect(() => {
     if (!sessionId) {
       setVizError(new APIError('No session ID provided', 400, 'Bad Request'))
@@ -135,11 +140,18 @@ export function Visualization() {
       return
     }
 
+    // Skip if we've already fetched for this session (prevents StrictMode double-fetch)
+    if (fetchedSessionRef.current === sessionId) {
+      return
+    }
+    fetchedSessionRef.current = sessionId
+
     fetchVizData()
-    if (isRemediate) {
+    // Only fetch remediate data if we don't already have it from navigation state
+    if (isRemediate && !navigationState?.remediateData) {
       fetchRemediateData()
     }
-  }, [sessionId, fetchVizData, fetchRemediateData, isRemediate])
+  }, [sessionId, isRemediate, navigationState?.remediateData, fetchVizData, fetchRemediateData])
 
   // Loading state
   if (isVizLoading && !remediateData) {
@@ -246,15 +258,26 @@ export function Visualization() {
 
       {/* Section 3: Visualizations */}
       {hasVisualization ? (
-        <TabContainer
-          visualizations={vizData!.visualizations}
-          renderContent={(viz) => <VisualizationRenderer visualization={viz} />}
-        />
-      ) : isVizLoading ? (
+        <div className="relative">
+          {/* Loading overlay when refreshing visualizations */}
+          {isReloading && (
+            <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-lg">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                <span>Refreshing visualizations...</span>
+              </div>
+            </div>
+          )}
+          <TabContainer
+            visualizations={vizData!.visualizations}
+            renderContent={(viz) => <VisualizationRenderer visualization={viz} />}
+          />
+        </div>
+      ) : isVizLoading || isReloading ? (
         <div className="py-6">
           <div className="flex items-center gap-3 text-muted-foreground">
             <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
-            <span>Loading visualizations...</span>
+            <span>{isReloading ? 'Refreshing visualizations...' : 'Loading visualizations...'}</span>
           </div>
         </div>
       ) : (

@@ -59,44 +59,25 @@ function extractUrlContext(
 
 /**
  * Build context string from selected resources
- * Uses multi-line YAML-like format for readability
+ * Uses YAML array format for consistency (always an array, even for single resource)
  */
 function buildSelectionContext(selectedItems: SelectedResource[]): string {
   if (selectedItems.length === 0) return ''
 
-  // Group items by kind and apiVersion
-  const byKind = selectedItems.reduce((acc, item) => {
-    const key = `${item.kind}|${item.apiVersion}`
-    if (!acc[key]) {
-      acc[key] = { kind: item.kind, apiVersion: item.apiVersion, items: [] }
-    }
-    acc[key].items.push(item)
-    return acc
-  }, {} as Record<string, { kind: string; apiVersion: string; items: SelectedResource[] }>)
+  const lines: string[] = ['Analyze:', 'resources:']
 
-  const groups = Object.values(byKind)
-  const lines: string[] = ['Analyze:']
-
-  for (const { kind, apiVersion, items } of groups) {
-    const namespaces = [...new Set(items.map((i) => i.namespace).filter(Boolean))]
+  for (const item of selectedItems) {
     // Extract group from apiVersion (e.g., "apps/v1" -> "apps", "v1" -> null)
-    const group = apiVersion.includes('/') ? apiVersion.split('/')[0] : null
+    const group = item.apiVersion.includes('/') ? item.apiVersion.split('/')[0] : null
 
-    lines.push(`  kind: ${kind}`)
+    lines.push(`  - kind: ${item.kind}`)
     if (group) {
-      lines.push(`  group: ${group}`)
+      lines.push(`    group: ${group}`)
     }
-    if (namespaces.length === 1) {
-      lines.push(`  namespace: ${namespaces[0]}`)
-    } else if (namespaces.length > 1) {
-      lines.push(`  namespaces: ${namespaces.join(', ')}`)
+    if (item.namespace) {
+      lines.push(`    namespace: ${item.namespace}`)
     }
-    if (items.length === 1) {
-      lines.push(`  name: ${items[0].name}`)
-    } else {
-      lines.push('  names:')
-      items.forEach((item) => lines.push(`    - ${item.name}`))
-    }
+    lines.push(`    name: ${item.name}`)
   }
 
   return lines.join('\n')

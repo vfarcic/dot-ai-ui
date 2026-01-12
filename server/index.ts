@@ -6,11 +6,14 @@ import rateLimit from 'express-rate-limit'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Rate limiting configuration
-// Dashboard makes ~5 requests per resource view (namespaces, kinds, resources, capabilities, status)
-// Allow enough for active dashboard exploration
+// Dashboard makes many parallel requests:
+// - AllResourcesView: parallel requests for each kind (20+ kinds possible)
+// - Each kind: resources + capabilities = 2 requests
+// - Plus: namespaces, resource kinds for sidebar
+// Conservative estimate: 50+ requests per page load
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 200, // 200 requests per minute per IP
+  max: 1000, // 1000 requests per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later' },
@@ -18,7 +21,7 @@ const apiLimiter = rateLimit({
 
 const staticLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 120, // 120 requests per minute per IP for static files
+  max: 500, // 500 requests per minute per IP for static files
   standardHeaders: true,
   legacyHeaders: false,
 })
