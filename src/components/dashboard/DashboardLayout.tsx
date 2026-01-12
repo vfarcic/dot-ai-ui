@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { DashboardSidebar } from './DashboardSidebar'
 import { NamespaceSelector } from './NamespaceSelector'
 import { ResourceList } from './ResourceList'
+import { AllResourcesView } from './AllResourcesView'
 import { ExpandableDescription } from './ExpandableDescription'
 import {
   getCapabilities,
@@ -22,6 +23,7 @@ export function DashboardLayout() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [hasResources, setHasResources] = useState<boolean | null>(null) // null = loading
+  const [availableKinds, setAvailableKinds] = useState<ResourceKind[]>([])
 
   // Read initial state from URL params
   const namespaceFromUrl = searchParams.get(PARAM_NAMESPACE)
@@ -147,6 +149,17 @@ export function DashboardLayout() {
     })
   }, [setSearchParams])
 
+  // Clear resource selection (when selected resource no longer exists in namespace)
+  const handleClearSelection = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete(PARAM_KIND)
+      next.delete(PARAM_VERSION)
+      next.delete(PARAM_GROUP)
+      return next
+    })
+  }, [setSearchParams])
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -179,10 +192,12 @@ export function DashboardLayout() {
         <DashboardSidebar
           selectedResource={selectedResource}
           onSelectResource={handleResourceSelect}
+          onClearSelection={handleClearSelection}
           namespace={selectedNamespace}
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           onResourcesLoaded={setHasResources}
+          onKindsLoaded={setAvailableKinds}
         />
 
         {/* Content area */}
@@ -225,7 +240,7 @@ export function DashboardLayout() {
                 </div>
               </div>
             </>
-          ) : (
+          ) : hasResources === false ? (
             <div className="flex-1 flex items-center justify-center h-full">
               <div className="text-center text-muted-foreground">
                 <svg
@@ -241,26 +256,27 @@ export function DashboardLayout() {
                     d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                   />
                 </svg>
-                {hasResources === false ? (
-                  <>
-                    <p className="text-lg text-yellow-500 font-medium mb-2">No resources indexed</p>
-                    <p className="text-sm mb-4 max-w-md">
-                      The dot-ai-controller may not be running or hasn't synced cluster resources yet.
-                    </p>
-                    <a
-                      href="https://devopstoolkit.ai/docs/controller/resource-sync-guide"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      View resource sync guide →
-                    </a>
-                  </>
-                ) : (
-                  <p className="text-lg">Select a resource type from the sidebar</p>
-                )}
+                <p className="text-lg text-yellow-500 font-medium mb-2">No resources indexed</p>
+                <p className="text-sm mb-4 max-w-md">
+                  The dot-ai-controller may not be running or hasn't synced cluster resources yet.
+                </p>
+                <a
+                  href="https://devopstoolkit.ai/docs/controller/resource-sync-guide"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  View resource sync guide →
+                </a>
               </div>
             </div>
+          ) : (
+            <AllResourcesView
+              kinds={availableKinds}
+              namespace={selectedNamespace}
+              onNamespaceClick={handleNamespaceChange}
+              onKindClick={handleResourceSelect}
+            />
           )}
         </main>
       </div>

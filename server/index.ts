@@ -495,6 +495,119 @@ async function createServer() {
     }
   })
 
+  // Proxy Remediate tool API requests to MCP server
+  // Multi-step workflow: analysis → user decision → execution
+  app.post('/api/v1/tools/remediate', apiLimiter, async (req, res) => {
+    try {
+      const { issue, sessionId, executeChoice } = req.body as {
+        issue?: string
+        sessionId?: string
+        executeChoice?: number
+      }
+
+      // Either issue (step 1) or sessionId + executeChoice (step 2) required
+      if (!issue && !sessionId) {
+        return res.status(400).json({ error: 'Missing required parameter: issue or sessionId' })
+      }
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+      if (AUTH_TOKEN) {
+        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      }
+
+      const controller = new AbortController()
+      // 30 minute timeout for complex AI analysis
+      const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000)
+
+      const url = `${MCP_BASE_URL}/api/v1/tools/remediate`
+      const body = sessionId ? { sessionId, executeChoice } : { issue }
+      console.log(`[Proxy] Sending remediate to MCP: ${url}`)
+      console.log(`[Proxy] Body: ${JSON.stringify(body).substring(0, 200)}...`)
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('Remediate timeout')
+        return res.status(408).json({ error: 'Remediate timeout - request took too long' })
+      }
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to execute remediate' })
+    }
+  })
+
+  // Proxy session retrieval API requests to MCP server
+  // Generic endpoint for retrieving any session data (remediate, query, etc.)
+  app.get('/api/v1/sessions/:sessionId', apiLimiter, async (req, res) => {
+    const { sessionId } = req.params
+
+    // Validate sessionId format to prevent path injection
+    if (!/^[a-zA-Z0-9_+-]+$/.test(sessionId)) {
+      return res.status(400).json({ error: 'Invalid session ID format' })
+    }
+
+    try {
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      }
+      if (AUTH_TOKEN) {
+        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
+
+      const url = `${MCP_BASE_URL}/api/v1/sessions/${sessionId}`
+      console.log(`[Proxy] Fetching session from MCP: ${url}`)
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to fetch session data' })
+    }
+  })
+
   // Proxy dashboard resource kinds API requests to MCP server
   app.get('/api/v1/resources/kinds', apiLimiter, async (req, res) => {
     try {

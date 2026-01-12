@@ -19,6 +19,7 @@ interface DashboardContextValue {
   selectedResource: ResourceKind | null
   setSelectedResource: (resource: ResourceKind) => void
   hasResources: boolean | null
+  availableKinds: ResourceKind[]
   sidebarCollapsed: boolean
 }
 
@@ -45,6 +46,7 @@ export function SharedDashboardLayout({
 }: SharedDashboardLayoutProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [hasResources, setHasResources] = useState<boolean | null>(null)
+  const [availableKinds, setAvailableKinds] = useState<ResourceKind[]>([])
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -119,12 +121,24 @@ export function SharedDashboardLayout({
     [searchParams, location.pathname, navigate, setSearchParams, sidebarCollapsed]
   )
 
+  // Clear resource selection (show all resources view)
+  const handleClearSelection = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete(PARAM_KIND)
+      next.delete(PARAM_VERSION)
+      next.delete(PARAM_GROUP)
+      return next
+    })
+  }, [setSearchParams])
+
   const contextValue: DashboardContextValue = {
     selectedNamespace,
     setSelectedNamespace: handleNamespaceChange,
     selectedResource,
     setSelectedResource: handleResourceSelect,
     hasResources,
+    availableKinds,
     sidebarCollapsed,
   }
 
@@ -162,10 +176,12 @@ export function SharedDashboardLayout({
             <DashboardSidebar
               selectedResource={selectedResource}
               onSelectResource={handleResourceSelect}
+              onClearSelection={handleClearSelection}
               namespace={selectedNamespace}
               isCollapsed={sidebarCollapsed}
               onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
               onResourcesLoaded={setHasResources}
+              onKindsLoaded={setAvailableKinds}
             />
           )}
 

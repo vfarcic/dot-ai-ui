@@ -214,8 +214,63 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - UI implementation needed: BarChartRenderer component
 - MCP implementation needed: Add bar-chart as new visualization type
 
+**Remediate Tool Integration (Designed)**
+- [x] Design: Remediate tool integration - multi-step workflow with analysis and execution
+
+*Architecture Decisions:*
+- Decision: Remediate is a multi-step workflow, not one-shot like Query
+- Decision: Call remediate tool first (get analysis), then fetch visualization separately (progressive loading)
+- Decision: User sees analysis immediately while visualization generates in background
+- Decision: Visualization page (`/v/{sessionId}`) extended to show both workflow controls AND visualizations
+- Decision: No MCP response restructuring needed - UI consumes existing fields directly
+
+*Visualization Page Evolution:*
+- Decision: `/v/{sessionId}` becomes a generic "session viewer" with four optional sections:
+  1. **Information** - Text, analysis, insights (always present)
+  2. **Form** - Input fields (optional, for tools needing user input)
+  3. **Visualization** - Diagrams, tables, charts (optional)
+  4. **Actions** - Buttons to continue workflow (optional)
+- Decision: Query sessions show: Information + Visualization
+- Decision: Remediate sessions show: Information + Visualization + Actions
+- Decision: Future tools (Operate, Recommend) use same pattern
+
+*Information Section - Config-Driven Templates:*
+- Decision: Use config-driven templates (not string templates like Go/Handlebars)
+- Decision: Template is a TypeScript config array that maps MCP fields to display blocks
+- Decision: Generic block types: `heading`, `text`, `list`, `code`, `actions-list`
+- Decision: Each tool defines its template; renderer is generic
+- Example template structure:
+  ```typescript
+  const REMEDIATE_TEMPLATE = [
+    { type: 'heading', text: 'Root Cause', badge: { field: 'analysis.confidence', format: 'percent' } },
+    { type: 'text', field: 'analysis.rootCause' },
+    { type: 'heading', text: 'Contributing Factors' },
+    { type: 'list', field: 'analysis.factors', severity: 'warning' },
+    { type: 'heading', text: 'Recommended Actions' },
+    { type: 'actions-list', field: 'remediation.actions', showCommand: true, showRisk: true }
+  ];
+  ```
+
+*MCP Response Contract (UI consumes these fields):*
+```typescript
+interface RemediateResponse {
+  sessionId: string;
+  status: "awaiting_user_approval" | "success" | "failed";
+  analysis: { rootCause: string; confidence: number; factors: string[] };
+  remediation: { summary: string; actions: Array<{ description: string; command: string; risk: string }> };
+  executionChoices: Array<{ id: number; label: string; description: string }>;
+  results?: Array<{ action: string; success: boolean; output: string }>;  // After execution
+}
+```
+
+*User Flow:*
+1. ActionBar submit → POST `/api/v1/tools/remediate` → get sessionId + analysis
+2. Navigate to `/v/{sessionId}` → show analysis immediately (Information section)
+3. Background: GET `/api/v1/visualize/{sessionId}` → append visualizations when ready
+4. User clicks "Execute via MCP" → POST with `{ sessionId, executeChoice: 1 }`
+5. Show execution results in Information section
+
 **Other Tools (To Be Designed)**
-- [ ] Design: Remediate tool integration - how to present analysis and suggested fixes?
 - [ ] Design: Operate tool integration - what Day 2 operations to expose (scale, update, rollback)?
 - [ ] Design: Recommend tool integration - when/where to show deployment recommendations?
 - [ ] Design: Capabilities tool integration - how to display cluster resource capabilities and operators?
@@ -233,12 +288,21 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 - [x] Multi-select Query icons in ResourceList rows with cumulative selection and YAML-format intent
 - [x] Query tool fully integrated (ActionBar defaults to Query, navigates to `/v/{sessionId}` on submit)
 
+**Remediate Tool Implementation (Ready to Build):**
+- [ ] Generic info template renderer component (`InfoRenderer`)
+- [ ] Config-driven template for Remediate tool (`REMEDIATE_TEMPLATE`)
+- [ ] API client for Remediate tool (`src/api/remediate.ts`)
+- [ ] Proxy endpoint for Remediate tool (`/api/v1/tools/remediate`)
+- [ ] Enable Remediate in ActionBar tool selector
+- [ ] Extend visualization page to show Information section (from tool response)
+- [ ] Extend visualization page to show Actions section (execution buttons)
+- [ ] Handle execution flow (call MCP with executeChoice, show results)
+- [ ] Progressive loading: show analysis first, append visualizations when ready
+
 **Remaining Tools (one at a time, each needs design then implementation):**
-- [ ] Remediate tool integration (design pending - see "Other Tools" section above)
 - [ ] Operate tool integration (design pending)
 - [ ] Recommend tool integration (design pending)
 - [ ] MCP client functions for each tool as implemented
-- [ ] `AIResultsPanel` side panel for tool responses (if needed - may navigate to visualization instead)
 
 **Validation**: Click "Analyze Cluster Health" on dashboard home, see AI analysis rendered inline
 
@@ -375,6 +439,11 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-10 | Query tool needs `inline` parameter for direct visualization data | Currently Query returns JSON + link to `/v/{sessionId}`; dashboard needs visualization data directly without redirect | MCP change required: `inline: true` parameter returns visualization payload instead of session link |
 | 2025-01-10 | No generic agentic chat for v1 | Generic chat without tool access is just ChatGPT in sidebar - limited value; tool-specific integrations (Query, Remediate, Operate) provide cluster-aware value | Focus on tool integrations; defer free-form chat to future milestone |
 | 2025-01-10 | LLM API keys stay in MCP server | Exposing API keys to browser is security risk; MCP already handles authenticated communication | All AI features proxy through MCP; UI never has direct LLM access |
+| 2025-01-12 | Remediate is multi-step workflow, not one-shot | Unlike Query (single response), Remediate has analysis → user decision → execution → results flow. Tested via curl: MCP returns `status: "awaiting_user_approval"` with `executionChoices` array | Visualization page must support workflow controls (action buttons), not just passive display |
+| 2025-01-12 | Progressive loading for Remediate | Call remediate tool first (fast, ~10s), show analysis immediately. Fetch visualization in background, append when ready. Better UX than waiting for both | Two parallel fetches on page load; analysis section renders first |
+| 2025-01-12 | Visualization page becomes generic session viewer | `/v/{sessionId}` shows four optional sections: Information, Form, Visualization, Actions. Each tool uses whichever sections apply | Query uses Info+Viz; Remediate uses Info+Viz+Actions; Recommend may use Info+Form+Viz+Actions |
+| 2025-01-12 | Config-driven templates for Information section | Use TypeScript config arrays (not Go-style string templates) to map MCP response fields to display blocks. Generic block types: heading, text, list, code, actions-list | Each tool defines its template config; `InfoRenderer` component is generic and reusable |
+| 2025-01-12 | No MCP response restructuring needed | UI consumes existing MCP fields directly (sessionId, status, analysis, remediation, executionChoices, results). No translation layer or mapping needed | Simpler integration; just define TypeScript types matching MCP response |
 
 ---
 
@@ -422,4 +491,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-11 | Milestone 5 partial - Status-based problem indication complete for all visualization types. UI: Cards/Tables use `status`/`rowStatuses` fields with colored left borders (red=error, yellow=warning, green=ok). MCP: Mermaid prompts updated to use red styling for error nodes only, no colors for healthy nodes. Added tab status indicators as bonus UX (red/yellow dots on tabs with issues). Dashboard home alignment fixed (top-aligned vs vertically centered). Cross-project skills created (request-dot-ai-feature, process-feature-request) for file-based feature request workflow. |
 | 2025-01-11 | Milestone 5 - BarChartRenderer implemented. New visualization type for resource metrics (memory, CPU usage). Types added (BarChartBar, BarChartContent, BarChartVisualization), horizontal/vertical orientations supported, status-based coloring (red=error, yellow=warning, green=ok, blue=default). Integrated into VisualizationRenderer switch. Added bar-chart support to TabContainer for tab status indicators. Coordinated with MCP via cross-project feature request workflow. Verified rendering with Playwright - bars display correctly with status colors. |
 | 2025-01-11 | Milestone 5 - Query tool integration complete. ActionBar now context-aware: extracts kind/group/namespace/name from URL. Added multi-select Query icons to ResourceList with ActionSelectionContext. YAML-format intent for readability. ActionBar on all pages. Remaining tools (Remediate, Operate, Recommend) pending design - will implement one at a time. |
+| 2025-01-12 | Milestone 5 - Remediate tool design complete. Tested MCP remediate endpoint via curl - confirmed multi-step workflow (analysis → user choice → execution → results). Key insight: visualization page must evolve from passive display to interactive session viewer. Designed four-section page structure (Information, Form, Visualization, Actions) that works for all tools. Chose config-driven templates over Go-style string templates for Information section. No MCP changes needed - UI consumes existing response structure. Ready for implementation. |
 

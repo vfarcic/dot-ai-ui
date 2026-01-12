@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDashboardContext } from './SharedDashboardLayout'
 import { ResourceList } from './ResourceList'
+import { AllResourcesView } from './AllResourcesView'
 import { ExpandableDescription } from './ExpandableDescription'
 import { LoadingSpinner } from '../LoadingSpinner'
 import { ErrorDisplay } from '../ErrorDisplay'
@@ -23,7 +24,9 @@ export function DashboardHome() {
     selectedNamespace,
     setSelectedNamespace,
     selectedResource,
+    setSelectedResource,
     hasResources,
+    availableKinds,
     sidebarCollapsed,
   } = useDashboardContext()
 
@@ -258,82 +261,76 @@ export function DashboardHome() {
     )
   }
 
-  // Default state - show "Analyze Cluster Health" button
-  return (
-    <div className="flex-1 flex items-center pt-16 sm:pt-24 flex-col">
-      <div className="text-center">
-        {hasResources === false ? (
-          // No resources indexed state
-          <>
-            <svg
-              className="w-16 h-16 mx-auto mb-4 opacity-50 text-muted-foreground"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-              />
-            </svg>
-            <p className="text-lg text-yellow-500 font-medium mb-2">No resources indexed</p>
-            <p className="text-sm text-muted-foreground mb-4 max-w-md">
-              The dot-ai-controller may not be running or hasn't synced cluster resources yet.
-            </p>
-            <a
-              href="https://devopstoolkit.ai/docs/controller/resource-sync-guide"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              View resource sync guide →
-            </a>
-          </>
-        ) : (
-          // Resources available - show AI analysis button
-          <>
-            <svg
-              className="w-20 h-20 mx-auto mb-6 text-primary/60"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
-            <h2 className="text-xl font-semibold text-foreground mb-2">
-              Kubernetes Dashboard
-            </h2>
-            <p className="text-muted-foreground mb-6 max-w-md">
-              Select a resource type from the sidebar to browse your cluster,
-              or let AI analyze your cluster health.
-            </p>
-            <button
-              onClick={handleAnalyzeCluster}
-              className="inline-flex items-center gap-2 px-6 py-3 text-base font-medium text-black bg-yellow-400 hover:bg-yellow-500 rounded-lg transition-colors shadow-sm"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
-              </svg>
-              Analyze Cluster Health
-            </button>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Uses AI to analyze resources and provide insights
-            </p>
-          </>
-        )}
+  // Default state - show all resources or no resources message
+  if (hasResources === false) {
+    return (
+      <div className="flex-1 flex items-center pt-16 sm:pt-24 flex-col">
+        <div className="text-center">
+          <svg
+            className="w-16 h-16 mx-auto mb-4 opacity-50 text-muted-foreground"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1}
+              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+            />
+          </svg>
+          <p className="text-lg text-yellow-500 font-medium mb-2">No resources indexed</p>
+          <p className="text-sm text-muted-foreground mb-4 max-w-md">
+            The dot-ai-controller may not be running or hasn't synced cluster resources yet.
+          </p>
+          <a
+            href="https://devopstoolkit.ai/docs/controller/resource-sync-guide"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            View resource sync guide →
+          </a>
+        </div>
       </div>
-    </div>
+    )
+  }
+
+  // Only show AllResourcesView when a specific namespace is selected
+  // When "All Namespaces" is selected, show a prompt to select a namespace or resource
+  if (selectedNamespace === 'All Namespaces') {
+    return (
+      <div className="flex-1 flex items-center pt-16 sm:pt-24 flex-col">
+        <div className="text-center">
+          <svg
+            className="w-16 h-16 mx-auto mb-4 opacity-50 text-muted-foreground"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1}
+              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+            />
+          </svg>
+          <p className="text-lg font-medium text-foreground mb-2">Select a resource or namespace</p>
+          <p className="text-sm text-muted-foreground mb-4 max-w-md">
+            Choose a resource type from the sidebar, or select a namespace to view all resources within it.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show all resources grouped by kind for the selected namespace
+  return (
+    <AllResourcesView
+      kinds={availableKinds}
+      namespace={selectedNamespace}
+      onNamespaceClick={setSelectedNamespace}
+      onKindClick={setSelectedResource}
+    />
   )
 }

@@ -307,6 +307,8 @@ export function ResourceList({
       setLoading(true)
       setStatusLoading(true)
       setError(null)
+      // Clear resources immediately to prevent showing stale data during namespace changes
+      setResources([])
 
       // First: fetch metadata only (fast)
       const result = await getResources({

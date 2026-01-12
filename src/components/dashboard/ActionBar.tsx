@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useNavigate, useSearchParams, useLocation, useParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { queryCluster } from '../../api/query'
+import { analyzeIssue } from '../../api/remediate'
 import { useActionSelection, type SelectedResource } from '../../context/ActionSelectionContext'
 
 export type Tool = 'query' | 'remediate' | 'operate' | 'recommend'
@@ -146,7 +147,7 @@ const TOOLS: ToolOption[] = [
     id: 'remediate',
     label: 'Remediate',
     defaultText: 'Describe the issue to fix',
-    disabled: true,
+    disabled: false,
     description: 'AI-powered issue resolution',
   },
   {
@@ -188,7 +189,6 @@ function LoadingSpinner() {
 
 export function ActionBar() {
   const navigate = useNavigate()
-  const location = useLocation()
   const routeParams = useParams()
   const [searchParams] = useSearchParams()
 
@@ -298,8 +298,38 @@ export function ActionBar() {
         setIsLoading(false)
         abortControllerRef.current = null
       }
+    } else if (selectedTool === 'remediate') {
+      setIsLoading(true)
+      setError(null)
+
+      // Create new AbortController for this request
+      abortControllerRef.current = new AbortController()
+
+      try {
+        const result = await analyzeIssue(input.trim(), abortControllerRef.current.signal)
+
+        // Navigate to visualization page with sessionId
+        // Pass remediate data via navigation state for immediate display
+        if (result.sessionId) {
+          const sidebarParam = sidebarCollapsed ? '?sb=1' : '?sb=0'
+          navigate(`/v/${result.sessionId}${sidebarParam}`, {
+            state: { remediateData: result }
+          })
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Request cancelled') {
+          // Silently handle cancellation
+        } else {
+          const message = err instanceof Error ? err.message : 'An error occurred'
+          setError(message)
+          console.error('[ActionBar] Remediate error:', err)
+        }
+      } finally {
+        setIsLoading(false)
+        abortControllerRef.current = null
+      }
     }
-    // Other tools (remediate, operate, recommend) will be handled when implemented
+    // Other tools (operate, recommend) will be handled when implemented
   }
 
   const handleCancel = (e: React.MouseEvent) => {

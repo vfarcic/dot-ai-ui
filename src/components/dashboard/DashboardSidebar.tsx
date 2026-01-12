@@ -9,10 +9,12 @@ import {
 interface DashboardSidebarProps {
   selectedResource: ResourceKind | null
   onSelectResource: (resource: ResourceKind) => void
+  onClearSelection?: () => void
   namespace: string
   isCollapsed: boolean
   onToggleCollapse: () => void
   onResourcesLoaded?: (hasResources: boolean) => void
+  onKindsLoaded?: (kinds: ResourceKind[]) => void
 }
 
 function ChevronIcon({
@@ -106,10 +108,12 @@ function getGroupAbbreviation(groupName: string): string {
 export function DashboardSidebar({
   selectedResource,
   onSelectResource,
+  onClearSelection,
   namespace,
   isCollapsed,
   onToggleCollapse,
   onResourcesLoaded,
+  onKindsLoaded,
 }: DashboardSidebarProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [kindsByGroup, setKindsByGroup] = useState<Map<string, ResourceKind[]>>(new Map())
@@ -135,6 +139,23 @@ export function DashboardSidebar({
         }
         // Notify parent about resources state
         onResourcesLoaded?.(groups.length > 0)
+
+        // Pass all kinds to parent for "all resources" view
+        onKindsLoaded?.(kinds)
+
+        // Check if currently selected resource still exists in the loaded kinds
+        // If not, clear the selection (handles namespace changes where resource doesn't exist)
+        if (selectedResource && onClearSelection) {
+          const selectedExists = kinds.some(
+            (k) =>
+              k.kind === selectedResource.kind &&
+              k.apiGroup === selectedResource.apiGroup &&
+              k.apiVersion === selectedResource.apiVersion
+          )
+          if (!selectedExists) {
+            onClearSelection()
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load resources')
       } finally {
@@ -216,6 +237,44 @@ export function DashboardSidebar({
             >
               View resource sync guide →
             </a>
+          </div>
+        )}
+
+        {/* "All" button - shows all resources in selected namespace */}
+        {!loading && !error && sortedGroups.length > 0 && namespace !== 'All Namespaces' && (
+          <div className="mb-2 border-b border-border pb-2">
+            <button
+              onClick={() => onClearSelection?.()}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
+                isCollapsed ? 'justify-center' : ''
+              } ${
+                !selectedResource
+                  ? 'text-primary bg-primary/10'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-primary/10'
+              }`}
+              title="Show all resources"
+            >
+              {isCollapsed ? (
+                <span className="text-xs font-semibold uppercase tracking-tight">ALL</span>
+              ) : (
+                <>
+                  <svg
+                    className="w-4 h-4 flex-shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                    />
+                  </svg>
+                  <span className="flex-1 text-left">All Resources</span>
+                </>
+              )}
+            </button>
           </div>
         )}
 
