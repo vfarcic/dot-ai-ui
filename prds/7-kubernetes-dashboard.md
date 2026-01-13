@@ -380,8 +380,207 @@ const OPERATE_TEMPLATE: InfoTemplate = [
 6. Show execution results with command outputs
 7. Refresh visualization for updated diagrams
 
+**Recommend Tool Integration (Designed)**
+- [x] Design: Recommend tool integration - multi-stage workflow with solutions, questions, and manifests
+
+*Architecture Decisions:*
+- Decision: Recommend is a multi-stage wizard workflow, significantly different from Remediate/Operate
+- Decision: Session prefix is `sol-` (solution IDs)
+- Decision: First tool to use the **Form** section (question stages)
+- Decision: Reuse existing components where possible: `InfoRenderer`, `ActionsPanel`, visualization page structure
+- Decision: New components needed: `SolutionSelector` (solution cards), `QuestionForm` (multi-stage form)
+
+*MCP Response Contracts (tested via HTTP):*
+
+```typescript
+// Stage 1: Intent needs refinement (final: false or omitted)
+interface RecommendRefinementResponse {
+  needsRefinement: true;
+  intent: string;
+  guidance: string;  // Markdown instructions
+}
+
+// Stage 2: Solutions returned (final: true)
+interface RecommendSolutionsResponse {
+  intent: string;
+  solutions: Array<{
+    solutionId: string;  // e.g., "sol-1768335259981-2c26853c"
+    type: string;  // "combination"
+    score: number;  // 0-100
+    description: string;
+    primaryResources: string[];  // ["Deployment", "Service"]
+    resources: Array<{ kind: string; apiVersion: string; group: string; description: string }>;
+    reasons: string[];
+    appliedPatterns: string[];
+    relevantPolicies: string[];
+  }>;
+  organizationalContext: {
+    solutionsUsingPatterns: number;
+    totalSolutions: number;
+    totalPatterns: number;
+    totalPolicies: number;
+    patternsAvailable: string;
+    policiesAvailable: string;
+  };
+  nextAction: string;
+  guidance: string;
+  visualizationUrl: string;
+}
+
+// Stage 3+: Question stages (required → basic → advanced → open)
+interface RecommendQuestionsResponse {
+  status: "stage_questions";
+  solutionId: string;
+  currentStage: "required" | "basic" | "advanced" | "open";
+  questions: Array<{
+    id: string;
+    question: string;
+    type: "text" | "number" | "select";
+    placeholder?: string;
+    options?: string[];  // for select type
+    validation?: {
+      required?: boolean;
+      pattern?: string;
+      min?: number;
+      max?: number;
+      minLength?: number;
+      maxLength?: number;
+    };
+    suggestedAnswer?: string | number | null;
+    answer?: string | number;  // if previously answered
+  }>;
+  nextStage: string;
+  message: string;
+  nextAction: string;
+  guidance: string;
+  agentInstructions: string;
+}
+
+// Stage N: Manifest generation
+interface RecommendManifestResponse {
+  success: true;
+  status: "manifests_generated";
+  solutionId: string;
+  outputFormat: "raw" | "helm" | "kustomize";
+  outputPath: string;
+  files: Array<{
+    relativePath: string;
+    content: string;  // YAML content
+  }>;
+  validationAttempts: number;
+  agentInstructions: string;
+  visualizationUrl: string;
+}
+
+// Stage N+1: Deployment (optional)
+interface RecommendDeployResponse {
+  success: boolean;
+  status: "deployed" | "failed";
+  results: Array<{ resource: string; status: string; message: string }>;
+}
+```
+
+*Key Differences from Remediate/Operate:*
+| Aspect | Remediate | Operate | Recommend |
+|--------|-----------|---------|-----------|
+| Purpose | Diagnose & fix issues | Day 2 operations | New deployments |
+| Session prefix | `rem-` | `opr-` | `sol-` |
+| Steps | 2 (analysis → execute) | 2 (analysis → execute) | 6+ (intent → solutions → questions × N → manifests → deploy) |
+| User input | Single issue | Single intent | Solution selection + multi-stage questions |
+| Form needed | No | No | **Yes** (first tool to use Form section) |
+| Output | Actions to execute | Proposed changes | Manifest files + optional deploy |
+
+*User Flow:*
+1. User enters intent in ActionBar with "Recommend" tool selected
+2. If `needsRefinement: true`, show guidance message (amber notice box like Query)
+3. Call again with `final: true` → receive solutions array
+4. Show `SolutionSelector` component with solution cards (score, description, resources, patterns)
+5. User clicks a solution → call `chooseSolution` → receive required questions
+6. Show `QuestionForm` with current stage questions
+7. User answers → call `answerQuestion:{stage}` → receive next stage or ready for generation
+8. Repeat until all stages complete (user can skip optional stages)
+9. Call `generateManifests` → show manifest preview with syntax-highlighted YAML
+10. User clicks "Deploy" → call `deployManifests` → show results
+11. Navigate to `/v/{solutionId}` for cached visualization
+
+*New Components Needed:*
+
+**1. SolutionSelector** - Card-based solution picker
+```typescript
+interface SolutionSelectorProps {
+  solutions: Solution[];
+  onSelect: (solutionId: string) => void;
+  organizationalContext: OrganizationalContext;
+}
+// Shows: score badge, description, primary resources, applied patterns
+// Highlight solutions using organizational patterns (different border/badge)
+```
+
+**2. QuestionForm** - Multi-stage question wizard
+```typescript
+interface QuestionFormProps {
+  questions: Question[];
+  currentStage: string;
+  nextStage: string | null;
+  onSubmit: (answers: Record<string, string | number>) => void;
+  onSkip: () => void;  // Skip optional stages
+  isLoading: boolean;
+}
+// Shows: stage indicator (required/basic/advanced/open)
+// Renders: text input, number input, select dropdown based on question.type
+// Validates: pattern, min/max, required according to question.validation
+// Pre-fills: suggestedAnswer as placeholder or default value
+```
+
+**3. ManifestPreview** - YAML display with deploy action
+```typescript
+interface ManifestPreviewProps {
+  files: ManifestFile[];
+  outputFormat: string;
+  outputPath: string;
+  onDeploy: () => void;
+  isDeploying: boolean;
+}
+// Shows: file tabs (if multiple), syntax-highlighted YAML, copy button
+// Actions: "Deploy to Cluster" button, "Download" button
+```
+
+*Template Design (`RECOMMEND_TEMPLATE` for solution info):*
+```typescript
+const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
+  { type: 'heading', text: 'Selected Solution', badge: { field: 'score', format: 'score' }, level: 2 },
+  { type: 'text', field: 'description' },
+
+  { type: 'heading', text: 'Kubernetes Resources', level: 3 },
+  { type: 'resource-list', field: 'resources' },  // New block type showing Kind + apiVersion
+
+  { type: 'heading', text: 'Why This Solution', level: 3 },
+  { type: 'list', field: 'reasons', severity: 'info' },
+
+  { type: 'heading', text: 'Organizational Patterns Applied', level: 3, condition: { field: 'appliedPatterns', notEmpty: true } },
+  { type: 'list', field: 'appliedPatterns', severity: 'ok' },
+
+  { type: 'heading', text: 'Policies Checked', level: 3, condition: { field: 'relevantPolicies', notEmpty: true } },
+  { type: 'list', field: 'relevantPolicies', severity: 'info' },
+];
+```
+
+*Visualization Page Extension:*
+- Add `isRecommendSession(sessionId)` check for `sol-` prefix
+- Add `recommendData` state (similar to remediateData, operateData)
+- Show workflow sections based on recommend stage:
+  - Solutions stage: `SolutionSelector` component
+  - Questions stage: `QuestionForm` component
+  - Manifest stage: `ManifestPreview` component
+  - Deployed: `ResultsPanel` component
+
+*ActionBar Integration:*
+- Add "Recommend" to tool selector dropdown
+- Recommend uses same two-field design (Resources + Intent)
+- Intent placeholder: "What do you want to deploy? e.g., nginx web server with 2 replicas"
+- On submit: call recommend API → navigate to `/v/{solutionId}` or show solutions inline
+
 **Other Tools (To Be Designed)**
-- [ ] Design: Recommend tool integration - when/where to show deployment recommendations?
 - [ ] Design: Organizational Data integration - how to view/manage patterns and policies?
   - Patterns: organizational deployment patterns that guide AI recommendations
   - Policies: policy intents that constrain AI-generated configurations
@@ -424,8 +623,22 @@ const OPERATE_TEMPLATE: InfoTemplate = [
 - [x] Session state reset when navigating between visualization pages
 - [x] User-friendly guidance display when Query declines (no raw JSON)
 
+**Recommend Tool Implementation (PENDING):**
+- [ ] API client for Recommend tool (`src/api/recommend.ts`) with stage-based calls
+- [ ] Proxy endpoint for Recommend tool (`/api/v1/tools/recommend`)
+- [ ] TypeScript types for all Recommend response shapes
+- [ ] `SolutionSelector` component for solution card display and selection
+- [ ] `QuestionForm` component for multi-stage question wizard
+- [ ] `ManifestPreview` component for YAML display with deploy action
+- [ ] Config-driven template for Recommend tool (`RECOMMEND_SOLUTION_TEMPLATE`)
+- [ ] Enable Recommend in ActionBar tool selector
+- [ ] Extend Visualization page to detect `sol-` session prefix
+- [ ] Add `recommendData` state and stage management handlers
+- [ ] Handle multi-stage workflow (solutions → questions → manifests → deploy)
+- [ ] Skip/previous navigation for optional question stages
+- [ ] Manifest download functionality
+
 **Remaining Tools (one at a time, each needs design then implementation):**
-- [ ] Recommend tool integration (design pending)
 - [ ] Organizational Data integration - patterns and policies (design pending)
 - [ ] MCP client functions for each tool as implemented
 
@@ -606,6 +819,7 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-13 | Added Organizational Data (patterns + policies) to scope | Patterns and policies guide AI recommendations (Recommend, Operate tools); users need visibility and management. Capabilities excluded - already covered by resource kinds in sidebar | New design task added; will follow same design-then-implement pattern as other tools |
 | 2025-01-13 | Operate tool follows Remediate pattern with different data shape | Tested MCP operate endpoint via HTTP. Same multi-step workflow (analysis → approval → execution → results) but different response structure: `analysis.proposedChanges` (create/update/delete manifests) vs `remediation.actions`. Session prefix is `opr-` | Reuse InfoRenderer, ActionsPanel, ResultsPanel; need new `changes-list` and `code-list` block types for manifest display |
 | 2025-01-13 | Add onboarding guided tour for new users | Dashboard has many features (sidebar navigation, AI tools, resource details) that aren't immediately obvious to new users. Step-by-step guided tours are a proven UX pattern for complex dashboards | New Milestone 9 added; session-scoped by default (shows once per session); design decisions pending for library choice and interruption handling |
+| 2025-01-13 | Recommend tool is multi-stage wizard workflow | Tested MCP recommend endpoint via HTTP. Unlike Remediate/Operate (2-step), Recommend has 6+ stages: intent → solutions → questions (required/basic/advanced/open) → manifests → deploy. Session prefix is `sol-`. First tool to use Form section. | New components needed: SolutionSelector, QuestionForm, ManifestPreview. Reuse InfoRenderer for solution display. Significantly more complex than other tools. |
 
 ---
 
@@ -660,4 +874,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-13 | ActionBar refactored to two-field design: Resources field (auto-populated from context, editable) + Intent field (with tool-specific placeholders). Context-aware placeholders change based on whether resources are selected. Fields combined for MCP submission. Improved UX for Operate tool which requires both resources AND intent. |
 | 2025-01-13 | Fixed multiple UX issues: (1) Session state now resets when navigating between visualization pages (useState initial values only apply on mount). (2) Intent field clears after successful submission. (3) ResultsPanel shows "Execution Complete" instead of "Remediation Complete" (works for all tools). (4) Duplicate text fix - validation.summary only shown if different from message. |
 | 2025-01-13 | Improved Query tool error handling: When Query returns guidance instead of visualizations (e.g., "use operate tool"), UI now shows user-friendly amber notice box instead of raw JSON. "Session & Insights" panel hidden when showing inline guidance. MCP bug fixed on server side to return valid JSON with empty visualizations array. |
+| 2025-01-13 | Milestone 5 - Recommend tool design COMPLETE. Tested MCP recommend endpoint via HTTP to understand full workflow. Key findings: 6+ stage wizard (intent → solutions → questions × 4 stages → manifests → deploy). Session prefix `sol-`. First tool to use Form section. Solutions array includes score, resources, applied patterns, relevant policies. Question stages: required (name, namespace, outputFormat, outputPath), basic (replicas, image, ports), advanced (resources, strategy, labels), open. Manifest generation returns YAML files. Visualization endpoint returns rich diagrams. New components needed: SolutionSelector, QuestionForm, ManifestPreview. Ready for implementation. |
 
