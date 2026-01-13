@@ -288,16 +288,16 @@ interface RemediateResponse {
 - [x] Multi-select Query icons in ResourceList rows with cumulative selection and YAML-format intent
 - [x] Query tool fully integrated (ActionBar defaults to Query, navigates to `/v/{sessionId}` on submit)
 
-**Remediate Tool Implementation (Ready to Build):**
-- [ ] Generic info template renderer component (`InfoRenderer`)
-- [ ] Config-driven template for Remediate tool (`REMEDIATE_TEMPLATE`)
-- [ ] API client for Remediate tool (`src/api/remediate.ts`)
-- [ ] Proxy endpoint for Remediate tool (`/api/v1/tools/remediate`)
-- [ ] Enable Remediate in ActionBar tool selector
-- [ ] Extend visualization page to show Information section (from tool response)
-- [ ] Extend visualization page to show Actions section (execution buttons)
-- [ ] Handle execution flow (call MCP with executeChoice, show results)
-- [ ] Progressive loading: show analysis first, append visualizations when ready
+**Remediate Tool Implementation (COMPLETED):**
+- [x] Generic info template renderer component (`InfoRenderer`)
+- [x] Config-driven template for Remediate tool (`REMEDIATE_TEMPLATE`)
+- [x] API client for Remediate tool (`src/api/remediate.ts`)
+- [x] Proxy endpoint for Remediate tool (`/api/v1/tools/remediate`)
+- [x] Enable Remediate in ActionBar tool selector
+- [x] Extend visualization page to show Information section (from tool response)
+- [x] Extend visualization page to show Actions section (execution buttons)
+- [x] Handle execution flow (call MCP with executeChoice, show results)
+- [x] Progressive loading: show analysis first, append visualizations when ready
 
 **Remaining Tools (one at a time, each needs design then implementation):**
 - [ ] Operate tool integration (design pending)
@@ -492,4 +492,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-11 | Milestone 5 - BarChartRenderer implemented. New visualization type for resource metrics (memory, CPU usage). Types added (BarChartBar, BarChartContent, BarChartVisualization), horizontal/vertical orientations supported, status-based coloring (red=error, yellow=warning, green=ok, blue=default). Integrated into VisualizationRenderer switch. Added bar-chart support to TabContainer for tab status indicators. Coordinated with MCP via cross-project feature request workflow. Verified rendering with Playwright - bars display correctly with status colors. |
 | 2025-01-11 | Milestone 5 - Query tool integration complete. ActionBar now context-aware: extracts kind/group/namespace/name from URL. Added multi-select Query icons to ResourceList with ActionSelectionContext. YAML-format intent for readability. ActionBar on all pages. Remaining tools (Remediate, Operate, Recommend) pending design - will implement one at a time. |
 | 2025-01-12 | Milestone 5 - Remediate tool design complete. Tested MCP remediate endpoint via curl - confirmed multi-step workflow (analysis → user choice → execution → results). Key insight: visualization page must evolve from passive display to interactive session viewer. Designed four-section page structure (Information, Form, Visualization, Actions) that works for all tools. Chose config-driven templates over Go-style string templates for Information section. No MCP changes needed - UI consumes existing response structure. Ready for implementation. |
+| 2025-01-13 | Milestone 5 - Remediate tool implementation COMPLETE. Added InfoRenderer with config-driven templates, ActionsPanel for execution choices, ResultsPanel for results display. API client (`src/api/remediate.ts`) with session management. Proxy endpoint `/api/v1/tools/remediate`. Visualization page extended to show Information + Actions sections. Progressive loading: analysis displays immediately while visualizations load in background. Also added AllResourcesView for namespace-scoped resource browsing, fixed duplicate fetch issues, increased rate limits. |
 
