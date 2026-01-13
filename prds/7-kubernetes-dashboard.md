@@ -273,7 +273,9 @@ interface RemediateResponse {
 **Other Tools (To Be Designed)**
 - [ ] Design: Operate tool integration - what Day 2 operations to expose (scale, update, rollback)?
 - [ ] Design: Recommend tool integration - when/where to show deployment recommendations?
-- [ ] Design: Capabilities tool integration - how to display cluster resource capabilities and operators?
+- [ ] Design: Organizational Data integration - how to view/manage patterns and policies?
+  - Patterns: organizational deployment patterns that guide AI recommendations
+  - Policies: policy intents that constrain AI-generated configurations
 
 #### Implementation
 - [x] Shared `SharedDashboardLayout` component with collapsible sidebar (completed)
@@ -302,6 +304,7 @@ interface RemediateResponse {
 **Remaining Tools (one at a time, each needs design then implementation):**
 - [ ] Operate tool integration (design pending)
 - [ ] Recommend tool integration (design pending)
+- [ ] Organizational Data integration - patterns and policies (design pending)
 - [ ] MCP client functions for each tool as implemented
 
 **Validation**: Click "Analyze Cluster Health" on dashboard home, see AI analysis rendered inline
@@ -444,6 +447,7 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-12 | Visualization page becomes generic session viewer | `/v/{sessionId}` shows four optional sections: Information, Form, Visualization, Actions. Each tool uses whichever sections apply | Query uses Info+Viz; Remediate uses Info+Viz+Actions; Recommend may use Info+Form+Viz+Actions |
 | 2025-01-12 | Config-driven templates for Information section | Use TypeScript config arrays (not Go-style string templates) to map MCP response fields to display blocks. Generic block types: heading, text, list, code, actions-list | Each tool defines its template config; `InfoRenderer` component is generic and reusable |
 | 2025-01-12 | No MCP response restructuring needed | UI consumes existing MCP fields directly (sessionId, status, analysis, remediation, executionChoices, results). No translation layer or mapping needed | Simpler integration; just define TypeScript types matching MCP response |
+| 2025-01-13 | Added Organizational Data (patterns + policies) to scope | Patterns and policies guide AI recommendations (Recommend, Operate tools); users need visibility and management. Capabilities excluded - already covered by resource kinds in sidebar | New design task added; will follow same design-then-implement pattern as other tools |
 
 ---
 
