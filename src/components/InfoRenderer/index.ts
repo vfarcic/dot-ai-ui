@@ -1,3 +1,3 @@
 export { InfoRenderer } from './InfoRenderer'
 export * from './types'
-export { REMEDIATE_TEMPLATE } from './templates'
+export { REMEDIATE_TEMPLATE, OPERATE_TEMPLATE } from './templates'

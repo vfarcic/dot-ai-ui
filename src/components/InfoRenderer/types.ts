@@ -3,7 +3,7 @@
  * Each tool defines its own template; the renderer is generic
  */
 
-export type InfoBlockType = 'heading' | 'text' | 'list' | 'code' | 'key-value' | 'actions-list'
+export type InfoBlockType = 'heading' | 'text' | 'list' | 'code' | 'key-value' | 'actions-list' | 'changes-list' | 'code-list'
 
 export type Severity = 'info' | 'warning' | 'error' | 'success'
 
@@ -53,6 +53,25 @@ export interface ActionsListBlock {
   showRisk?: boolean
 }
 
+/**
+ * Block for displaying proposed changes (create/update/delete)
+ * Used by Operate tool to show manifest changes
+ */
+export interface ChangesListBlock {
+  type: 'changes-list'
+  field: string
+}
+
+/**
+ * Block for displaying a list of code snippets (commands)
+ * Used by Operate tool to show kubectl commands
+ */
+export interface CodeListBlock {
+  type: 'code-list'
+  field: string
+  language?: string
+}
+
 export type InfoBlock =
   | HeadingBlock
   | TextBlock
@@ -60,6 +79,8 @@ export type InfoBlock =
   | CodeBlock
   | KeyValueBlock
   | ActionsListBlock
+  | ChangesListBlock
+  | CodeListBlock
 
 export type InfoTemplate = InfoBlock[]
 

@@ -44,13 +44,14 @@ export function ResultsPanel({ results, validation, message }: ResultsPanelProps
       <div className="flex items-center gap-2 mb-3">
         {getResultIcon(overallSuccess)}
         <span className={`font-medium ${overallSuccess ? 'text-green-400' : 'text-red-400'}`}>
-          {overallSuccess ? 'Remediation Complete' : 'Remediation Failed'}
+          {overallSuccess ? 'Execution Complete' : 'Execution Failed'}
         </span>
       </div>
 
       {message && <p className="text-sm text-foreground mb-3">{message}</p>}
 
-      {validation?.summary && (
+      {/* Only show validation summary if it differs from the message */}
+      {validation?.summary && validation.summary !== message && (
         <p className="text-sm text-muted-foreground mb-3">{validation.summary}</p>
       )}
 

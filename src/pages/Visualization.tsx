@@ -5,11 +5,12 @@ import { InsightsPanel } from '@/components/InsightsPanel'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { VisualizationRenderer } from '@/components/renderers'
-import { InfoRenderer, REMEDIATE_TEMPLATE } from '@/components/InfoRenderer'
+import { InfoRenderer, REMEDIATE_TEMPLATE, OPERATE_TEMPLATE } from '@/components/InfoRenderer'
 import { ActionsPanel } from '@/components/ActionsPanel'
 import { ResultsPanel } from '@/components/ResultsPanel'
 import { getVisualization, APIError } from '@/api'
 import { executeRemediation, getRemediateSession, type RemediateResponse } from '@/api/remediate'
+import { executeOperation, getOperateSession, type OperateResponse } from '@/api/operate'
 import type { VisualizationResponse } from '@/types'
 
 /**
@@ -19,16 +20,24 @@ function isRemediateSession(sessionId: string): boolean {
   return sessionId.startsWith('rem-')
 }
 
-// Navigation state type for remediate data passed from ActionBar
+/**
+ * Check if session is an operate session based on ID prefix
+ */
+function isOperateSession(sessionId: string): boolean {
+  return sessionId.startsWith('opr-')
+}
+
+// Navigation state type for tool data passed from ActionBar
 interface NavigationState {
   remediateData?: RemediateResponse
+  operateData?: OperateResponse
 }
 
 export function Visualization() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const location = useLocation()
 
-  // Get remediate data from navigation state (passed from ActionBar)
+  // Get tool data from navigation state (passed from ActionBar)
   const navigationState = location.state as NavigationState | null
 
   // Visualization state
@@ -43,12 +52,35 @@ export function Visualization() {
   )
   const [remediateError, setRemediateError] = useState<string | null>(null)
   const [isRemediateLoading, setIsRemediateLoading] = useState(false)
-  const [isExecuting, setIsExecuting] = useState(false)
+  const [isRemediateExecuting, setIsRemediateExecuting] = useState(false)
+
+  // Operate workflow state - initialize from navigation state if available
+  const [operateData, setOperateData] = useState<OperateResponse | null>(
+    navigationState?.operateData || null
+  )
+  const [operateError, setOperateError] = useState<string | null>(null)
+  const [isOperateLoading, setIsOperateLoading] = useState(false)
+  const [isOperateExecuting, setIsOperateExecuting] = useState(false)
 
   // Track which session we've fetched to prevent duplicate fetches from React StrictMode
   const fetchedSessionRef = useRef<string | null>(null)
 
+  // Reset state when navigating between sessions
+  // useState initial values only apply on mount, so we need this for re-navigation
+  useEffect(() => {
+    setRemediateData(navigationState?.remediateData || null)
+    setOperateData(navigationState?.operateData || null)
+    setRemediateError(null)
+    setOperateError(null)
+    setVizData(null)
+    setVizError(null)
+    setIsVizLoading(true)
+    // Reset fetch ref to allow fetching for new session
+    fetchedSessionRef.current = null
+  }, [sessionId, navigationState?.remediateData, navigationState?.operateData])
+
   const isRemediate = sessionId ? isRemediateSession(sessionId) : false
+  const isOperate = sessionId ? isOperateSession(sessionId) : false
 
   // Fetch visualization data
   const fetchVizData = useCallback(
@@ -104,12 +136,12 @@ export function Visualization() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, isRemediate])
 
-  // Handle execution choice
-  const handleExecuteChoice = useCallback(
+  // Handle remediate execution choice
+  const handleRemediateExecute = useCallback(
     async (choiceId: number) => {
       if (!sessionId || !remediateData) return
 
-      setIsExecuting(true)
+      setIsRemediateExecuting(true)
       setRemediateError(null)
 
       try {
@@ -121,10 +153,61 @@ export function Visualization() {
       } catch (err) {
         setRemediateError(err instanceof Error ? err.message : 'Execution failed')
       } finally {
-        setIsExecuting(false)
+        setIsRemediateExecuting(false)
       }
     },
     [sessionId, remediateData, fetchVizData]
+  )
+
+  // Fetch operate data (for page refresh/shared URLs)
+  const fetchOperateData = useCallback(async () => {
+    if (!sessionId || !isOperate) return
+
+    setIsOperateLoading(true)
+    setOperateError(null)
+
+    try {
+      const data = await getOperateSession(sessionId)
+      if (data) {
+        setOperateData(data)
+      } else {
+        setOperateError('Session not found or expired. Please re-submit the operation from the dashboard.')
+      }
+    } catch (err) {
+      setOperateError(err instanceof Error ? err.message : 'Failed to load session data')
+    } finally {
+      setIsOperateLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, isOperate])
+
+  // Handle operate execution choice
+  const handleOperateExecute = useCallback(
+    async (choiceId: number) => {
+      if (!sessionId || !operateData) return
+
+      setIsOperateExecuting(true)
+      setOperateError(null)
+
+      try {
+        const result = await executeOperation(sessionId, choiceId)
+        // Merge result with existing data to preserve analysis
+        setOperateData({
+          ...operateData,
+          ...result,
+          // Keep original analysis if execution response doesn't include it
+          analysis: result.analysis || operateData.analysis,
+        })
+
+        // Refresh visualization to get updated data after execution
+        await fetchVizData(true)
+      } catch (err) {
+        setOperateError(err instanceof Error ? err.message : 'Execution failed')
+      } finally {
+        setIsOperateExecuting(false)
+      }
+    },
+    [sessionId, operateData, fetchVizData]
   )
 
   const handleReload = useCallback(() => {
@@ -151,15 +234,22 @@ export function Visualization() {
     if (isRemediate && !navigationState?.remediateData) {
       fetchRemediateData()
     }
-  }, [sessionId, isRemediate, navigationState?.remediateData, fetchVizData, fetchRemediateData])
+    // Only fetch operate data if we don't already have it from navigation state
+    if (isOperate && !navigationState?.operateData) {
+      fetchOperateData()
+    }
+  }, [sessionId, isRemediate, isOperate, navigationState?.remediateData, navigationState?.operateData, fetchVizData, fetchRemediateData, fetchOperateData])
+
+  // Check if we have any tool data to show
+  const hasToolData = remediateData || operateData
 
   // Loading state
-  if (isVizLoading && !remediateData) {
+  if (isVizLoading && !hasToolData) {
     return <LoadingSpinner />
   }
 
   // Error state
-  if (vizError && !remediateData) {
+  if (vizError && !hasToolData) {
     return (
       <ErrorDisplay
         type={vizError.errorType}
@@ -174,9 +264,11 @@ export function Visualization() {
   const hasVisualization = vizData && vizData.visualizations && vizData.visualizations.length > 0
   const hasRemediateWorkflow = remediateData && remediateData.status === 'awaiting_user_approval'
   const hasRemediateResults = remediateData && remediateData.status === 'success' && remediateData.results
+  const hasOperateWorkflow = operateData && operateData.status === 'awaiting_user_approval'
+  const hasOperateResults = operateData && operateData.status === 'success' && operateData.execution?.results
 
-  // Title - prefer remediate data title pattern
-  const title = vizData?.title || (remediateData ? 'Remediation Analysis' : 'Visualization')
+  // Title - prefer tool data title patterns
+  const title = vizData?.title || (remediateData ? 'Remediation Analysis' : operateData ? 'Operation Proposal' : 'Visualization')
 
   return (
     <div className="w-full p-4 sm:p-6">
@@ -206,7 +298,7 @@ export function Visualization() {
         </button>
       </div>
 
-      {/* Section 1: Information (Remediate analysis) */}
+      {/* Section 1a: Information (Remediate analysis) */}
       {remediateData && (
         <div className="mb-4 p-4 rounded-lg border border-border bg-card">
           {isRemediateLoading ? (
@@ -228,12 +320,12 @@ export function Visualization() {
                 </div>
               )}
 
-              {/* Section 4: Actions (execution buttons) */}
+              {/* Actions (execution buttons) */}
               {hasRemediateWorkflow && remediateData.executionChoices && (
                 <ActionsPanel
                   choices={remediateData.executionChoices.filter(c => c.id === 1)}
-                  onSelect={handleExecuteChoice}
-                  isLoading={isExecuting}
+                  onSelect={handleRemediateExecute}
+                  isLoading={isRemediateExecuting}
                   hint="Or use the Copy buttons above to execute commands manually"
                 />
               )}
@@ -251,8 +343,57 @@ export function Visualization() {
         </div>
       )}
 
-      {/* Section 2: Insights (skip for remediate - analysis already shows this) */}
-      {!isRemediate && vizData?.insights && vizData.insights.length > 0 && (
+      {/* Section 1b: Information (Operate proposal) */}
+      {operateData && (
+        <div className="mb-4 p-4 rounded-lg border border-border bg-card">
+          {isOperateLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <LoadingSpinner />
+              <span>Loading operation proposal...</span>
+            </div>
+          ) : (
+            <>
+              <InfoRenderer
+                template={OPERATE_TEMPLATE}
+                data={operateData as unknown as Record<string, unknown>}
+              />
+
+              {/* Error message */}
+              {operateError && (
+                <div className="mt-3 p-3 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                  {operateError}
+                </div>
+              )}
+
+              {/* Actions (execution buttons) */}
+              {hasOperateWorkflow && (
+                <ActionsPanel
+                  choices={[{ id: 1, label: 'Execute automatically', description: 'Apply the proposed changes to the cluster' }]}
+                  onSelect={handleOperateExecute}
+                  isLoading={isOperateExecuting}
+                  hint="Or use the Copy buttons above to execute commands manually"
+                />
+              )}
+
+              {/* Results after execution */}
+              {hasOperateResults && operateData.execution?.results && (
+                <ResultsPanel
+                  results={operateData.execution.results.map(r => ({
+                    action: r.command,
+                    success: r.success,
+                    output: r.output,
+                  }))}
+                  validation={{ success: true, summary: operateData.execution.validation || '' }}
+                  message={operateData.message}
+                />
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Section 2: Insights (skip for tool sessions and when no visualizations - shown inline instead) */}
+      {!isRemediate && !isOperate && hasVisualization && vizData?.insights && vizData.insights.length > 0 && (
         <InsightsPanel sessionId={sessionId!} insights={vizData.insights} />
       )}
 
@@ -281,14 +422,27 @@ export function Visualization() {
           </div>
         </div>
       ) : (
-        !remediateData && (
+        !hasToolData && (
           <div className="flex items-center justify-center min-h-[50vh]">
-            <div className="text-center">
-              <div className="text-muted-foreground mb-4">No visualizations available</div>
-              {vizData && (
-                <pre className="text-xs text-left bg-muted p-4 rounded overflow-auto max-w-xl">
-                  {JSON.stringify(vizData, null, 2)}
-                </pre>
+            <div className="text-center max-w-lg">
+              {vizData?.insights && vizData.insights.length > 0 ? (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <svg className="w-6 h-6 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-lg font-medium text-amber-400">
+                      {vizData.title || 'Notice'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-foreground text-left space-y-2">
+                    {vizData.insights.map((insight, idx) => (
+                      <p key={idx}>{insight}</p>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-muted-foreground">No visualizations available</div>
               )}
             </div>
           </div>

@@ -270,8 +270,117 @@ interface RemediateResponse {
 4. User clicks "Execute via MCP" → POST with `{ sessionId, executeChoice: 1 }`
 5. Show execution results in Information section
 
+**Operate Tool Integration (Designed)**
+- [x] Design: Operate tool integration - natural language Day 2 operations
+
+*Architecture Decisions:*
+- Decision: Operate follows same multi-step workflow as Remediate (analysis → approval → execution → results)
+- Decision: Reuse existing components: `InfoRenderer`, `ActionsPanel`, `ResultsPanel`
+- Decision: Session prefix is `opr-` (MCP already uses this convention)
+- Decision: Show proposed manifests in expandable/collapsible sections for review before execution
+- Decision: Display organizational patterns applied and policies checked (AI transparency)
+
+*MCP Response Contract (tested via HTTP):*
+```typescript
+// Initial analysis response (POST /api/v1/tools/operate with { intent: "..." })
+interface OperateResponse {
+  sessionId: string;  // e.g., "opr-1768325341066-e10636db"
+  status: "awaiting_user_approval" | "success" | "failed";
+
+  analysis: {
+    summary: string;  // What the operation will do
+    currentState: {
+      resources: Array<{ kind: string; name: string; namespace: string; summary: string }>;
+    };
+    proposedChanges: {
+      create: Array<{ kind: string; name: string; manifest: string; rationale: string }>;
+      update: Array<{ kind: string; name: string; manifest: string; rationale: string }>;
+      delete: Array<{ kind: string; name: string; rationale: string }>;
+    };
+    commands: string[];  // kubectl commands for manual execution
+    dryRunValidation: { status: "success" | "failed"; details: string };
+    patternsApplied: string[];  // Organizational patterns used
+    capabilitiesUsed: string[];  // Resource types involved
+    policiesChecked: string[];  // Policies that were validated
+    risks: { level: "low" | "medium" | "high"; description: string };
+    validationIntent: string;  // How to verify success after execution
+  };
+
+  message: string;
+  nextAction: string;
+}
+
+// Execution response (POST with { sessionId, executeChoice: 1 })
+interface OperateExecutionResponse {
+  sessionId: string;
+  status: "success" | "failed";
+  execution: {
+    results: Array<{
+      command: string;
+      success: boolean;
+      output: string;
+      timestamp: string;
+    }>;
+    validation: string;  // Post-execution validation results
+  };
+  message: string;
+}
+```
+
+*Key Differences from Remediate:*
+| Aspect | Remediate | Operate |
+|--------|-----------|---------|
+| Purpose | Diagnose and fix issues | Perform Day 2 operations |
+| Session prefix | `rem-` | `opr-` |
+| Analysis focus | `rootCause`, `confidence`, `factors` | `summary`, `proposedChanges`, `risks` |
+| Actions display | `remediation.actions` with risk | `analysis.commands` (kubectl) |
+| Post-execution | `results` + `validation` | `execution.results` + `execution.validation` |
+| Template focus | Why something is broken | What will change (create/update/delete) |
+
+*Template Design (`OPERATE_TEMPLATE`):*
+```typescript
+const OPERATE_TEMPLATE: InfoTemplate = [
+  { type: 'heading', text: 'Operation Summary', level: 2 },
+  { type: 'text', field: 'analysis.summary' },
+
+  { type: 'heading', text: 'Risk Assessment', badge: { field: 'analysis.risks.level', format: 'risk' }, level: 3 },
+  { type: 'text', field: 'analysis.risks.description' },
+
+  { type: 'heading', text: 'Proposed Changes', level: 2 },
+  // Custom block type for manifests (see below)
+  { type: 'changes-list', field: 'analysis.proposedChanges' },
+
+  { type: 'heading', text: 'Commands', level: 3 },
+  { type: 'code-list', field: 'analysis.commands' },
+
+  { type: 'heading', text: 'Validation', level: 3 },
+  { type: 'key-value', items: [
+    { label: 'Dry Run', field: 'analysis.dryRunValidation.status' },
+    { label: 'Details', field: 'analysis.dryRunValidation.details' },
+  ]},
+
+  { type: 'heading', text: 'AI Context', level: 3 },
+  { type: 'list', field: 'analysis.patternsApplied', severity: 'info' },
+  { type: 'list', field: 'analysis.policiesChecked', severity: 'info' },
+];
+```
+
+*New Block Type Needed: `changes-list`*
+- Shows proposed creates/updates/deletes in collapsible sections
+- Each change shows: kind, name, rationale, and expandable manifest (YAML)
+- Color-coded: green for create, yellow for update, red for delete
+- Manifests use Prism syntax highlighting (already available)
+
+*User Flow:*
+1. User types intent in ActionBar (e.g., "scale nginx to 5 replicas")
+2. ActionBar calls `operateCluster(intent)` → gets sessionId + analysis
+3. Navigate to `/v/{sessionId}` → show analysis with proposed changes
+4. User reviews manifests, sees dry-run validation passed
+5. User clicks "Execute automatically" → POST with `executeChoice: 1`
+6. Show execution results with command outputs
+7. Refresh visualization for updated diagrams
+
 **Other Tools (To Be Designed)**
-- [ ] Design: Operate tool integration - what Day 2 operations to expose (scale, update, rollback)?
 - [ ] Design: Recommend tool integration - when/where to show deployment recommendations?
 - [ ] Design: Organizational Data integration - how to view/manage patterns and policies?
   - Patterns: organizational deployment patterns that guide AI recommendations
@@ -301,8 +410,21 @@ interface RemediateResponse {
 - [x] Handle execution flow (call MCP with executeChoice, show results)
 - [x] Progressive loading: show analysis first, append visualizations when ready
 
+**Operate Tool Implementation (COMPLETED):**
+- [x] API client for Operate tool (`src/api/operate.ts`)
+- [x] Proxy endpoint for Operate tool (`/api/v1/tools/operate`)
+- [x] New `changes-list` block type in InfoRenderer for manifest display
+- [x] New `code-list` block type in InfoRenderer for command arrays
+- [x] Config-driven template for Operate tool (`OPERATE_TEMPLATE`)
+- [x] Enable Operate in ActionBar tool selector
+- [x] Extend Visualization page to detect `opr-` session prefix
+- [x] Add `operateData` state and handlers (similar to remediateData)
+- [x] Handle different execution result structure (execution.results vs results)
+- [x] ActionBar refactored to two-field design (Resources + Intent) for all tools
+- [x] Session state reset when navigating between visualization pages
+- [x] User-friendly guidance display when Query declines (no raw JSON)
+
 **Remaining Tools (one at a time, each needs design then implementation):**
-- [ ] Operate tool integration (design pending)
 - [ ] Recommend tool integration (design pending)
 - [ ] Organizational Data integration - patterns and policies (design pending)
 - [ ] MCP client functions for each tool as implemented
@@ -363,6 +485,39 @@ UI (dot-ai-ui)          Express Proxy           MCP Server (dot-ai)
 
 **Validation**: Dashboard requires authentication; unauthenticated users cannot access resources or trigger AI operations
 
+### Milestone 9: Onboarding Guided Tour
+
+**Problem**: New users arriving at the dashboard may not immediately understand how to navigate the sidebar, use AI tools, or interpret resource information. A guided tour reduces time-to-value and improves user confidence.
+
+**Design Decisions (To Be Resolved)**
+- [ ] Design: Library choice - React Joyride (most popular) vs Shepherd.js vs Intro.js vs custom?
+- [ ] Design: Tour trigger - first visit per session? localStorage-persisted? user preference in settings?
+- [ ] Design: Tour interruption handling - what happens if user navigates mid-tour?
+- [ ] Design: Mobile experience - should tour be disabled or adapted for small screens?
+
+**Proposed Tour Flow**
+1. **Sidebar Highlight** - Spotlight on left sidebar with modal explaining resource type navigation, prompting user to click a resource type
+2. **Resource List Highlight** - After user clicks sidebar, spotlight on main body explaining the resource table, status indicators, and clickable rows
+3. **ActionBar Introduction** - Spotlight on bottom ActionBar explaining AI tools (Query, Remediate, Operate) and how to ask questions about the cluster
+4. **Completion** - Success message with option to replay tour from settings/help menu
+
+**Implementation**
+- [ ] Choose and install tour library (recommend React Joyride for React ecosystem fit)
+- [ ] Create `GuidedTour` component with step definitions and callbacks
+- [ ] Add tour state to session storage (shown/not shown this session)
+- [ ] Style tour tooltips/modals to match dashboard dark theme
+- [ ] Add "Replay Tour" option in header or help menu
+- [ ] Handle edge cases: navigation during tour, window resize, mobile viewports
+
+**UX Requirements**
+- Tour must be skippable at any step ("Skip tour" button always visible)
+- Each step should have concise text (1-2 sentences max)
+- Highlighted area should be interactive (user can click the actual element)
+- Dim overlay on non-focused areas without blocking the highlighted element
+- Tour should gracefully handle if user navigates away (reset or pause)
+
+**Validation**: New user visits `/dashboard`, guided tour starts automatically, user can complete all steps or skip. Tour doesn't reappear after completion (within session). "Replay Tour" button works.
+
 ---
 
 ## Out of Scope (Future Considerations)
@@ -402,6 +557,7 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 
 ### UI Dependencies
 - `@tanstack/react-query` - Server state management (planned, using useState/useEffect currently)
+- `react-joyride` - Guided tour library (planned, for Milestone 9 onboarding)
 - Existing MCP proxy infrastructure (all K8s data flows through MCP)
 
 ### External Dependencies (dot-ai MCP)
@@ -448,6 +604,8 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-12 | Config-driven templates for Information section | Use TypeScript config arrays (not Go-style string templates) to map MCP response fields to display blocks. Generic block types: heading, text, list, code, actions-list | Each tool defines its template config; `InfoRenderer` component is generic and reusable |
 | 2025-01-12 | No MCP response restructuring needed | UI consumes existing MCP fields directly (sessionId, status, analysis, remediation, executionChoices, results). No translation layer or mapping needed | Simpler integration; just define TypeScript types matching MCP response |
 | 2025-01-13 | Added Organizational Data (patterns + policies) to scope | Patterns and policies guide AI recommendations (Recommend, Operate tools); users need visibility and management. Capabilities excluded - already covered by resource kinds in sidebar | New design task added; will follow same design-then-implement pattern as other tools |
+| 2025-01-13 | Operate tool follows Remediate pattern with different data shape | Tested MCP operate endpoint via HTTP. Same multi-step workflow (analysis → approval → execution → results) but different response structure: `analysis.proposedChanges` (create/update/delete manifests) vs `remediation.actions`. Session prefix is `opr-` | Reuse InfoRenderer, ActionsPanel, ResultsPanel; need new `changes-list` and `code-list` block types for manifest display |
+| 2025-01-13 | Add onboarding guided tour for new users | Dashboard has many features (sidebar navigation, AI tools, resource details) that aren't immediately obvious to new users. Step-by-step guided tours are a proven UX pattern for complex dashboards | New Milestone 9 added; session-scoped by default (shows once per session); design decisions pending for library choice and interruption handling |
 
 ---
 
@@ -497,4 +655,9 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-11 | Milestone 5 - Query tool integration complete. ActionBar now context-aware: extracts kind/group/namespace/name from URL. Added multi-select Query icons to ResourceList with ActionSelectionContext. YAML-format intent for readability. ActionBar on all pages. Remaining tools (Remediate, Operate, Recommend) pending design - will implement one at a time. |
 | 2025-01-12 | Milestone 5 - Remediate tool design complete. Tested MCP remediate endpoint via curl - confirmed multi-step workflow (analysis → user choice → execution → results). Key insight: visualization page must evolve from passive display to interactive session viewer. Designed four-section page structure (Information, Form, Visualization, Actions) that works for all tools. Chose config-driven templates over Go-style string templates for Information section. No MCP changes needed - UI consumes existing response structure. Ready for implementation. |
 | 2025-01-13 | Milestone 5 - Remediate tool implementation COMPLETE. Added InfoRenderer with config-driven templates, ActionsPanel for execution choices, ResultsPanel for results display. API client (`src/api/remediate.ts`) with session management. Proxy endpoint `/api/v1/tools/remediate`. Visualization page extended to show Information + Actions sections. Progressive loading: analysis displays immediately while visualizations load in background. Also added AllResourcesView for namespace-scoped resource browsing, fixed duplicate fetch issues, increased rate limits. |
+| 2025-01-13 | Milestone 5 - Operate tool design COMPLETE. Tested MCP operate endpoint via HTTP to understand actual response structure. Key findings: session prefix `opr-`, analysis includes `proposedChanges` (create/update/delete with manifests), `commands` array, `dryRunValidation`, `patternsApplied`, `policiesChecked`, `risks`. Execution returns `execution.results` + `execution.validation` (different from Remediate's flat `results`). Design reuses existing components; needs new `changes-list` block type for manifest display with collapsible YAML sections. |
+| 2025-01-13 | Milestone 5 - Operate tool implementation COMPLETE. Added `src/api/operate.ts` API client with session management. Proxy endpoint `/api/v1/tools/operate`. Added `changes-list` and `code-list` block types to InfoRenderer for manifest display with collapsible YAML and command lists with copy buttons. Added `OPERATE_TEMPLATE` in templates.ts. Visualization page extended to handle `opr-` sessions with execution workflow. |
+| 2025-01-13 | ActionBar refactored to two-field design: Resources field (auto-populated from context, editable) + Intent field (with tool-specific placeholders). Context-aware placeholders change based on whether resources are selected. Fields combined for MCP submission. Improved UX for Operate tool which requires both resources AND intent. |
+| 2025-01-13 | Fixed multiple UX issues: (1) Session state now resets when navigating between visualization pages (useState initial values only apply on mount). (2) Intent field clears after successful submission. (3) ResultsPanel shows "Execution Complete" instead of "Remediation Complete" (works for all tools). (4) Duplicate text fix - validation.summary only shown if different from message. |
+| 2025-01-13 | Improved Query tool error handling: When Query returns guidance instead of visualizations (e.g., "use operate tool"), UI now shows user-friendly amber notice box instead of raw JSON. "Session & Insights" panel hidden when showing inline guidance. MCP bug fixed on server side to return valid JSON with empty visualizations array. |
 

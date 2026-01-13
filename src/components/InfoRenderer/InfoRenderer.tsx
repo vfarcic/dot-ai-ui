@@ -13,6 +13,8 @@ import type {
   CodeBlock,
   KeyValueBlock,
   ActionsListBlock,
+  ChangesListBlock,
+  CodeListBlock,
   Severity,
   BadgeConfig,
 } from './types'
@@ -245,6 +247,136 @@ function ActionsListRenderer({ block, data }: { block: ActionsListBlock; data: R
   )
 }
 
+/**
+ * Proposed change item for Operate tool
+ */
+interface ProposedChange {
+  kind: string
+  name: string
+  manifest?: string
+  rationale: string
+}
+
+interface ProposedChanges {
+  create?: ProposedChange[]
+  update?: ProposedChange[]
+  delete?: ProposedChange[]
+}
+
+/**
+ * Collapsible section for a single proposed change
+ */
+function ChangeItem({ change, type }: { change: ProposedChange; type: 'create' | 'update' | 'delete' }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  const typeStyles = {
+    create: 'border-l-green-500 bg-green-500/5',
+    update: 'border-l-yellow-500 bg-yellow-500/5',
+    delete: 'border-l-red-500 bg-red-500/5',
+  }
+
+  const typeLabels = {
+    create: 'Create',
+    update: 'Update',
+    delete: 'Delete',
+  }
+
+  const typeBadgeStyles = {
+    create: 'bg-green-500/20 text-green-400',
+    update: 'bg-yellow-500/20 text-yellow-400',
+    delete: 'bg-red-500/20 text-red-400',
+  }
+
+  return (
+    <div className={`border-l-2 rounded-r-md ${typeStyles[type]}`}>
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full p-3 flex items-center justify-between gap-2 hover:bg-muted/30 transition-colors cursor-pointer"
+      >
+        <div className="flex items-center gap-2 text-left">
+          <span className={`px-2 py-0.5 rounded text-xs font-medium ${typeBadgeStyles[type]}`}>
+            {typeLabels[type]}
+          </span>
+          <span className="font-medium text-sm">{change.kind}</span>
+          <span className="text-muted-foreground text-sm">{change.name}</span>
+        </div>
+        <svg
+          className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isExpanded && (
+        <div className="px-3 pb-3 space-y-2">
+          <p className="text-sm text-muted-foreground">{change.rationale}</p>
+          {change.manifest && (
+            <div className="relative">
+              <pre className="text-xs bg-background p-3 pr-16 rounded overflow-x-auto font-mono text-muted-foreground max-h-80 overflow-y-auto">
+                {change.manifest}
+              </pre>
+              <div className="absolute top-2 right-2">
+                <CopyButton text={change.manifest} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ChangesListRenderer({ block, data }: { block: ChangesListBlock; data: Record<string, unknown> }) {
+  const value = getFieldValue(data, block.field) as ProposedChanges | null
+  if (!value) return null
+
+  const { create = [], update = [], delete: deleteChanges = [] } = value
+  const hasChanges = create.length > 0 || update.length > 0 || deleteChanges.length > 0
+
+  if (!hasChanges) {
+    return (
+      <p className="text-sm text-muted-foreground mb-3">No changes proposed.</p>
+    )
+  }
+
+  return (
+    <div className="space-y-2 mb-3">
+      {create.map((change, index) => (
+        <ChangeItem key={`create-${index}`} change={change} type="create" />
+      ))}
+      {update.map((change, index) => (
+        <ChangeItem key={`update-${index}`} change={change} type="update" />
+      ))}
+      {deleteChanges.map((change, index) => (
+        <ChangeItem key={`delete-${index}`} change={change} type="delete" />
+      ))}
+    </div>
+  )
+}
+
+function CodeListRenderer({ block, data }: { block: CodeListBlock; data: Record<string, unknown> }) {
+  const value = getFieldValue(data, block.field)
+  if (!Array.isArray(value) || value.length === 0) return null
+
+  return (
+    <div className="space-y-2 mb-3">
+      {value.map((command, index) => (
+        <div key={index} className="relative">
+          <pre className="text-xs bg-muted p-3 pr-16 rounded overflow-x-auto font-mono text-muted-foreground">
+            {String(command)}
+          </pre>
+          <div className="absolute top-2 right-2">
+            <CopyButton text={String(command)} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function BlockRenderer({ block, data }: { block: InfoBlock; data: Record<string, unknown> }) {
   switch (block.type) {
     case 'heading':
@@ -259,6 +391,10 @@ function BlockRenderer({ block, data }: { block: InfoBlock; data: Record<string,
       return <KeyValueRenderer block={block} data={data} />
     case 'actions-list':
       return <ActionsListRenderer block={block} data={data} />
+    case 'changes-list':
+      return <ChangesListRenderer block={block} data={data} />
+    case 'code-list':
+      return <CodeListRenderer block={block} data={data} />
     default:
       return null
   }

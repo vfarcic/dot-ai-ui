@@ -561,6 +561,70 @@ async function createServer() {
     }
   })
 
+  // Proxy Operate tool API requests to MCP server
+  // Multi-step workflow: analysis → user approval → execution
+  // Used for Day 2 operations: scale, update, rollback, etc.
+  app.post('/api/v1/tools/operate', apiLimiter, async (req, res) => {
+    try {
+      const { intent, sessionId, executeChoice } = req.body as {
+        intent?: string
+        sessionId?: string
+        executeChoice?: number
+      }
+
+      // Either intent (step 1) or sessionId + executeChoice (step 2) required
+      if (!intent && !sessionId) {
+        return res.status(400).json({ error: 'Missing required parameter: intent or sessionId' })
+      }
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+      if (AUTH_TOKEN) {
+        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      }
+
+      const controller = new AbortController()
+      // 30 minute timeout for complex AI operations
+      const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000)
+
+      const url = `${MCP_BASE_URL}/api/v1/tools/operate`
+      const body = sessionId ? { sessionId, executeChoice } : { intent }
+      console.log(`[Proxy] Sending operate to MCP: ${url}`)
+      console.log(`[Proxy] Body: ${JSON.stringify(body).substring(0, 200)}...`)
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('Operate timeout')
+        return res.status(408).json({ error: 'Operate timeout - request took too long' })
+      }
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to execute operate' })
+    }
+  })
+
   // Proxy session retrieval API requests to MCP server
   // Generic endpoint for retrieving any session data (remediate, query, etc.)
   app.get('/api/v1/sessions/:sessionId', apiLimiter, async (req, res) => {

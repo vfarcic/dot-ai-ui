@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { queryCluster } from '../../api/query'
 import { analyzeIssue } from '../../api/remediate'
+import { operateCluster } from '../../api/operate'
 import { useActionSelection, type SelectedResource } from '../../context/ActionSelectionContext'
 
 export type Tool = 'query' | 'remediate' | 'operate' | 'recommend'
@@ -19,7 +20,7 @@ const PARAM_LABELS: Record<string, string> = {
 
 /**
  * Extract context from URL params (both route and query params)
- * Returns a YAML-like formatted string
+ * Returns YAML-like formatted lines (without header prefix)
  */
 function extractUrlContext(
   routeParams: Record<string, string | undefined>,
@@ -30,17 +31,17 @@ function extractUrlContext(
   // Process route params (from resource detail page)
   // Route: /dashboard/:group/:version/:kind/:namespace/:name
   if (routeParams.kind) {
-    lines.push(`  kind: ${routeParams.kind}`)
+    lines.push(`kind: ${routeParams.kind}`)
   }
   // Include group only for non-core resources (CRDs)
   if (routeParams.group && routeParams.group !== '_core') {
-    lines.push(`  group: ${routeParams.group}`)
+    lines.push(`group: ${routeParams.group}`)
   }
   if (routeParams.namespace && routeParams.namespace !== '_cluster') {
-    lines.push(`  namespace: ${routeParams.namespace}`)
+    lines.push(`namespace: ${routeParams.namespace}`)
   }
   if (routeParams.name) {
-    lines.push(`  name: ${routeParams.name}`)
+    lines.push(`name: ${routeParams.name}`)
   }
 
   // Process query params (from resource list page)
@@ -50,24 +51,39 @@ function extractUrlContext(
     if (routeParams[key]) return
 
     const label = PARAM_LABELS[key] || key
-    lines.push(`  ${label}: ${value}`)
+    lines.push(`${label}: ${value}`)
   })
 
-  if (lines.length === 0) return ''
-  return 'Analyze:\n' + lines.join('\n')
+  return lines.join('\n')
 }
 
 /**
  * Build context string from selected resources
- * Uses YAML array format for consistency (always an array, even for single resource)
+ * Uses YAML array format for multiple resources
  */
 function buildSelectionContext(selectedItems: SelectedResource[]): string {
   if (selectedItems.length === 0) return ''
 
-  const lines: string[] = ['Analyze:', 'resources:']
+  if (selectedItems.length === 1) {
+    // Single resource - simple format
+    const item = selectedItems[0]
+    const group = item.apiVersion.includes('/') ? item.apiVersion.split('/')[0] : null
+    const lines: string[] = []
+    lines.push(`kind: ${item.kind}`)
+    if (group) {
+      lines.push(`group: ${group}`)
+    }
+    if (item.namespace) {
+      lines.push(`namespace: ${item.namespace}`)
+    }
+    lines.push(`name: ${item.name}`)
+    return lines.join('\n')
+  }
+
+  // Multiple resources - array format
+  const lines: string[] = ['resources:']
 
   for (const item of selectedItems) {
-    // Extract group from apiVersion (e.g., "apps/v1" -> "apps", "v1" -> null)
     const group = item.apiVersion.includes('/') ? item.apiVersion.split('/')[0] : null
 
     lines.push(`  - kind: ${item.kind}`)
@@ -84,34 +100,38 @@ function buildSelectionContext(selectedItems: SelectedResource[]): string {
 }
 
 /**
- * Build tool-specific default text using context (from selection or URL)
- * Context is already in YAML format starting with "Analyze:" or similar
+ * Get tool-specific placeholder text for the intent field
+ * Changes based on whether resources are selected
  */
-function getToolDefaultText(tool: Tool, context: string): string {
-  if (!context) {
-    // No context - use generic defaults
+function getIntentPlaceholder(tool: Tool, hasResources: boolean): string {
+  if (hasResources) {
     switch (tool) {
-      case 'query': return 'Analyze cluster health'
-      case 'remediate': return 'Describe the issue to fix'
-      case 'operate': return 'What operation do you want to perform?'
-      case 'recommend': return 'What do you want to deploy?'
+      case 'query':
+        return 'What would you like to know about these resources?'
+      case 'remediate':
+        return 'Describe the issue to fix...'
+      case 'operate':
+        return 'Describe the operation (e.g., scale to 5, update image, rollback)...'
+      case 'recommend':
+        return 'What would you like to deploy?'
     }
-  }
-
-  // Context already has the action prefix (Analyze:, Fix:, etc.)
-  // Just replace the prefix based on tool
-  switch (tool) {
-    case 'query': return context // Already starts with "Analyze:"
-    case 'remediate': return context.replace(/^Analyze:/, 'Fix issues with:')
-    case 'operate': return context.replace(/^Analyze:/, 'Operate on:')
-    case 'recommend': return context.replace(/^Analyze:/, 'Recommend for:')
+  } else {
+    switch (tool) {
+      case 'query':
+        return 'Ask about the cluster (e.g., show all failing pods, list deployments)...'
+      case 'remediate':
+        return 'Describe the issue to fix (e.g., fix crashing pods in namespace X)...'
+      case 'operate':
+        return 'Describe the operation (e.g., scale nginx deployment to 5 replicas)...'
+      case 'recommend':
+        return 'What would you like to deploy?'
+    }
   }
 }
 
 interface ToolOption {
   id: Tool
   label: string
-  defaultText: string
   disabled: boolean
   description: string
 }
@@ -120,28 +140,24 @@ const TOOLS: ToolOption[] = [
   {
     id: 'query',
     label: 'Query',
-    defaultText: 'Analyze cluster health',
     disabled: false,
     description: 'Ask questions about resources',
   },
   {
     id: 'remediate',
     label: 'Remediate',
-    defaultText: 'Describe the issue to fix',
     disabled: false,
     description: 'AI-powered issue resolution',
   },
   {
     id: 'operate',
     label: 'Operate',
-    defaultText: 'What operation do you want to perform?',
-    disabled: true,
+    disabled: false,
     description: 'Day 2 operations (scale, update, rollback)',
   },
   {
     id: 'recommend',
     label: 'Recommend',
-    defaultText: 'What do you want to deploy?',
     disabled: true,
     description: 'Deployment recommendations',
   },
@@ -192,13 +208,15 @@ export function ActionBar() {
   const activeContext = selectionContext || urlContext
 
   const [selectedTool, setSelectedTool] = useState<Tool>('query')
-  const [input, setInput] = useState(() => getToolDefaultText('query', activeContext))
+  const [resources, setResources] = useState(activeContext)
+  const [intent, setIntent] = useState('')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const resourcesRef = useRef<HTMLTextAreaElement>(null)
+  const intentRef = useRef<HTMLTextAreaElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const currentTool = TOOLS.find((t) => t.id === selectedTool)!
@@ -206,23 +224,26 @@ export function ActionBar() {
   // Get sidebar state from URL for preserving across navigation
   const sidebarCollapsed = searchParams.get('sb') === '1'
 
-  // Update input when selection or URL context changes
+  // Update resources when context changes
   useEffect(() => {
-    setInput(getToolDefaultText(selectedTool, activeContext))
-  }, [selectedTool, activeContext])
+    setResources(activeContext)
+  }, [activeContext])
 
-  // Auto-resize textarea to fit content
-  const adjustTextareaHeight = () => {
-    const textarea = textareaRef.current
+  // Auto-resize textareas to fit content
+  const adjustTextareaHeight = (textarea: HTMLTextAreaElement | null, maxHeight: number) => {
     if (textarea) {
       textarea.style.height = 'auto'
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px` // Max 150px
+      textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`
     }
   }
 
   useEffect(() => {
-    adjustTextareaHeight()
-  }, [input])
+    adjustTextareaHeight(resourcesRef.current, 100)
+  }, [resources])
+
+  useEffect(() => {
+    adjustTextareaHeight(intentRef.current, 100)
+  }, [intent])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -246,28 +267,55 @@ export function ActionBar() {
     }
   }, [error])
 
+  /**
+   * Combine resources and intent into a single string for MCP
+   * Intent first (primary), then resources as context
+   */
+  function buildMcpInput(): string {
+    const parts: string[] = []
+
+    if (intent.trim()) {
+      parts.push(intent.trim())
+    }
+
+    if (resources.trim()) {
+      if (parts.length > 0) {
+        parts.push('')  // Empty line separator
+        parts.push('Resources:')
+      }
+      // Indent resources for clarity
+      const indented = resources.trim().split('\n').map(line => `  ${line}`).join('\n')
+      parts.push(indented)
+    }
+
+    return parts.join('\n')
+  }
+
+  // Check if we can submit (at least one field has content)
+  const canSubmit = (resources.trim() || intent.trim()) && !currentTool.disabled
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
 
-    if (!input.trim() || isLoading) return
+    if (!canSubmit || isLoading) return
+
+    const mcpInput = buildMcpInput()
 
     if (selectedTool === 'query') {
       setIsLoading(true)
       setError(null)
 
-      // Create new AbortController for this request
       abortControllerRef.current = new AbortController()
 
       try {
-        const result = await queryCluster(input.trim(), abortControllerRef.current.signal)
+        const result = await queryCluster(mcpInput, abortControllerRef.current.signal)
 
-        // Navigate to visualization page with sessionId
         if (result.sessionId) {
           const sidebarParam = sidebarCollapsed ? '?sb=1' : '?sb=0'
+          setIntent('')  // Clear input after successful submission
           navigate(`/v/${result.sessionId}${sidebarParam}`)
         }
       } catch (err) {
-        // Don't show error message for user-initiated cancellation
         if (err instanceof Error && err.message === 'Request cancelled') {
           // Silently handle cancellation
         } else {
@@ -283,16 +331,14 @@ export function ActionBar() {
       setIsLoading(true)
       setError(null)
 
-      // Create new AbortController for this request
       abortControllerRef.current = new AbortController()
 
       try {
-        const result = await analyzeIssue(input.trim(), abortControllerRef.current.signal)
+        const result = await analyzeIssue(mcpInput, abortControllerRef.current.signal)
 
-        // Navigate to visualization page with sessionId
-        // Pass remediate data via navigation state for immediate display
         if (result.sessionId) {
           const sidebarParam = sidebarCollapsed ? '?sb=1' : '?sb=0'
+          setIntent('')  // Clear input after successful submission
           navigate(`/v/${result.sessionId}${sidebarParam}`, {
             state: { remediateData: result }
           })
@@ -309,8 +355,36 @@ export function ActionBar() {
         setIsLoading(false)
         abortControllerRef.current = null
       }
+    } else if (selectedTool === 'operate') {
+      setIsLoading(true)
+      setError(null)
+
+      abortControllerRef.current = new AbortController()
+
+      try {
+        const result = await operateCluster(mcpInput, abortControllerRef.current.signal)
+
+        if (result.sessionId) {
+          const sidebarParam = sidebarCollapsed ? '?sb=1' : '?sb=0'
+          setIntent('')  // Clear input after successful submission
+          navigate(`/v/${result.sessionId}${sidebarParam}`, {
+            state: { operateData: result }
+          })
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Request cancelled') {
+          // Silently handle cancellation
+        } else {
+          const message = err instanceof Error ? err.message : 'An error occurred'
+          setError(message)
+          console.error('[ActionBar] Operate error:', err)
+        }
+      } finally {
+        setIsLoading(false)
+        abortControllerRef.current = null
+      }
     }
-    // Other tools (operate, recommend) will be handled when implemented
+    // Recommend tool will be handled when implemented
   }
 
   const handleCancel = (e: React.MouseEvent) => {
@@ -318,7 +392,6 @@ export function ActionBar() {
     e.stopPropagation()
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
-      // Immediately clear the controller and reset loading state
       abortControllerRef.current = null
       setIsLoading(false)
     }
@@ -328,20 +401,13 @@ export function ActionBar() {
     const toolOption = TOOLS.find((t) => t.id === tool)
     if (toolOption && !toolOption.disabled) {
       setSelectedTool(tool)
-      // Use context-aware default text for the selected tool
-      setInput(getToolDefaultText(tool, activeContext))
       setIsDropdownOpen(false)
       setError(null)
-      // Select all text so user can easily replace it
+      // Focus intent field after tool change
       setTimeout(() => {
-        textareaRef.current?.select()
+        intentRef.current?.focus()
       }, 0)
     }
-  }
-
-  const handleTextareaFocus = () => {
-    // Select all text on focus for easy replacement
-    textareaRef.current?.select()
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -362,9 +428,9 @@ export function ActionBar() {
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           {/* Tool selector dropdown */}
-          <div className="relative" ref={dropdownRef}>
+          <div className="relative flex-shrink-0" ref={dropdownRef}>
             <button
               type="button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -382,7 +448,7 @@ export function ActionBar() {
               </svg>
             </button>
 
-            {/* Dropdown menu - matches dashboard body styling */}
+            {/* Dropdown menu */}
             {isDropdownOpen && (
               <div className="absolute bottom-full left-0 mb-1 w-56 bg-background border border-border rounded-md shadow-lg py-1">
                 {TOOLS.map((tool) => (
@@ -413,15 +479,29 @@ export function ActionBar() {
             )}
           </div>
 
-          {/* Textarea - pre-populated with default text, auto-expands */}
+          {/* Resources field - shows context */}
+          <div className="flex-shrink-0 w-80">
+            <textarea
+              ref={resourcesRef}
+              value={resources}
+              onChange={(e) => setResources(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+              rows={1}
+              placeholder="No resources selected"
+              className="w-full px-3 py-2 bg-muted/50 border border-border rounded-md text-xs text-muted-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none overflow-y-auto disabled:opacity-50"
+            />
+          </div>
+
+          {/* Intent field - user types their question/command */}
           <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onFocus={handleTextareaFocus}
+            ref={intentRef}
+            value={intent}
+            onChange={(e) => setIntent(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isLoading}
             rows={1}
+            placeholder={getIntentPlaceholder(selectedTool, !!resources.trim())}
             className="flex-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none overflow-hidden disabled:opacity-50"
           />
 
@@ -430,7 +510,7 @@ export function ActionBar() {
             <button
               type="button"
               onClick={handleCancel}
-              className="flex items-center gap-2 px-4 py-2 bg-red-500/80 text-white rounded-md text-sm font-medium hover:bg-red-500 transition-colors"
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-red-500/80 text-white rounded-md text-sm font-medium hover:bg-red-500 transition-colors"
             >
               <LoadingSpinner />
               <span>Cancel</span>
@@ -438,8 +518,8 @@ export function ActionBar() {
           ) : (
             <button
               type="submit"
-              disabled={!input.trim() || currentTool.disabled}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!canSubmit}
+              className="flex-shrink-0 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
