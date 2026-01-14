@@ -635,7 +635,7 @@ const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
 - [x] Extend Visualization page to detect `sol-` session prefix
 - [x] Add `recommendData` state and stage management handlers
 - [x] Handle multi-stage workflow (solutions → questions → manifests → deploy)
-- [ ] Skip/previous navigation for optional question stages
+- [~] Skip/previous navigation for optional question stages (deferred)
 - [x] Manifest download functionality (ZIP format preserving directory structure)
 
 **Remaining Tools (one at a time, each needs design then implementation):**
@@ -823,6 +823,7 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-14 | MCP deploy response format verified via HTTP | Tested actual MCP `deployManifests` response. Returns `{success, solutionId, solutionType, manifestPath, message, kubectlOutput, deploymentComplete, ...}` - NOT the originally assumed `{status, results[]}` format. | Updated `RecommendDeployResponse` interface; deployed stage shows MCP's `message` and expandable `kubectlOutput` |
 | 2025-01-14 | Manifest download changed to ZIP format | Original "Download All" concatenated files into single YAML, losing directory structure needed for kustomize/helm. | Added jszip dependency; ManifestPreview downloads `manifests.zip` preserving directory structure |
 | 2025-01-14 | Organizational Data deferred to PRD #8 | Feature scope warranted its own PRD with dedicated milestones for patterns and policies CRUD | Removed from Milestone 5 scope; cross-linked to PRD #8 |
+| 2025-01-14 | Skip/previous navigation for Recommend question stages deferred | Core Recommend workflow is functional; users can complete all stages sequentially. Skip/back navigation is a UX enhancement, not a blocker | Marked as deferred in Milestone 5; Recommend tool considered complete for v1 |
 
 ---
 
