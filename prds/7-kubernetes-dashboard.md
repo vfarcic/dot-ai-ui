@@ -644,11 +644,10 @@ const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
 
 **Validation**: Click "Analyze Cluster Health" on dashboard home, see AI analysis rendered inline
 
-### Milestone 6: Polish & Error Handling
+### Milestone 6: Polish & Error Handling (COMPLETED)
 - [x] Loading skeletons for resource lists
 - [x] Error states for K8s connection failures (covered by generic MCP error handling - UI only talks to MCP via proxy)
 - [x] Empty states for namespaces with no resources
-- [ ] Mobile-responsive sidebar
 
 **Validation**: Dashboard handles edge cases gracefully (no cluster, empty namespace, errors)
 
@@ -739,6 +738,7 @@ UI (dot-ai-ui)          Express Proxy           MCP Server (dot-ai)
 - Real-time WebSocket updates (polling is sufficient for v1)
 - Multi-cluster support
 - Advanced authentication (OAuth/OIDC, SSO, RBAC integration) - separate PRD after Milestone 8
+- Mobile-responsive optimization - dashboard is a power-user tool for workstations; complex content doesn't translate to small screens
 
 ---
 
@@ -825,6 +825,7 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-14 | Organizational Data deferred to PRD #8 | Feature scope warranted its own PRD with dedicated milestones for patterns and policies CRUD | Removed from Milestone 5 scope; cross-linked to PRD #8 |
 | 2025-01-14 | Skip/previous navigation for Recommend question stages deferred | Core Recommend workflow is functional; users can complete all stages sequentially. Skip/back navigation is a UX enhancement, not a blocker | Marked as deferred in Milestone 5; Recommend tool considered complete for v1 |
 | 2025-01-14 | Milestone 3 (Frontend Infrastructure) deferred to PRD #9 | React Query integration warranted its own PRD with dedicated milestones; dashboard works correctly with current useState/useEffect patterns | Milestone 3 marked as deferred; cross-linked to PRD #9 |
+| 2025-01-14 | Mobile-responsive sidebar removed from scope | Kubernetes dashboards are power-user tools primarily used at workstations; complex content (tables, YAML, logs, diagrams) doesn't translate to small screens; AI workflows awkward on mobile; industry norm (Lens, Rancher, K8s Dashboard don't prioritize mobile); on-call engineers use kubectl or alerting apps | Removed from Milestone 6; added to Out of Scope |
 
 ---
 
@@ -882,4 +883,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-13 | Milestone 5 - Recommend tool design COMPLETE. Tested MCP recommend endpoint via HTTP to understand full workflow. Key findings: 6+ stage wizard (intent → solutions → questions × 4 stages → manifests → deploy). Session prefix `sol-`. First tool to use Form section. Solutions array includes score, resources, applied patterns, relevant policies. Question stages: required (name, namespace, outputFormat, outputPath), basic (replicas, image, ports), advanced (resources, strategy, labels), open. Manifest generation returns YAML files. Visualization endpoint returns rich diagrams. New components needed: SolutionSelector, QuestionForm, ManifestPreview. Ready for implementation. |
 | 2025-01-14 | Milestone 5 - Recommend tool implementation COMPLETE. Fixed deployed stage showing empty content by verifying actual MCP response via HTTP (returns `{success, message, kubectlOutput, ...}` not `{status, results[]}`). Updated `RecommendDeployResponse` interface to match. Deployed stage now shows MCP's `message` and expandable `kubectlOutput`. Changed "Download All" from single concatenated YAML to ZIP format (jszip) preserving directory structure for kustomize/helm. Removed visualizations from Recommend workflow (complicated and not helpful). Fixed URL navigation to use single solution ID after selection. |
 | 2025-01-14 | Milestone 6 partial - Marked "Error states for K8s connection failures" as complete. UI only talks to MCP via proxy; existing generic error handling in `src/api/client.ts` already displays MCP error responses appropriately. No special K8s-specific error handling needed. |
+| 2025-01-14 | Milestone 6 COMPLETED - Removed mobile-responsive sidebar from scope. Kubernetes dashboards are power-user tools for workstations; complex content (tables, YAML, logs, diagrams) doesn't translate to small screens; AI workflows awkward on mobile. Added to Out of Scope. |
 
