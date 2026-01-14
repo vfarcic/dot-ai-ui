@@ -580,8 +580,8 @@ const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
 - Intent placeholder: "What do you want to deploy? e.g., nginx web server with 2 replicas"
 - On submit: call recommend API → navigate to `/v/{solutionId}` or show solutions inline
 
-**Other Tools (To Be Designed)**
-- [ ] Design: Organizational Data integration - how to view/manage patterns and policies?
+**Other Tools (Deferred)**
+- [~] Design: Organizational Data integration - deferred to PRD #8
   - Patterns: organizational deployment patterns that guide AI recommendations
   - Policies: policy intents that constrain AI-generated configurations
 
@@ -822,6 +822,7 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-13 | Recommend tool is multi-stage wizard workflow | Tested MCP recommend endpoint via HTTP. Unlike Remediate/Operate (2-step), Recommend has 6+ stages: intent → solutions → questions (required/basic/advanced/open) → manifests → deploy. Session prefix is `sol-`. First tool to use Form section. | New components needed: SolutionSelector, QuestionForm, ManifestPreview. Reuse InfoRenderer for solution display. Significantly more complex than other tools. |
 | 2025-01-14 | MCP deploy response format verified via HTTP | Tested actual MCP `deployManifests` response. Returns `{success, solutionId, solutionType, manifestPath, message, kubectlOutput, deploymentComplete, ...}` - NOT the originally assumed `{status, results[]}` format. | Updated `RecommendDeployResponse` interface; deployed stage shows MCP's `message` and expandable `kubectlOutput` |
 | 2025-01-14 | Manifest download changed to ZIP format | Original "Download All" concatenated files into single YAML, losing directory structure needed for kustomize/helm. | Added jszip dependency; ManifestPreview downloads `manifests.zip` preserving directory structure |
+| 2025-01-14 | Organizational Data deferred to PRD #8 | Feature scope warranted its own PRD with dedicated milestones for patterns and policies CRUD | Removed from Milestone 5 scope; cross-linked to PRD #8 |
 
 ---
 
