@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useDashboardContext } from './SharedDashboardLayout'
 import { ResourceList } from './ResourceList'
 import { AllResourcesView } from './AllResourcesView'
+import { SearchResultsView } from './SearchResultsView'
 import { ExpandableDescription } from './ExpandableDescription'
 import { LoadingSpinner } from '../LoadingSpinner'
 import { ErrorDisplay } from '../ErrorDisplay'
@@ -28,6 +29,7 @@ export function DashboardHome() {
     hasResources,
     availableKinds,
     sidebarCollapsed,
+    searchQuery,
   } = useDashboardContext()
 
   // Capabilities state for resource description and printer columns
@@ -151,6 +153,18 @@ export function DashboardHome() {
   const handleClearResults = () => {
     setQueryResult(null)
     setQueryError(null)
+  }
+
+  // If search query is active, show search results
+  if (searchQuery) {
+    return (
+      <SearchResultsView
+        query={searchQuery}
+        namespace={selectedNamespace}
+        kind={selectedResource?.kind}
+        apiVersion={selectedResource?.apiVersion}
+      />
+    )
   }
 
   // If a resource is selected, show the resource list

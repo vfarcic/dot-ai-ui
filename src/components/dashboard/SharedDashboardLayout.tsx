@@ -2,6 +2,7 @@ import { useState, useCallback, createContext, useContext } from 'react'
 import { Link, Outlet, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { DashboardSidebar } from './DashboardSidebar'
 import { NamespaceSelector } from './NamespaceSelector'
+import { SearchInput } from './SearchInput'
 import { ActionBar } from './ActionBar'
 import type { ResourceKind } from '../../api/dashboard'
 
@@ -11,6 +12,7 @@ const PARAM_KIND = 'kind'
 const PARAM_GROUP = 'group'
 const PARAM_VERSION = 'version'
 const PARAM_SIDEBAR = 'sb' // '1' = collapsed
+const PARAM_SEARCH = 'q' // search query
 
 // Context for sharing dashboard state with child components
 interface DashboardContextValue {
@@ -21,6 +23,8 @@ interface DashboardContextValue {
   hasResources: boolean | null
   availableKinds: ResourceKind[]
   sidebarCollapsed: boolean
+  searchQuery: string
+  setSearchQuery: (query: string) => void
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null)
@@ -56,6 +60,7 @@ export function SharedDashboardLayout({
   const groupFromUrl = searchParams.get(PARAM_GROUP)
   const versionFromUrl = searchParams.get(PARAM_VERSION)
   const sidebarFromUrl = searchParams.get(PARAM_SIDEBAR)
+  const searchFromUrl = searchParams.get(PARAM_SEARCH)
 
   // Sidebar state: URL param takes precedence, then defaultCollapsed
   // sb=1 means collapsed, sb=0 means expanded
@@ -76,6 +81,23 @@ export function SharedDashboardLayout({
           count: 0,
         }
       : null
+  const searchQuery = searchFromUrl || ''
+
+  // Update URL when search query changes
+  const handleSearchChange = useCallback(
+    (query: string) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        if (query) {
+          next.set(PARAM_SEARCH, query)
+        } else {
+          next.delete(PARAM_SEARCH)
+        }
+        return next
+      })
+    },
+    [setSearchParams]
+  )
 
   // Update URL when namespace changes
   const handleNamespaceChange = useCallback(
@@ -107,6 +129,11 @@ export function SharedDashboardLayout({
       const currentNs = searchParams.get(PARAM_NAMESPACE)
       if (currentNs) {
         params.set(PARAM_NAMESPACE, currentNs)
+      }
+      // Preserve search query
+      const currentSearch = searchParams.get(PARAM_SEARCH)
+      if (currentSearch) {
+        params.set(PARAM_SEARCH, currentSearch)
       }
       // Preserve sidebar state (sb=1 collapsed, sb=0 expanded)
       params.set(PARAM_SIDEBAR, sidebarCollapsed ? '1' : '0')
@@ -140,13 +167,15 @@ export function SharedDashboardLayout({
     hasResources,
     availableKinds,
     sidebarCollapsed,
+    searchQuery,
+    setSearchQuery: handleSearchChange,
   }
 
   return (
     <DashboardContext.Provider value={contextValue}>
       <div className="min-h-screen bg-background flex flex-col">
         {/* Header */}
-        <header className="bg-header-bg border-b border-border px-3 sm:px-4 py-2 flex items-center justify-between">
+        <header className="bg-header-bg border-b border-border px-3 sm:px-4 py-2 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link
               to="/"
@@ -157,16 +186,23 @@ export function SharedDashboardLayout({
                 alt="DevOps AI Toolkit"
                 className="h-7 sm:h-8 w-auto rounded"
               />
-              <span className="text-xs sm:text-sm font-medium text-primary">
+              <span className="text-xs sm:text-sm font-medium text-primary hidden sm:inline">
                 DevOps AI Toolkit
               </span>
             </Link>
           </div>
           {showSidebar && (
-            <NamespaceSelector
-              value={selectedNamespace}
-              onChange={handleNamespaceChange}
-            />
+            <div className="flex items-center gap-3 flex-1 max-w-2xl">
+              <SearchInput
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className="flex-1"
+              />
+              <NamespaceSelector
+                value={selectedNamespace}
+                onChange={handleNamespaceChange}
+              />
+            </div>
           )}
         </header>
 

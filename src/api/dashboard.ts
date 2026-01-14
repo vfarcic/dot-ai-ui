@@ -676,6 +676,7 @@ export interface Resource {
   createdAt: string
   status?: Record<string, unknown> // Raw K8s status object, varies by resource type
   spec?: Record<string, unknown> // Raw K8s spec object
+  score?: number // Semantic search relevance score (0.0-1.0)
   // Allow additional fields for full resource data
   [key: string]: unknown
 }
@@ -738,6 +739,80 @@ export async function getResources(params: GetResourcesParams): Promise<Resource
   return {
     resources: json.data?.resources || [],
     total: json.data?.total || 0,
+  }
+}
+
+// ============================================================================
+// Search Resources API
+// ============================================================================
+
+export interface SearchResourcesParams {
+  /** Search query (semantic search) */
+  q: string
+  /** Optional namespace filter */
+  namespace?: string
+  /** Optional kind filter */
+  kind?: string
+  /** Optional API version filter */
+  apiVersion?: string
+  /** Max results (default: 100) */
+  limit?: number
+  /** Skip N results for pagination (default: 0) */
+  offset?: number
+  /** Minimum relevance score to include (0.0-1.0) */
+  minScore?: number
+}
+
+export interface SearchResourcesResponse {
+  resources: Resource[]
+  total: number
+  limit: number
+  offset: number
+}
+
+/**
+ * Search resources using semantic search
+ * Searches names, kinds, labels, and annotations via Qdrant
+ */
+export async function searchResources(params: SearchResourcesParams): Promise<SearchResourcesResponse> {
+  const { q, namespace, kind, apiVersion, limit = 100, offset = 0, minScore } = params
+
+  const queryParams = new URLSearchParams({
+    q,
+    limit: String(limit),
+    offset: String(offset),
+  })
+
+  if (namespace) {
+    queryParams.set('namespace', namespace)
+  }
+  if (kind) {
+    queryParams.set('kind', kind)
+  }
+  if (apiVersion) {
+    queryParams.set('apiVersion', apiVersion)
+  }
+  if (minScore !== undefined) {
+    queryParams.set('minScore', String(minScore))
+  }
+
+  const response = await fetch(`${API_PATH}/resources/search?${queryParams}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to search resources: ${response.status} ${response.statusText}`)
+  }
+
+  const json = await response.json()
+  return {
+    resources: json.data?.resources || [],
+    total: json.data?.total || 0,
+    limit: json.data?.limit || limit,
+    offset: json.data?.offset || offset,
   }
 }
 
