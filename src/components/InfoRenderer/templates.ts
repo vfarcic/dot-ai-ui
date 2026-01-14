@@ -133,3 +133,60 @@ export const OPERATE_TEMPLATE: InfoTemplate = [
     severity: 'info',
   },
 ]
+
+/**
+ * Template for Recommend tool solution display
+ * Shows selected solution details before proceeding to questions
+ */
+export const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
+  {
+    type: 'heading',
+    text: 'Selected Solution',
+    badge: { field: 'score', format: 'percent' },
+    level: 2,
+  },
+  {
+    type: 'text',
+    field: 'description',
+  },
+  {
+    type: 'heading',
+    text: 'Kubernetes Resources',
+    level: 3,
+  },
+  {
+    type: 'list',
+    field: 'primaryResources',
+    severity: 'info',
+  },
+  {
+    type: 'heading',
+    text: 'Why This Solution',
+    level: 3,
+  },
+  {
+    type: 'list',
+    field: 'reasons',
+    severity: 'info',
+  },
+  {
+    type: 'heading',
+    text: 'Organizational Patterns Applied',
+    level: 3,
+  },
+  {
+    type: 'list',
+    field: 'appliedPatterns',
+    severity: 'success',
+  },
+  {
+    type: 'heading',
+    text: 'Policies Checked',
+    level: 3,
+  },
+  {
+    type: 'list',
+    field: 'relevantPolicies',
+    severity: 'info',
+  },
+]

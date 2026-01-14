@@ -58,7 +58,10 @@ function formatBadgeValue(value: unknown, format?: BadgeConfig['format']): strin
   switch (format) {
     case 'percent':
       const num = typeof value === 'number' ? value : parseFloat(String(value))
-      return isNaN(num) ? String(value) : `${Math.round(num * 100)}%`
+      if (isNaN(num)) return String(value)
+      // If value > 1, it's already a percentage (e.g., 96), otherwise it's decimal (e.g., 0.96)
+      const percentValue = num > 1 ? Math.round(num) : Math.round(num * 100)
+      return `${percentValue}%`
     case 'risk':
       const risk = String(value).toLowerCase()
       return risk.charAt(0).toUpperCase() + risk.slice(1) + ' Risk'
@@ -72,8 +75,10 @@ function getBadgeStyles(value: unknown, format?: BadgeConfig['format']): string 
   if (format === 'percent') {
     const num = typeof value === 'number' ? value : parseFloat(String(value))
     if (!isNaN(num)) {
-      if (num >= 0.9) return 'bg-green-500/20 text-green-400'
-      if (num >= 0.7) return 'bg-yellow-500/20 text-yellow-400'
+      // Normalize to 0-100 scale for comparison
+      const normalized = num > 1 ? num : num * 100
+      if (normalized >= 90) return 'bg-green-500/20 text-green-400'
+      if (normalized >= 70) return 'bg-yellow-500/20 text-yellow-400'
       return 'bg-red-500/20 text-red-400'
     }
   }

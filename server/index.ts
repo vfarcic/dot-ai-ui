@@ -625,6 +625,95 @@ async function createServer() {
     }
   })
 
+  // Proxy Recommend tool API requests to MCP server
+  // Multi-stage workflow: intent → solutions → questions → manifests → deploy
+  // Used for AI-powered deployment recommendations
+  app.post('/api/v1/tools/recommend', apiLimiter, async (req, res) => {
+    try {
+      const { intent, final, stage, solutionId, answers, timeout } = req.body as {
+        intent?: string
+        final?: boolean
+        stage?: string
+        solutionId?: string
+        answers?: Record<string, string | number>
+        timeout?: number
+      }
+
+      // Validate request: either intent (initial) or stage + solutionId (subsequent stages)
+      if (!intent && !stage) {
+        return res.status(400).json({ error: 'Missing required parameter: intent or stage' })
+      }
+      if (stage && !solutionId) {
+        return res.status(400).json({ error: 'Missing required parameter: solutionId for stage operations' })
+      }
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+      if (AUTH_TOKEN) {
+        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      }
+
+      const controller = new AbortController()
+      // 30 minute timeout for complex AI operations
+      const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000)
+
+      const url = `${MCP_BASE_URL}/api/v1/tools/recommend`
+
+      // Build body based on the stage of the workflow
+      let body: Record<string, unknown>
+      if (intent) {
+        // Initial intent submission
+        body = { intent }
+        if (final) {
+          body.final = true
+        }
+      } else {
+        // Stage-based operations
+        body = { stage, solutionId }
+        if (answers) {
+          body.answers = answers
+        }
+        if (timeout) {
+          body.timeout = timeout
+        }
+      }
+
+      console.log(`[Proxy] Sending recommend to MCP: ${url}`)
+      console.log(`[Proxy] Body: ${JSON.stringify(body).substring(0, 200)}...`)
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('Recommend timeout')
+        return res.status(408).json({ error: 'Recommend timeout - request took too long' })
+      }
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to execute recommend' })
+    }
+  })
+
   // Proxy session retrieval API requests to MCP server
   // Generic endpoint for retrieving any session data (remediate, query, etc.)
   app.get('/api/v1/sessions/:sessionId', apiLimiter, async (req, res) => {

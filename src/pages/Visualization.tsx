@@ -5,12 +5,27 @@ import { InsightsPanel } from '@/components/InsightsPanel'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { VisualizationRenderer } from '@/components/renderers'
-import { InfoRenderer, REMEDIATE_TEMPLATE, OPERATE_TEMPLATE } from '@/components/InfoRenderer'
+import { InfoRenderer, REMEDIATE_TEMPLATE, OPERATE_TEMPLATE, RECOMMEND_SOLUTION_TEMPLATE } from '@/components/InfoRenderer'
 import { ActionsPanel } from '@/components/ActionsPanel'
 import { ResultsPanel } from '@/components/ResultsPanel'
+import { SolutionSelector, QuestionForm, ManifestPreview } from '@/components/recommend'
 import { getVisualization, APIError } from '@/api'
 import { executeRemediation, getRemediateSession, type RemediateResponse } from '@/api/remediate'
 import { executeOperation, getOperateSession, type OperateResponse } from '@/api/operate'
+import {
+  chooseSolution,
+  answerQuestions,
+  generateManifests,
+  deployManifests,
+  getRecommendSession,
+  isQuestionsResponse,
+  isManifestResponse,
+  type RecommendSolutionsResponse,
+  type Solution,
+  type Question,
+  type ManifestFile,
+  type DeploymentResult,
+} from '@/api/recommend'
 import type { VisualizationResponse } from '@/types'
 
 /**
@@ -27,11 +42,22 @@ function isOperateSession(sessionId: string): boolean {
   return sessionId.startsWith('opr-')
 }
 
+/**
+ * Check if session is a recommend session based on ID prefix
+ */
+function isRecommendSession(sessionId: string): boolean {
+  return sessionId.startsWith('sol-')
+}
+
 // Navigation state type for tool data passed from ActionBar
 interface NavigationState {
   remediateData?: RemediateResponse
   operateData?: OperateResponse
+  recommendData?: RecommendSolutionsResponse
 }
+
+// Recommend workflow stage type
+type RecommendStage = 'solutions' | 'questions' | 'manifests' | 'deployed'
 
 export function Visualization() {
   const { sessionId } = useParams<{ sessionId: string }>()
@@ -62,6 +88,25 @@ export function Visualization() {
   const [isOperateLoading, setIsOperateLoading] = useState(false)
   const [isOperateExecuting, setIsOperateExecuting] = useState(false)
 
+  // Recommend workflow state - multi-stage wizard
+  const [recommendStage, setRecommendStage] = useState<RecommendStage>('solutions')
+  const [solutions, setSolutions] = useState<Solution[]>(
+    navigationState?.recommendData?.solutions || []
+  )
+  const [organizationalContext, setOrganizationalContext] = useState(
+    navigationState?.recommendData?.organizationalContext
+  )
+  const [selectedSolution, setSelectedSolution] = useState<Solution | null>(null)
+  const [currentQuestionStage, setCurrentQuestionStage] = useState<string | null>(null)
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [nextStage, setNextStage] = useState<string | null>(null)
+  const [manifests, setManifests] = useState<ManifestFile[]>([])
+  const [outputFormat, setOutputFormat] = useState<string>('')
+  const [outputPath, setOutputPath] = useState<string>('')
+  const [deployResults, setDeployResults] = useState<DeploymentResult[] | null>(null)
+  const [recommendError, setRecommendError] = useState<string | null>(null)
+  const [isRecommendLoading, setIsRecommendLoading] = useState(false)
+
   // Track which session we've fetched to prevent duplicate fetches from React StrictMode
   const fetchedSessionRef = useRef<string | null>(null)
 
@@ -75,12 +120,26 @@ export function Visualization() {
     setVizData(null)
     setVizError(null)
     setIsVizLoading(true)
-    // Reset fetch ref to allow fetching for new session
+    // Reset recommend state
+    setRecommendStage('solutions')
+    setSolutions(navigationState?.recommendData?.solutions || [])
+    setOrganizationalContext(navigationState?.recommendData?.organizationalContext)
+    setSelectedSolution(null)
+    setCurrentQuestionStage(null)
+    setQuestions([])
+    setNextStage(null)
+    setManifests([])
+    setOutputFormat('')
+    setOutputPath('')
+    setDeployResults(null)
+    setRecommendError(null)
+        // Reset fetch ref to allow fetching for new session
     fetchedSessionRef.current = null
-  }, [sessionId, navigationState?.remediateData, navigationState?.operateData])
+  }, [sessionId, navigationState?.remediateData, navigationState?.operateData, navigationState?.recommendData])
 
   const isRemediate = sessionId ? isRemediateSession(sessionId) : false
   const isOperate = sessionId ? isOperateSession(sessionId) : false
+  const isRecommend = sessionId ? isRecommendSession(sessionId) : false
 
   // Fetch visualization data
   const fetchVizData = useCallback(
@@ -210,6 +269,194 @@ export function Visualization() {
     [sessionId, operateData, fetchVizData]
   )
 
+  // Fetch recommend data (for page refresh/shared URLs)
+  const fetchRecommendData = useCallback(async () => {
+    if (!sessionId || !isRecommend) return
+
+    setIsRecommendLoading(true)
+    setRecommendError(null)
+
+    try {
+      const data = await getRecommendSession(sessionId)
+      if (data) {
+        // Restore state based on what stage we're at
+        if (data.solutions) {
+          setSolutions(data.solutions)
+        }
+        if (data.organizationalContext) {
+          setOrganizationalContext(data.organizationalContext)
+        }
+        if (data.selectedSolution) {
+          setSelectedSolution(data.selectedSolution)
+        }
+        if (data.questions) {
+          setQuestions(data.questions)
+          setCurrentQuestionStage(data.currentQuestionStage || null)
+          setNextStage(data.nextStage || null)
+          setRecommendStage('questions')
+        }
+        if (data.manifests) {
+          setManifests(data.manifests)
+          setOutputFormat(data.outputFormat || 'raw')
+          setOutputPath(data.outputPath || '')
+          setRecommendStage('manifests')
+        }
+        if (data.deployResults) {
+          setDeployResults(data.deployResults)
+          setRecommendStage('deployed')
+        }
+        if (data.guidance) {
+                  }
+      } else {
+        setRecommendError('Session not found or expired. Please start a new recommendation from the dashboard.')
+      }
+    } catch (err) {
+      setRecommendError(err instanceof Error ? err.message : 'Failed to load session data')
+    } finally {
+      setIsRecommendLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, isRecommend])
+
+  // Handle solution selection
+  const handleSolutionSelect = useCallback(
+    async (solutionId: string) => {
+      const solution = solutions.find((s) => s.solutionId === solutionId)
+      if (!solution) return
+
+      setSelectedSolution(solution)
+      setIsRecommendLoading(true)
+      setRecommendError(null)
+
+      try {
+        const result = await chooseSolution(solutionId)
+        if (isQuestionsResponse(result)) {
+          setQuestions(result.questions)
+          setCurrentQuestionStage(result.currentStage)
+          setNextStage(result.nextStage)
+                    setRecommendStage('questions')
+        }
+      } catch (err) {
+        setRecommendError(err instanceof Error ? err.message : 'Failed to select solution')
+        setSelectedSolution(null)
+      } finally {
+        setIsRecommendLoading(false)
+      }
+    },
+    [solutions]
+  )
+
+  // Handle question form submission
+  const handleQuestionsSubmit = useCallback(
+    async (answers: Record<string, string | number>) => {
+      if (!selectedSolution || !currentQuestionStage) return
+
+      setIsRecommendLoading(true)
+      setRecommendError(null)
+
+      try {
+        const result = await answerQuestions(
+          selectedSolution.solutionId,
+          currentQuestionStage as 'required' | 'basic' | 'advanced' | 'open',
+          answers
+        )
+
+        if (isQuestionsResponse(result)) {
+          // More questions
+          setQuestions(result.questions)
+          setCurrentQuestionStage(result.currentStage)
+          setNextStage(result.nextStage)
+                  } else if (isManifestResponse(result)) {
+          // Manifests ready
+          setManifests(result.files)
+          setOutputFormat(result.outputFormat)
+          setOutputPath(result.outputPath)
+          setRecommendStage('manifests')
+          // Also fetch visualization
+          await fetchVizData(true)
+        }
+      } catch (err) {
+        setRecommendError(err instanceof Error ? err.message : 'Failed to submit answers')
+      } finally {
+        setIsRecommendLoading(false)
+      }
+    },
+    [selectedSolution, currentQuestionStage, fetchVizData]
+  )
+
+  // Handle skipping optional question stages
+  const handleQuestionsSkip = useCallback(async () => {
+    if (!selectedSolution || !nextStage) return
+
+    setIsRecommendLoading(true)
+    setRecommendError(null)
+
+    try {
+      // Skip by submitting empty answers to next stage
+      const result = await answerQuestions(
+        selectedSolution.solutionId,
+        nextStage.replace('answerQuestion:', '') as 'required' | 'basic' | 'advanced' | 'open',
+        {}
+      )
+
+      if (isQuestionsResponse(result)) {
+        setQuestions(result.questions)
+        setCurrentQuestionStage(result.currentStage)
+        setNextStage(result.nextStage)
+              } else if (isManifestResponse(result)) {
+        setManifests(result.files)
+        setOutputFormat(result.outputFormat)
+        setOutputPath(result.outputPath)
+        setRecommendStage('manifests')
+        await fetchVizData(true)
+      }
+    } catch (err) {
+      setRecommendError(err instanceof Error ? err.message : 'Failed to skip stage')
+    } finally {
+      setIsRecommendLoading(false)
+    }
+  }, [selectedSolution, nextStage, fetchVizData])
+
+  // Handle manifest generation
+  const handleGenerateManifests = useCallback(async () => {
+    if (!selectedSolution) return
+
+    setIsRecommendLoading(true)
+    setRecommendError(null)
+
+    try {
+      const result = await generateManifests(selectedSolution.solutionId)
+      setManifests(result.files)
+      setOutputFormat(result.outputFormat)
+      setOutputPath(result.outputPath)
+      setRecommendStage('manifests')
+      await fetchVizData(true)
+    } catch (err) {
+      setRecommendError(err instanceof Error ? err.message : 'Failed to generate manifests')
+    } finally {
+      setIsRecommendLoading(false)
+    }
+  }, [selectedSolution, fetchVizData])
+
+  // Handle deployment
+  const handleDeploy = useCallback(async () => {
+    if (!selectedSolution) return
+
+    setIsRecommendLoading(true)
+    setRecommendError(null)
+
+    try {
+      const result = await deployManifests(selectedSolution.solutionId)
+      setDeployResults(result.results)
+      setRecommendStage('deployed')
+      await fetchVizData(true)
+    } catch (err) {
+      setRecommendError(err instanceof Error ? err.message : 'Deployment failed')
+    } finally {
+      setIsRecommendLoading(false)
+    }
+  }, [selectedSolution, fetchVizData])
+
   const handleReload = useCallback(() => {
     fetchVizData(true)
   }, [fetchVizData])
@@ -238,10 +485,14 @@ export function Visualization() {
     if (isOperate && !navigationState?.operateData) {
       fetchOperateData()
     }
-  }, [sessionId, isRemediate, isOperate, navigationState?.remediateData, navigationState?.operateData, fetchVizData, fetchRemediateData, fetchOperateData])
+    // Only fetch recommend data if we don't already have it from navigation state
+    if (isRecommend && !navigationState?.recommendData) {
+      fetchRecommendData()
+    }
+  }, [sessionId, isRemediate, isOperate, isRecommend, navigationState?.remediateData, navigationState?.operateData, navigationState?.recommendData, fetchVizData, fetchRemediateData, fetchOperateData, fetchRecommendData])
 
   // Check if we have any tool data to show
-  const hasToolData = remediateData || operateData
+  const hasToolData = remediateData || operateData || solutions.length > 0
 
   // Loading state
   if (isVizLoading && !hasToolData) {
@@ -268,7 +519,12 @@ export function Visualization() {
   const hasOperateResults = operateData && operateData.status === 'success' && operateData.execution?.results
 
   // Title - prefer tool data title patterns
-  const title = vizData?.title || (remediateData ? 'Remediation Analysis' : operateData ? 'Operation Proposal' : 'Visualization')
+  const title = vizData?.title || (
+    remediateData ? 'Remediation Analysis' :
+    operateData ? 'Operation Proposal' :
+    isRecommend ? 'Deployment Recommendations' :
+    'Visualization'
+  )
 
   return (
     <div className="w-full p-4 sm:p-6">
@@ -392,8 +648,110 @@ export function Visualization() {
         </div>
       )}
 
+      {/* Section 1c: Recommend workflow */}
+      {isRecommend && (
+        <div className="mb-4 p-4 rounded-lg border border-border bg-card">
+          {isRecommendLoading && recommendStage === 'solutions' && solutions.length === 0 ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <LoadingSpinner />
+              <span>Loading recommendations...</span>
+            </div>
+          ) : (
+            <>
+              {/* Error message */}
+              {recommendError && (
+                <div className="mb-4 p-3 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                  {recommendError}
+                </div>
+              )}
+
+              {/* Stage: Solutions */}
+              {recommendStage === 'solutions' && solutions.length > 0 && (
+                <SolutionSelector
+                  solutions={solutions}
+                  organizationalContext={organizationalContext}
+                  onSelect={handleSolutionSelect}
+                  isLoading={isRecommendLoading}
+                  selectedId={selectedSolution?.solutionId}
+                />
+              )}
+
+              {/* Stage: Questions */}
+              {recommendStage === 'questions' && questions.length > 0 && (
+                <>
+                  {/* Show selected solution info */}
+                  {selectedSolution && (
+                    <div className="mb-4 pb-4 border-b border-border">
+                      <InfoRenderer
+                        template={RECOMMEND_SOLUTION_TEMPLATE}
+                        data={selectedSolution as unknown as Record<string, unknown>}
+                      />
+                    </div>
+                  )}
+                  <QuestionForm
+                    questions={questions}
+                    currentStage={currentQuestionStage || 'required'}
+                    nextStage={nextStage}
+                    onSubmit={handleQuestionsSubmit}
+                    onSkip={handleQuestionsSkip}
+                    onGenerateManifests={handleGenerateManifests}
+                    isLoading={isRecommendLoading}
+                  />
+                </>
+              )}
+
+              {/* Stage: Manifests */}
+              {recommendStage === 'manifests' && manifests.length > 0 && (
+                <>
+                  {/* Show selected solution info */}
+                  {selectedSolution && (
+                    <div className="mb-4 pb-4 border-b border-border">
+                      <InfoRenderer
+                        template={RECOMMEND_SOLUTION_TEMPLATE}
+                        data={selectedSolution as unknown as Record<string, unknown>}
+                      />
+                    </div>
+                  )}
+                  <ManifestPreview
+                    files={manifests}
+                    outputFormat={outputFormat}
+                    outputPath={outputPath}
+                    onDeploy={handleDeploy}
+                    isDeploying={isRecommendLoading}
+                    deployResults={deployResults || undefined}
+                  />
+                </>
+              )}
+
+              {/* Stage: Deployed */}
+              {recommendStage === 'deployed' && deployResults && (
+                <>
+                  {/* Show selected solution info */}
+                  {selectedSolution && (
+                    <div className="mb-4 pb-4 border-b border-border">
+                      <InfoRenderer
+                        template={RECOMMEND_SOLUTION_TEMPLATE}
+                        data={selectedSolution as unknown as Record<string, unknown>}
+                      />
+                    </div>
+                  )}
+                  <ManifestPreview
+                    files={manifests}
+                    outputFormat={outputFormat}
+                    outputPath={outputPath}
+                    onDeploy={handleDeploy}
+                    isDeploying={false}
+                    deployResults={deployResults}
+                  />
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {/* Section 2: Insights (skip for tool sessions and when no visualizations - shown inline instead) */}
-      {!isRemediate && !isOperate && hasVisualization && vizData?.insights && vizData.insights.length > 0 && (
+      {!isRemediate && !isOperate && !isRecommend && hasVisualization && vizData?.insights && vizData.insights.length > 0 && (
         <InsightsPanel sessionId={sessionId!} insights={vizData.insights} />
       )}
 

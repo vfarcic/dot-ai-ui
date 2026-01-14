@@ -3,9 +3,10 @@ import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { queryCluster } from '../../api/query'
 import { analyzeIssue } from '../../api/remediate'
 import { operateCluster } from '../../api/operate'
-import { useActionSelection, type SelectedResource } from '../../context/ActionSelectionContext'
+import { submitRecommendIntent, isSolutionsResponse } from '../../api/recommend'
+import { useActionSelection, type SelectedResource, type Tool } from '../../context/ActionSelectionContext'
 
-export type Tool = 'query' | 'remediate' | 'operate' | 'recommend'
+export type { Tool }
 
 // Internal/UI params to exclude from context (version is redundant - group is more meaningful for CRDs)
 const EXCLUDED_PARAMS = new Set(['sb', 'tab', 'version'])
@@ -158,8 +159,8 @@ const TOOLS: ToolOption[] = [
   {
     id: 'recommend',
     label: 'Recommend',
-    disabled: true,
-    description: 'Deployment recommendations',
+    disabled: false,
+    description: 'AI-powered deployment recommendations',
   },
 ]
 
@@ -189,8 +190,8 @@ export function ActionBar() {
   const routeParams = useParams()
   const [searchParams] = useSearchParams()
 
-  // Get selected items from action selection context
-  const { selectedItems } = useActionSelection()
+  // Get selected items and tool from action selection context
+  const { selectedItems, selectedTool, setSelectedTool } = useActionSelection()
 
   // Extract context from URL (memoized to avoid recalculation)
   const urlContext = useMemo(
@@ -207,7 +208,6 @@ export function ActionBar() {
   // Use selection context if items are selected, otherwise URL context
   const activeContext = selectionContext || urlContext
 
-  const [selectedTool, setSelectedTool] = useState<Tool>('query')
   const [resources, setResources] = useState(activeContext)
   const [intent, setIntent] = useState('')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -291,8 +291,11 @@ export function ActionBar() {
     return parts.join('\n')
   }
 
-  // Check if we can submit (at least one field has content)
-  const canSubmit = (resources.trim() || intent.trim()) && !currentTool.disabled
+  // Check if we can submit
+  // Recommend only needs intent (no resources), other tools need at least one field
+  const canSubmit = selectedTool === 'recommend'
+    ? intent.trim() && !currentTool.disabled
+    : (resources.trim() || intent.trim()) && !currentTool.disabled
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -383,8 +386,45 @@ export function ActionBar() {
         setIsLoading(false)
         abortControllerRef.current = null
       }
+    } else if (selectedTool === 'recommend') {
+      setIsLoading(true)
+      setError(null)
+
+      abortControllerRef.current = new AbortController()
+
+      try {
+        // Submit intent with final=true to get solutions directly
+        const result = await submitRecommendIntent(mcpInput, true, abortControllerRef.current.signal)
+
+        // Check if we got solutions (not refinement)
+        if (isSolutionsResponse(result)) {
+          // Use the first solution's ID for the session URL
+          const firstSolutionId = result.solutions[0]?.solutionId
+          if (firstSolutionId) {
+            const sidebarParam = sidebarCollapsed ? '?sb=1' : '?sb=0'
+            setIntent('')  // Clear input after successful submission
+            navigate(`/v/${firstSolutionId}${sidebarParam}`, {
+              state: { recommendData: result }
+            })
+          }
+        } else {
+          // Got refinement guidance - show as error for now
+          // (Future: could show inline guidance)
+          setError(result.guidance || 'Please provide more details about what you want to deploy.')
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Request cancelled') {
+          // Silently handle cancellation
+        } else {
+          const message = err instanceof Error ? err.message : 'An error occurred'
+          setError(message)
+          console.error('[ActionBar] Recommend error:', err)
+        }
+      } finally {
+        setIsLoading(false)
+        abortControllerRef.current = null
+      }
     }
-    // Recommend tool will be handled when implemented
   }
 
   const handleCancel = (e: React.MouseEvent) => {
@@ -400,9 +440,13 @@ export function ActionBar() {
   const handleToolSelect = (tool: Tool) => {
     const toolOption = TOOLS.find((t) => t.id === tool)
     if (toolOption && !toolOption.disabled) {
-      setSelectedTool(tool)
+      setSelectedTool(tool)  // Context handles clearing selection for recommend
       setIsDropdownOpen(false)
       setError(null)
+      // Clear resources field when switching to Recommend (resources don't apply)
+      if (tool === 'recommend') {
+        setResources('')
+      }
       // Focus intent field after tool change
       setTimeout(() => {
         intentRef.current?.focus()
@@ -479,17 +523,19 @@ export function ActionBar() {
             )}
           </div>
 
-          {/* Resources field - shows context */}
+          {/* Resources field - shows context (disabled for Recommend) */}
           <div className="flex-shrink-0 w-80">
             <textarea
               ref={resourcesRef}
-              value={resources}
+              value={selectedTool === 'recommend' ? '' : resources}
               onChange={(e) => setResources(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={isLoading}
+              disabled={isLoading || selectedTool === 'recommend'}
               rows={1}
-              placeholder="No resources selected"
-              className="w-full px-3 py-2 bg-muted/50 border border-border rounded-md text-xs text-muted-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none overflow-y-auto disabled:opacity-50"
+              placeholder={selectedTool === 'recommend' ? 'Not applicable' : 'No resources selected'}
+              className={`w-full px-3 py-2 bg-muted/50 border border-border rounded-md text-xs text-muted-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none overflow-y-auto disabled:opacity-50 ${
+                selectedTool === 'recommend' ? 'cursor-not-allowed' : ''
+              }`}
             />
           </div>
 

@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 
+export type Tool = 'query' | 'remediate' | 'operate' | 'recommend'
+
 export interface SelectedResource {
   kind: string
   apiVersion: string
@@ -15,18 +17,33 @@ interface ActionSelectionContextType {
   toggleItem: (item: SelectedResource) => void
   clearSelection: () => void
   isSelected: (item: SelectedResource) => boolean
+  selectedTool: Tool
+  setSelectedTool: (tool: Tool) => void
+  isSelectionDisabled: boolean
 }
 
 const ActionSelectionContext = createContext<ActionSelectionContextType | null>(null)
 
 export function ActionSelectionProvider({ children }: { children: ReactNode }) {
   const [selectedItems, setSelectedItems] = useState<SelectedResource[]>([])
+  const [selectedTool, setSelectedToolState] = useState<Tool>('query')
   const location = useLocation()
+
+  // Selection is disabled for Recommend tool (it creates new resources, doesn't operate on existing ones)
+  const isSelectionDisabled = selectedTool === 'recommend'
 
   // Clear selection when navigating or changing filters (pathname or search params)
   useEffect(() => {
     setSelectedItems([])
   }, [location.pathname, location.search])
+
+  // Set selected tool and clear selection if switching to recommend
+  const setSelectedTool = useCallback((tool: Tool) => {
+    setSelectedToolState(tool)
+    if (tool === 'recommend') {
+      setSelectedItems([])
+    }
+  }, [])
 
   const addItem = useCallback((item: SelectedResource) => {
     setSelectedItems((prev) => {
@@ -76,7 +93,17 @@ export function ActionSelectionProvider({ children }: { children: ReactNode }) {
 
   return (
     <ActionSelectionContext.Provider
-      value={{ selectedItems, addItem, removeItem, toggleItem, clearSelection, isSelected }}
+      value={{
+        selectedItems,
+        addItem,
+        removeItem,
+        toggleItem,
+        clearSelection,
+        isSelected,
+        selectedTool,
+        setSelectedTool,
+        isSelectionDisabled,
+      }}
     >
       {children}
     </ActionSelectionContext.Provider>

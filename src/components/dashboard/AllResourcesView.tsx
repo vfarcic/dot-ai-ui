@@ -76,7 +76,7 @@ function KindSectionView({
   onNamespaceClick?: (namespace: string) => void
   onKindClick?: (kind: ResourceKind) => void
 }) {
-  const { toggleItem, isSelected } = useActionSelection()
+  const { toggleItem, isSelected, isSelectionDisabled } = useActionSelection()
   const { kind, resources, capabilities, loading, error } = section
 
   // Build apiVersion for selection context
@@ -246,15 +246,20 @@ function KindSectionView({
                   </td>
                   <td className="px-2 py-2 text-center">
                     <button
-                      onClick={() => toggleItem(selectedResource)}
+                      onClick={() => !isSelectionDisabled && toggleItem(selectedResource)}
+                      disabled={isSelectionDisabled}
                       className={`p-1.5 rounded-md transition-all ${
-                        rowSelected
-                          ? 'bg-primary/20 ring-2 ring-primary/50'
-                          : 'hover:bg-muted/50'
+                        isSelectionDisabled
+                          ? 'opacity-30 cursor-not-allowed'
+                          : rowSelected
+                            ? 'bg-primary/20 ring-2 ring-primary/50'
+                            : 'hover:bg-muted/50'
                       }`}
-                      title={rowSelected
-                        ? `Remove from query: ${resource.name}`
-                        : `Add to query: ${resource.name}`
+                      title={isSelectionDisabled
+                        ? 'Selection not available for Recommend tool'
+                        : rowSelected
+                          ? `Remove from query: ${resource.name}`
+                          : `Add to query: ${resource.name}`
                       }
                     >
                       <QueryIcon selected={rowSelected} />
