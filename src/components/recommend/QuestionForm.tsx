@@ -11,7 +11,6 @@ interface QuestionFormProps {
   currentStage: string
   nextStage: string | null
   onSubmit: (answers: Record<string, string | number>) => void
-  onSkip?: () => void
   onGenerateManifests?: () => void
   isLoading?: boolean
   guidance?: string
@@ -54,10 +53,19 @@ function getStageDescription(stage: string): string {
 }
 
 /**
- * Check if a stage is optional (can be skipped)
+ * Questions to hide from UI but still submit with default values
+ * These are internal/technical questions not relevant to users
  */
-function isOptionalStage(stage: string): boolean {
-  return stage === 'basic' || stage === 'advanced' || stage === 'open'
+const HIDDEN_QUESTIONS: Record<string, string | number> = {
+  output_path: './manifests',
+}
+
+/**
+ * Check if a question should be hidden from UI
+ */
+function isHiddenQuestion(question: Question): boolean {
+  return question.id in HIDDEN_QUESTIONS ||
+    question.question.toLowerCase().includes('where would you like to save')
 }
 
 /**
@@ -70,11 +78,13 @@ function QuestionInput({
   error,
 }: {
   question: Question
-  value: string | number
+  value: string | number | undefined
   onChange: (value: string | number) => void
   error?: string
 }) {
   const inputId = `question-${question.id}`
+  // Ensure value is never undefined to prevent uncontrolled->controlled warning
+  const safeValue = value ?? ''
 
   return (
     <div className="space-y-1.5">
@@ -86,7 +96,7 @@ function QuestionInput({
       {question.type === 'select' && question.options ? (
         <select
           id={inputId}
-          value={value}
+          value={safeValue}
           onChange={(e) => onChange(e.target.value)}
           className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
         >
@@ -101,8 +111,11 @@ function QuestionInput({
         <input
           type="number"
           id={inputId}
-          value={value}
-          onChange={(e) => onChange(e.target.valueAsNumber || '')}
+          value={safeValue === '' ? '' : Number(safeValue)}
+          onChange={(e) => {
+            const num = e.target.valueAsNumber
+            onChange(Number.isNaN(num) ? '' : num)
+          }}
           placeholder={question.placeholder || question.suggestedAnswer?.toString()}
           min={question.validation?.min}
           max={question.validation?.max}
@@ -112,7 +125,7 @@ function QuestionInput({
         <input
           type="text"
           id={inputId}
-          value={value}
+          value={safeValue}
           onChange={(e) => onChange(e.target.value)}
           placeholder={question.placeholder || question.suggestedAnswer?.toString()}
           minLength={question.validation?.minLength}
@@ -122,7 +135,7 @@ function QuestionInput({
       )}
 
       {/* Suggested answer hint */}
-      {question.suggestedAnswer !== null && question.suggestedAnswer !== undefined && !value && (
+      {question.suggestedAnswer !== null && question.suggestedAnswer !== undefined && !safeValue && (
         <p className="text-xs text-muted-foreground">
           Suggested: <span className="font-mono">{question.suggestedAnswer}</span>
         </p>
@@ -141,7 +154,6 @@ export function QuestionForm({
   currentStage,
   nextStage,
   onSubmit,
-  onSkip,
   onGenerateManifests,
   isLoading,
   guidance,
@@ -195,6 +207,9 @@ export function QuestionForm({
     const newErrors: Record<string, string> = {}
 
     questions.forEach((q) => {
+      // Skip validation for hidden questions
+      if (isHiddenQuestion(q)) return
+
       const value = answers[q.id]
       const validation = q.validation
 
@@ -240,19 +255,18 @@ export function QuestionForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (validate()) {
-      // Filter out empty values for optional fields
-      const nonEmptyAnswers: Record<string, string | number> = {}
-      Object.entries(answers).forEach(([key, value]) => {
-        if (value !== '' && value !== undefined && value !== null) {
-          nonEmptyAnswers[key] = value
+      // Send all answers including empty values - MCP expects all question IDs
+      const allAnswers: Record<string, string | number> = { ...answers }
+      // Add default values for hidden questions
+      questions.forEach((q) => {
+        if (isHiddenQuestion(q)) {
+          allAnswers[q.id] = HIDDEN_QUESTIONS[q.id] ?? './manifests'
         }
       })
-      onSubmit(nonEmptyAnswers)
+      onSubmit(allAnswers)
     }
   }
 
-  const isOptional = isOptionalStage(currentStage)
-  const canSkip = isOptional && onSkip
   const isLastStage = !nextStage || nextStage === 'generateManifests'
 
   return (
@@ -262,7 +276,7 @@ export function QuestionForm({
         <div>
           <h2 className="text-base font-semibold flex items-center gap-2">
             {getStageName(currentStage)} Configuration
-            {isOptional && (
+            {currentStage !== 'required' && (
               <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
             )}
           </h2>
@@ -286,7 +300,7 @@ export function QuestionForm({
 
       {/* Questions form */}
       <form onSubmit={handleSubmit} className="space-y-4">
-        {questions.map((question) => (
+        {questions.filter(q => !isHiddenQuestion(q)).map((question) => (
           <QuestionInput
             key={question.id}
             question={question}
@@ -297,21 +311,8 @@ export function QuestionForm({
         ))}
 
         {/* Action buttons */}
-        <div className="flex items-center justify-between pt-2">
-          <div>
-            {canSkip && (
-              <button
-                type="button"
-                onClick={onSkip}
-                disabled={isLoading}
-                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-              >
-                Skip this stage
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {isLastStage && onGenerateManifests && (
+        <div className="flex items-center justify-end pt-2">
+            {isLastStage && onGenerateManifests ? (
               <button
                 type="button"
                 onClick={onGenerateManifests}
@@ -335,32 +336,30 @@ export function QuestionForm({
                   </>
                 )}
               </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </>
+                )}
+              </button>
             )}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Processing...
-                </>
-              ) : isLastStage ? (
-                'Continue'
-              ) : (
-                <>
-                  Next
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </>
-              )}
-            </button>
-          </div>
         </div>
       </form>
     </div>

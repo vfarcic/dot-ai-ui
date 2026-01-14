@@ -27,6 +27,7 @@
   "dependencies": {
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
+    "jszip": "^3.10.1",
     "mermaid": "^11.12.2",
     "prismjs": "^1.30.0",
     "react": "^19.2.3",

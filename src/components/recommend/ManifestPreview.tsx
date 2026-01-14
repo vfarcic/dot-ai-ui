@@ -3,9 +3,10 @@
  * Displays generated YAML manifests with syntax highlighting and deploy action
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Prism from 'prismjs'
 import 'prismjs/components/prism-yaml'
+import JSZip from 'jszip'
 import type { ManifestFile, DeploymentResult } from '../../api/recommend'
 
 interface ManifestPreviewProps {
@@ -196,9 +197,59 @@ export function ManifestPreview({
   deployResults,
 }: ManifestPreviewProps) {
   const [activeFileIndex, setActiveFileIndex] = useState(0)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
 
-  // Combine all files for "Download All"
-  const allContent = files.map((f) => `# File: ${f.relativePath}\n${f.content}`).join('\n---\n')
+  // Scroll state management
+  const updateScrollIndicators = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 0)
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1)
+  }, [])
+
+  const scrollLeft = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollBy({ left: -200, behavior: 'smooth' })
+  }, [])
+
+  const scrollRight = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollBy({ left: 200, behavior: 'smooth' })
+  }, [])
+
+  // Set up scroll listeners
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    updateScrollIndicators()
+    el.addEventListener('scroll', updateScrollIndicators)
+    window.addEventListener('resize', updateScrollIndicators)
+    return () => {
+      el.removeEventListener('scroll', updateScrollIndicators)
+      window.removeEventListener('resize', updateScrollIndicators)
+    }
+  }, [updateScrollIndicators, files])
+
+  // Download all files as ZIP
+  const handleDownloadAll = useCallback(async () => {
+    const zip = new JSZip()
+    files.forEach((file) => {
+      zip.file(file.relativePath, file.content)
+    })
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'manifests.zip'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [files])
 
   return (
     <div className="space-y-4">
@@ -212,17 +263,7 @@ export function ManifestPreview({
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              const blob = new Blob([allContent], { type: 'text/yaml' })
-              const url = URL.createObjectURL(blob)
-              const a = document.createElement('a')
-              a.href = url
-              a.download = 'manifests.yaml'
-              document.body.appendChild(a)
-              a.click()
-              document.body.removeChild(a)
-              URL.revokeObjectURL(url)
-            }}
+            onClick={handleDownloadAll}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -262,42 +303,50 @@ export function ManifestPreview({
 
       {/* File tabs (if multiple files) */}
       {files.length > 1 && (
-        <div className="flex items-center gap-1 border-b border-border">
-          {files.map((file, index) => (
+        <div className="relative border-b border-border">
+          {/* Left scroll button */}
+          {canScrollLeft && (
             <button
-              key={file.relativePath}
-              onClick={() => setActiveFileIndex(index)}
-              className={`px-3 py-2 text-sm font-mono transition-colors ${
-                index === activeFileIndex
-                  ? 'text-primary border-b-2 border-primary -mb-px'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+              onClick={scrollLeft}
+              className="absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-card via-card/90 to-transparent z-10 flex items-center justify-center hover:from-muted transition-colors cursor-pointer"
+              aria-label="Scroll tabs left"
             >
-              {file.relativePath.split('/').pop()}
+              <span className="text-primary text-2xl font-bold">‹</span>
             </button>
-          ))}
+          )}
+          {/* Right scroll button */}
+          {canScrollRight && (
+            <button
+              onClick={scrollRight}
+              className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-card via-card/90 to-transparent z-10 flex items-center justify-center hover:from-muted transition-colors cursor-pointer"
+              aria-label="Scroll tabs right"
+            >
+              <span className="text-primary text-2xl font-bold">›</span>
+            </button>
+          )}
+          <div
+            ref={scrollRef}
+            className="flex overflow-x-auto scrollbar-thin"
+          >
+            {files.map((file, index) => (
+              <button
+                key={file.relativePath}
+                onClick={() => setActiveFileIndex(index)}
+                className={`px-3 py-2 text-sm font-mono transition-colors whitespace-nowrap flex-shrink-0 cursor-pointer ${
+                  index === activeFileIndex
+                    ? 'text-primary border-b-2 border-primary -mb-px'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {file.relativePath.split('/').pop()}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Active file content */}
       <ManifestFileView file={files[activeFileIndex]} />
-
-      {/* All files (collapsed) */}
-      {files.length > 1 && (
-        <details className="group">
-          <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground py-2 flex items-center gap-2">
-            <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            Show all {files.length} files
-          </summary>
-          <div className="space-y-4 mt-4">
-            {files.map((file, index) => (
-              index !== activeFileIndex && <ManifestFileView key={file.relativePath} file={file} />
-            ))}
-          </div>
-        </details>
-      )}
     </div>
   )
 }

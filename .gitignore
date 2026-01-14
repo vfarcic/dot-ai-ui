@@ -35,4 +35,4 @@ vite.config.d.ts
 .playwright-mcp
 kubeconfig*.yaml
 
-/tmp
+/tmptest-results/

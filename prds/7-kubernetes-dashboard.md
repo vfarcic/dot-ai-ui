@@ -623,20 +623,20 @@ const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
 - [x] Session state reset when navigating between visualization pages
 - [x] User-friendly guidance display when Query declines (no raw JSON)
 
-**Recommend Tool Implementation (PENDING):**
-- [ ] API client for Recommend tool (`src/api/recommend.ts`) with stage-based calls
-- [ ] Proxy endpoint for Recommend tool (`/api/v1/tools/recommend`)
-- [ ] TypeScript types for all Recommend response shapes
-- [ ] `SolutionSelector` component for solution card display and selection
-- [ ] `QuestionForm` component for multi-stage question wizard
-- [ ] `ManifestPreview` component for YAML display with deploy action
-- [ ] Config-driven template for Recommend tool (`RECOMMEND_SOLUTION_TEMPLATE`)
-- [ ] Enable Recommend in ActionBar tool selector
-- [ ] Extend Visualization page to detect `sol-` session prefix
-- [ ] Add `recommendData` state and stage management handlers
-- [ ] Handle multi-stage workflow (solutions → questions → manifests → deploy)
+**Recommend Tool Implementation (COMPLETED):**
+- [x] API client for Recommend tool (`src/api/recommend.ts`) with stage-based calls
+- [x] Proxy endpoint for Recommend tool (`/api/v1/tools/recommend`)
+- [x] TypeScript types for all Recommend response shapes
+- [x] `SolutionSelector` component for solution card display and selection
+- [x] `QuestionForm` component for multi-stage question wizard
+- [x] `ManifestPreview` component for YAML display with deploy action
+- [x] Config-driven template for Recommend tool (`RECOMMEND_SOLUTION_TEMPLATE`)
+- [x] Enable Recommend in ActionBar tool selector
+- [x] Extend Visualization page to detect `sol-` session prefix
+- [x] Add `recommendData` state and stage management handlers
+- [x] Handle multi-stage workflow (solutions → questions → manifests → deploy)
 - [ ] Skip/previous navigation for optional question stages
-- [ ] Manifest download functionality
+- [x] Manifest download functionality (ZIP format preserving directory structure)
 
 **Remaining Tools (one at a time, each needs design then implementation):**
 - [ ] Organizational Data integration - patterns and policies (design pending)
@@ -820,6 +820,8 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-13 | Operate tool follows Remediate pattern with different data shape | Tested MCP operate endpoint via HTTP. Same multi-step workflow (analysis → approval → execution → results) but different response structure: `analysis.proposedChanges` (create/update/delete manifests) vs `remediation.actions`. Session prefix is `opr-` | Reuse InfoRenderer, ActionsPanel, ResultsPanel; need new `changes-list` and `code-list` block types for manifest display |
 | 2025-01-13 | Add onboarding guided tour for new users | Dashboard has many features (sidebar navigation, AI tools, resource details) that aren't immediately obvious to new users. Step-by-step guided tours are a proven UX pattern for complex dashboards | New Milestone 9 added; session-scoped by default (shows once per session); design decisions pending for library choice and interruption handling |
 | 2025-01-13 | Recommend tool is multi-stage wizard workflow | Tested MCP recommend endpoint via HTTP. Unlike Remediate/Operate (2-step), Recommend has 6+ stages: intent → solutions → questions (required/basic/advanced/open) → manifests → deploy. Session prefix is `sol-`. First tool to use Form section. | New components needed: SolutionSelector, QuestionForm, ManifestPreview. Reuse InfoRenderer for solution display. Significantly more complex than other tools. |
+| 2025-01-14 | MCP deploy response format verified via HTTP | Tested actual MCP `deployManifests` response. Returns `{success, solutionId, solutionType, manifestPath, message, kubectlOutput, deploymentComplete, ...}` - NOT the originally assumed `{status, results[]}` format. | Updated `RecommendDeployResponse` interface; deployed stage shows MCP's `message` and expandable `kubectlOutput` |
+| 2025-01-14 | Manifest download changed to ZIP format | Original "Download All" concatenated files into single YAML, losing directory structure needed for kustomize/helm. | Added jszip dependency; ManifestPreview downloads `manifests.zip` preserving directory structure |
 
 ---
 
@@ -875,4 +877,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-13 | Fixed multiple UX issues: (1) Session state now resets when navigating between visualization pages (useState initial values only apply on mount). (2) Intent field clears after successful submission. (3) ResultsPanel shows "Execution Complete" instead of "Remediation Complete" (works for all tools). (4) Duplicate text fix - validation.summary only shown if different from message. |
 | 2025-01-13 | Improved Query tool error handling: When Query returns guidance instead of visualizations (e.g., "use operate tool"), UI now shows user-friendly amber notice box instead of raw JSON. "Session & Insights" panel hidden when showing inline guidance. MCP bug fixed on server side to return valid JSON with empty visualizations array. |
 | 2025-01-13 | Milestone 5 - Recommend tool design COMPLETE. Tested MCP recommend endpoint via HTTP to understand full workflow. Key findings: 6+ stage wizard (intent → solutions → questions × 4 stages → manifests → deploy). Session prefix `sol-`. First tool to use Form section. Solutions array includes score, resources, applied patterns, relevant policies. Question stages: required (name, namespace, outputFormat, outputPath), basic (replicas, image, ports), advanced (resources, strategy, labels), open. Manifest generation returns YAML files. Visualization endpoint returns rich diagrams. New components needed: SolutionSelector, QuestionForm, ManifestPreview. Ready for implementation. |
+| 2025-01-14 | Milestone 5 - Recommend tool implementation COMPLETE. Fixed deployed stage showing empty content by verifying actual MCP response via HTTP (returns `{success, message, kubectlOutput, ...}` not `{status, results[]}`). Updated `RecommendDeployResponse` interface to match. Deployed stage now shows MCP's `message` and expandable `kubectlOutput`. Changed "Download All" from single concatenated YAML to ZIP format (jszip) preserving directory structure for kustomize/helm. Removed visualizations from Recommend workflow (complicated and not helpful). Fixed URL navigation to use single solution ID after selection. |
 

@@ -5,13 +5,14 @@
     "git@2.51.2",
     "vals@0.42.6",
     "kubectl@1.34.3",
-    "yq-go@4.45.4"
+    "yq-go@4.45.4",
+    "kubectl-tree@0.4.6"
   ],
   "shell": {
     "init_hook": [
       "[ -n \"$USE_VALS\" ] && eval \"$(vals env -export -f .env.vals.yaml)\" || true",
       "[ -f .env ] && source .env || true"
     ],
-    "scripts":   {}
+    "scripts": {}
   }
 }

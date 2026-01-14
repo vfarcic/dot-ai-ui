@@ -7,6 +7,10 @@
         "Authorization": "Bearer ${DOT_AI_AUTH_TOKEN}"
       }
     },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    },
     "coderabbitai": {
       "command": "npx",
       "args": ["coderabbitai-mcp@latest"],

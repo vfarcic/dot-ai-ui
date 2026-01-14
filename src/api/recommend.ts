@@ -159,8 +159,17 @@ export interface RecommendManifestResponse {
  */
 export interface RecommendDeployResponse {
   success: boolean
-  status: 'deployed' | 'failed'
-  results: DeploymentResult[]
+  solutionId: string
+  solutionType?: string
+  manifestPath?: string
+  readinessTimeout?: boolean
+  message?: string
+  kubectlOutput?: string
+  deploymentComplete?: boolean
+  requiresStatusCheck?: boolean
+  timestamp?: string
+  // Optional per-resource results (may be returned by some deployment methods)
+  results?: DeploymentResult[]
 }
 
 /**
@@ -193,7 +202,7 @@ export function isManifestResponse(response: RecommendResponse): response is Rec
 }
 
 export function isDeployResponse(response: RecommendResponse): response is RecommendDeployResponse {
-  return 'status' in response && (response.status === 'deployed' || response.status === 'failed') && 'results' in response
+  return 'success' in response && 'solutionId' in response && 'deploymentComplete' in response
 }
 
 /**
@@ -209,6 +218,7 @@ export interface RecommendWorkflowState {
   currentQuestionStage?: string
   questions?: Question[]
   nextStage?: string
+  answers?: Record<string, string | number>
   manifests?: ManifestFile[]
   outputFormat?: string
   outputPath?: string
@@ -695,35 +705,79 @@ export async function getRecommendSession(
     const { data } = sessionData
 
     // Map session data to RecommendWorkflowState format
+    // Use data.stage as source of truth (set by MCP at each stage transition)
     const state: RecommendWorkflowState = {
-      stage: 'initial',
+      stage: data.stage || 'initial',
       intent: data.intent,
     }
 
-    // Determine stage based on what data is present
-    if (data.deployResults) {
-      state.stage = 'deployed'
-      state.deployResults = data.deployResults
-    } else if (data.files) {
-      state.stage = 'manifests'
-      state.manifests = data.files
-      state.outputFormat = data.outputFormat
-      state.outputPath = data.outputPath
-    } else if (data.questions) {
-      state.stage = 'questions'
-      state.questions = data.questions
-      state.currentQuestionStage = data.currentStage
-      state.nextStage = data.nextStage
-    } else if (data.solutions) {
-      state.stage = 'solutions'
+    // Restore solutions list (allSolutions preserves all options even after selection)
+    if (data.allSolutions && Array.isArray(data.allSolutions)) {
+      state.solutions = data.allSolutions
+    } else if (data.solutions && Array.isArray(data.solutions)) {
+      // Fallback to solutions if allSolutions not present
       state.solutions = data.solutions
+    }
+
+    // Restore organizational context if present
+    if (data.organizationalContext) {
       state.organizationalContext = data.organizationalContext
     }
 
-    // Copy selected solution if present
-    if (data.selectedSolution) {
-      state.selectedSolution = data.selectedSolution
+    // Restore selected solution - build from session data fields
+    if (data.solutionId || data.description) {
+      state.selectedSolution = {
+        solutionId: sessionData.sessionId || data.solutionId,
+        type: data.type || 'single',
+        score: data.score || 0,
+        description: data.description || '',
+        primaryResources: data.primaryResources || [],
+        resources: data.resources || [],
+        reasons: data.reasons || [],
+        appliedPatterns: data.appliedPatterns || [],
+        relevantPolicies: data.relevantPolicies || [],
+      }
     }
+
+    // Restore questions for current stage
+    // Questions are organized by stage: data.questions.required, data.questions.basic, etc.
+    if (data.questions && data.currentQuestionStage) {
+      const questionsForStage = data.questions[data.currentQuestionStage]
+      if (Array.isArray(questionsForStage)) {
+        // Merge answers into questions so the form can pre-fill them
+        state.questions = questionsForStage.map((q: Question) => ({
+          ...q,
+          answer: data.answers?.[q.id] ?? q.answer,
+        }))
+      }
+      state.currentQuestionStage = data.currentQuestionStage
+      state.nextStage = data.nextQuestionStage
+    }
+
+    // Restore user's answers (for reference)
+    if (data.answers) {
+      state.answers = data.answers
+    }
+
+    // Restore manifests from generatedManifests
+    if (data.generatedManifests) {
+      const gm = data.generatedManifests
+      state.manifests = gm.files || []
+      state.outputFormat = gm.type || 'raw'
+      state.outputPath = gm.outputPath || './manifests'
+    } else if (data.files) {
+      // Fallback to files if generatedManifests not present
+      state.manifests = data.files
+      state.outputFormat = data.outputFormat || 'raw'
+      state.outputPath = data.outputPath || './manifests'
+    }
+
+    // Restore deployment results
+    if (data.deployResults) {
+      state.deployResults = data.deployResults
+    }
+
+    console.log(`[Recommend API] Session restored - stage: ${state.stage}, questionStage: ${state.currentQuestionStage}, questions: ${state.questions?.length || 0}`)
 
     return state
   } catch (error) {

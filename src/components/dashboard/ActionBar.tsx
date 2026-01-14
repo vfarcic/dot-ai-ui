@@ -398,12 +398,22 @@ export function ActionBar() {
 
         // Check if we got solutions (not refinement)
         if (isSolutionsResponse(result)) {
-          // Use the first solution's ID for the session URL
-          const firstSolutionId = result.solutions[0]?.solutionId
-          if (firstSolutionId) {
+          // Extract session ID from visualizationUrl provided by MCP
+          // The URL format is like: http://host:port/v/{sessionId}
+          // This may be a combined session ID (sol-1+sol-2+sol-3) for multi-solution visualization
+          let sessionId: string | undefined
+          if (result.visualizationUrl) {
+            const urlPath = result.visualizationUrl.split('/v/')[1]
+            sessionId = urlPath?.split('?')[0] // Remove any query params
+          }
+          // Fallback to first solution ID if visualizationUrl not available
+          if (!sessionId) {
+            sessionId = result.solutions[0]?.solutionId
+          }
+          if (sessionId) {
             const sidebarParam = sidebarCollapsed ? '?sb=1' : '?sb=0'
             setIntent('')  // Clear input after successful submission
-            navigate(`/v/${firstSolutionId}${sidebarParam}`, {
+            navigate(`/v/${sessionId}${sidebarParam}`, {
               state: { recommendData: result }
             })
           }

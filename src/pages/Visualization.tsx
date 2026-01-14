@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
-import { useParams, useLocation } from 'react-router-dom'
+import { useParams, useLocation, useSearchParams, useNavigate } from 'react-router-dom'
 import { TabContainer } from '@/components/TabContainer'
 import { InsightsPanel } from '@/components/InsightsPanel'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
@@ -21,10 +21,10 @@ import {
   isQuestionsResponse,
   isManifestResponse,
   type RecommendSolutionsResponse,
+  type RecommendDeployResponse,
   type Solution,
   type Question,
   type ManifestFile,
-  type DeploymentResult,
 } from '@/api/recommend'
 import type { VisualizationResponse } from '@/types'
 
@@ -49,22 +49,52 @@ function isRecommendSession(sessionId: string): boolean {
   return sessionId.startsWith('sol-')
 }
 
-// Navigation state type for tool data passed from ActionBar
+// Recommend workflow state passed through navigation (for solution selection)
+interface RecommendWorkflowState {
+  solutions: Solution[]
+  organizationalContext?: RecommendSolutionsResponse['organizationalContext']
+  selectedSolution: Solution
+  questions: Question[]
+  currentQuestionStage: string
+  nextStage: string
+}
+
+// Navigation state type for tool data passed from ActionBar or internal navigation
 interface NavigationState {
   remediateData?: RemediateResponse
   operateData?: OperateResponse
   recommendData?: RecommendSolutionsResponse
+  recommendWorkflow?: RecommendWorkflowState
 }
 
 // Recommend workflow stage type
 type RecommendStage = 'solutions' | 'questions' | 'manifests' | 'deployed'
 
+// Valid stages for URL param
+const VALID_STAGES: RecommendStage[] = ['solutions', 'questions', 'manifests', 'deployed']
+
+/**
+ * Parse stage from URL search params
+ */
+function parseStageFromUrl(searchParams: URLSearchParams): RecommendStage {
+  const stage = searchParams.get('stage')
+  if (stage && VALID_STAGES.includes(stage as RecommendStage)) {
+    return stage as RecommendStage
+  }
+  return 'solutions'
+}
+
 export function Visualization() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   // Get tool data from navigation state (passed from ActionBar)
   const navigationState = location.state as NavigationState | null
+
+  // Get initial stage from URL (for page refresh support)
+  const initialStage = parseStageFromUrl(searchParams)
 
   // Visualization state
   const [vizData, setVizData] = useState<VisualizationResponse | null>(null)
@@ -89,7 +119,8 @@ export function Visualization() {
   const [isOperateExecuting, setIsOperateExecuting] = useState(false)
 
   // Recommend workflow state - multi-stage wizard
-  const [recommendStage, setRecommendStage] = useState<RecommendStage>('solutions')
+  // Initialize from URL param for page refresh support
+  const [recommendStage, setRecommendStage] = useState<RecommendStage>(initialStage)
   const [solutions, setSolutions] = useState<Solution[]>(
     navigationState?.recommendData?.solutions || []
   )
@@ -103,16 +134,46 @@ export function Visualization() {
   const [manifests, setManifests] = useState<ManifestFile[]>([])
   const [outputFormat, setOutputFormat] = useState<string>('')
   const [outputPath, setOutputPath] = useState<string>('')
-  const [deployResults, setDeployResults] = useState<DeploymentResult[] | null>(null)
+  const [deployResponse, setDeployResponse] = useState<RecommendDeployResponse | null>(null)
   const [recommendError, setRecommendError] = useState<string | null>(null)
   const [isRecommendLoading, setIsRecommendLoading] = useState(false)
+  const [isDeploying, setIsDeploying] = useState(false)
 
   // Track which session we've fetched to prevent duplicate fetches from React StrictMode
   const fetchedSessionRef = useRef<string | null>(null)
+  // Track which session we've initialized to prevent re-running reset effect within same session
+  const initializedSessionRef = useRef<string | null>(null)
+
+  /**
+   * Update recommend stage and sync to URL
+   * This ensures the stage survives page refresh
+   */
+  const updateRecommendStage = useCallback((newStage: RecommendStage) => {
+    setRecommendStage(newStage)
+    // Update URL without triggering navigation
+    const newSearchParams = new URLSearchParams(searchParams)
+    if (newStage === 'solutions') {
+      newSearchParams.delete('stage') // Default stage, no need in URL
+    } else {
+      newSearchParams.set('stage', newStage)
+    }
+    const newUrl = newSearchParams.toString()
+      ? `${location.pathname}?${newSearchParams.toString()}`
+      : location.pathname
+    navigate(newUrl, { replace: true, state: location.state })
+  }, [searchParams, location.pathname, location.state, navigate])
 
   // Reset state when navigating between sessions
   // useState initial values only apply on mount, so we need this for re-navigation
+  // NOTE: We use initializedSessionRef to prevent re-running within the same session,
+  // which would clear state set by user actions (like selecting a solution)
   useEffect(() => {
+    // Skip if we've already initialized this session
+    if (initializedSessionRef.current === sessionId) {
+      return
+    }
+    initializedSessionRef.current = sessionId ?? null
+
     setRemediateData(navigationState?.remediateData || null)
     setOperateData(navigationState?.operateData || null)
     setRemediateError(null)
@@ -120,22 +181,51 @@ export function Visualization() {
     setVizData(null)
     setVizError(null)
     setIsVizLoading(true)
-    // Reset recommend state
-    setRecommendStage('solutions')
-    setSolutions(navigationState?.recommendData?.solutions || [])
-    setOrganizationalContext(navigationState?.recommendData?.organizationalContext)
-    setSelectedSolution(null)
-    setCurrentQuestionStage(null)
-    setQuestions([])
-    setNextStage(null)
+
+    // Handle recommend state initialization
+    const urlStage = parseStageFromUrl(searchParams)
+
+    // If we have recommendWorkflow from internal navigation (solution selection),
+    // use it to preserve the workflow state
+    if (navigationState?.recommendWorkflow) {
+      const workflow = navigationState.recommendWorkflow
+      setRecommendStage(urlStage)
+      setSolutions(workflow.solutions)
+      setOrganizationalContext(workflow.organizationalContext)
+      setSelectedSolution(workflow.selectedSolution)
+      setQuestions(workflow.questions)
+      setCurrentQuestionStage(workflow.currentQuestionStage)
+      setNextStage(workflow.nextStage)
+    } else if (navigationState?.recommendData) {
+      // Initial navigation from ActionBar with solutions response
+      setRecommendStage(urlStage)
+      setSolutions(navigationState.recommendData.solutions || [])
+      setOrganizationalContext(navigationState.recommendData.organizationalContext)
+      setSelectedSolution(null)
+      setCurrentQuestionStage(null)
+      setQuestions([])
+      setNextStage(null)
+    } else {
+      // Page refresh or direct URL access - will be restored from session
+      setRecommendStage(urlStage)
+      setSolutions([])
+      setOrganizationalContext(undefined)
+      setSelectedSolution(null)
+      setCurrentQuestionStage(null)
+      setQuestions([])
+      setNextStage(null)
+    }
+
     setManifests([])
     setOutputFormat('')
     setOutputPath('')
-    setDeployResults(null)
+    setDeployResponse(null)
     setRecommendError(null)
-        // Reset fetch ref to allow fetching for new session
+    setIsDeploying(false)
+    // Reset fetch ref to allow fetching for new session
     fetchedSessionRef.current = null
-  }, [sessionId, navigationState?.remediateData, navigationState?.operateData, navigationState?.recommendData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, navigationState?.remediateData, navigationState?.operateData, navigationState?.recommendData, navigationState?.recommendWorkflow])
 
   const isRemediate = sessionId ? isRemediateSession(sessionId) : false
   const isOperate = sessionId ? isOperateSession(sessionId) : false
@@ -277,36 +367,54 @@ export function Visualization() {
     setRecommendError(null)
 
     try {
-      const data = await getRecommendSession(sessionId)
+      // For multi-session URLs (sol-1+sol-2+sol-3), extract just the first session ID
+      // Each individual session contains allSolutions and organizationalContext
+      const firstSessionId = sessionId.includes('+') ? sessionId.split('+')[0] : sessionId
+      const data = await getRecommendSession(firstSessionId)
       if (data) {
-        // Restore state based on what stage we're at
-        if (data.solutions) {
+        // Use session stage as source of truth
+        // Only set stage if it's a valid UI stage (solutions, questions, manifests, deployed)
+        if (data.stage === 'solutions' || data.stage === 'questions' || data.stage === 'manifests' || data.stage === 'deployed') {
+          setRecommendStage(data.stage)
+        }
+
+        // Restore solutions list (preserved even after selection)
+        if (data.solutions && data.solutions.length > 0) {
           setSolutions(data.solutions)
         }
+
+        // Restore organizational context
         if (data.organizationalContext) {
           setOrganizationalContext(data.organizationalContext)
         }
+
+        // Restore selected solution
         if (data.selectedSolution) {
           setSelectedSolution(data.selectedSolution)
         }
-        if (data.questions) {
+
+        // Restore questions for current stage (with pre-filled answers)
+        if (data.questions && data.questions.length > 0) {
           setQuestions(data.questions)
           setCurrentQuestionStage(data.currentQuestionStage || null)
           setNextStage(data.nextStage || null)
-          setRecommendStage('questions')
         }
-        if (data.manifests) {
+
+        // Restore manifests
+        if (data.manifests && data.manifests.length > 0) {
           setManifests(data.manifests)
           setOutputFormat(data.outputFormat || 'raw')
-          setOutputPath(data.outputPath || '')
-          setRecommendStage('manifests')
+          setOutputPath(data.outputPath || './manifests')
         }
+
+        // Restore deployment results (create a response object from stored results)
         if (data.deployResults) {
-          setDeployResults(data.deployResults)
-          setRecommendStage('deployed')
+          setDeployResponse({
+            success: true,
+            solutionId: data.selectedSolution?.solutionId || '',
+            results: data.deployResults,
+          })
         }
-        if (data.guidance) {
-                  }
       } else {
         setRecommendError('Session not found or expired. Please start a new recommendation from the dashboard.')
       }
@@ -331,10 +439,28 @@ export function Visualization() {
       try {
         const result = await chooseSolution(solutionId)
         if (isQuestionsResponse(result)) {
-          setQuestions(result.questions)
-          setCurrentQuestionStage(result.currentStage)
-          setNextStage(result.nextStage)
-                    setRecommendStage('questions')
+          // Navigate to single solution URL for proper session restoration on refresh
+          // This replaces the multi-session URL (sol-1+sol-2+sol-3) with single session URL (sol-1)
+          const sidebarParam = searchParams.get('sb')
+          const newSearchParams = new URLSearchParams()
+          if (sidebarParam) newSearchParams.set('sb', sidebarParam)
+          newSearchParams.set('stage', 'questions')
+
+          // Pass recommend workflow state through navigation to preserve it after URL change
+          // This includes the selected solution, questions, and organizational context
+          navigate(`/v/${solutionId}?${newSearchParams.toString()}`, {
+            replace: true,
+            state: {
+              recommendWorkflow: {
+                solutions,
+                organizationalContext,
+                selectedSolution: solution,
+                questions: result.questions,
+                currentQuestionStage: result.currentStage,
+                nextStage: result.nextStage,
+              }
+            }
+          })
         }
       } catch (err) {
         setRecommendError(err instanceof Error ? err.message : 'Failed to select solution')
@@ -343,7 +469,7 @@ export function Visualization() {
         setIsRecommendLoading(false)
       }
     },
-    [solutions]
+    [solutions, organizationalContext, searchParams, navigate]
   )
 
   // Handle question form submission
@@ -366,14 +492,12 @@ export function Visualization() {
           setQuestions(result.questions)
           setCurrentQuestionStage(result.currentStage)
           setNextStage(result.nextStage)
-                  } else if (isManifestResponse(result)) {
+        } else if (isManifestResponse(result)) {
           // Manifests ready
           setManifests(result.files)
           setOutputFormat(result.outputFormat)
           setOutputPath(result.outputPath)
-          setRecommendStage('manifests')
-          // Also fetch visualization
-          await fetchVizData(true)
+          updateRecommendStage('manifests')
         }
       } catch (err) {
         setRecommendError(err instanceof Error ? err.message : 'Failed to submit answers')
@@ -381,41 +505,8 @@ export function Visualization() {
         setIsRecommendLoading(false)
       }
     },
-    [selectedSolution, currentQuestionStage, fetchVizData]
+    [selectedSolution, currentQuestionStage, updateRecommendStage]
   )
-
-  // Handle skipping optional question stages
-  const handleQuestionsSkip = useCallback(async () => {
-    if (!selectedSolution || !nextStage) return
-
-    setIsRecommendLoading(true)
-    setRecommendError(null)
-
-    try {
-      // Skip by submitting empty answers to next stage
-      const result = await answerQuestions(
-        selectedSolution.solutionId,
-        nextStage.replace('answerQuestion:', '') as 'required' | 'basic' | 'advanced' | 'open',
-        {}
-      )
-
-      if (isQuestionsResponse(result)) {
-        setQuestions(result.questions)
-        setCurrentQuestionStage(result.currentStage)
-        setNextStage(result.nextStage)
-              } else if (isManifestResponse(result)) {
-        setManifests(result.files)
-        setOutputFormat(result.outputFormat)
-        setOutputPath(result.outputPath)
-        setRecommendStage('manifests')
-        await fetchVizData(true)
-      }
-    } catch (err) {
-      setRecommendError(err instanceof Error ? err.message : 'Failed to skip stage')
-    } finally {
-      setIsRecommendLoading(false)
-    }
-  }, [selectedSolution, nextStage, fetchVizData])
 
   // Handle manifest generation
   const handleGenerateManifests = useCallback(async () => {
@@ -429,33 +520,41 @@ export function Visualization() {
       setManifests(result.files)
       setOutputFormat(result.outputFormat)
       setOutputPath(result.outputPath)
-      setRecommendStage('manifests')
-      await fetchVizData(true)
+      updateRecommendStage('manifests')
     } catch (err) {
       setRecommendError(err instanceof Error ? err.message : 'Failed to generate manifests')
     } finally {
       setIsRecommendLoading(false)
     }
-  }, [selectedSolution, fetchVizData])
+  }, [selectedSolution, updateRecommendStage])
 
   // Handle deployment
   const handleDeploy = useCallback(async () => {
-    if (!selectedSolution) return
+    console.log('[Deploy] Starting deployment, selectedSolution:', selectedSolution?.solutionId)
+    if (!selectedSolution) {
+      console.log('[Deploy] No selected solution, returning early')
+      return
+    }
 
-    setIsRecommendLoading(true)
+    setIsDeploying(true)
     setRecommendError(null)
 
     try {
+      console.log('[Deploy] Calling deployManifests...')
       const result = await deployManifests(selectedSolution.solutionId)
-      setDeployResults(result.results)
+      console.log('[Deploy] Got result:', result)
+      setDeployResponse(result)
+      // Don't use updateRecommendStage for deployed - just set state directly
+      // Using navigate() can cause state loss issues at this final stage
       setRecommendStage('deployed')
-      await fetchVizData(true)
+      console.log('[Deploy] Stage set to deployed')
     } catch (err) {
+      console.error('[Deploy] Error:', err)
       setRecommendError(err instanceof Error ? err.message : 'Deployment failed')
     } finally {
-      setIsRecommendLoading(false)
+      setIsDeploying(false)
     }
-  }, [selectedSolution, fetchVizData])
+  }, [selectedSolution])
 
   const handleReload = useCallback(() => {
     fetchVizData(true)
@@ -476,7 +575,13 @@ export function Visualization() {
     }
     fetchedSessionRef.current = sessionId
 
-    fetchVizData()
+    // Don't fetch visualizations for recommend sessions - they only show workflow UI
+    if (!isRecommend) {
+      fetchVizData()
+    } else {
+      // For recommend sessions, skip visualization loading
+      setIsVizLoading(false)
+    }
     // Only fetch remediate data if we don't already have it from navigation state
     if (isRemediate && !navigationState?.remediateData) {
       fetchRemediateData()
@@ -531,27 +636,30 @@ export function Visualization() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4 sm:mb-6">
         <h1 className="text-base sm:text-lg font-semibold leading-tight">{title}</h1>
-        <button
-          onClick={handleReload}
-          disabled={isReloading}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-black bg-yellow-400 hover:bg-yellow-500 rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-          title="Reload visualizations (invalidate cache)"
-        >
-          <svg
-            className={`w-4 h-4 ${isReloading ? 'animate-spin' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        {/* Hide reload button for recommend sessions - they don't have visualizations */}
+        {!isRecommend && (
+          <button
+            onClick={handleReload}
+            disabled={isReloading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-black bg-yellow-400 hover:bg-yellow-500 rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            title="Reload visualizations (invalidate cache)"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-          {isReloading ? 'Reloading...' : 'Reload Visualizations'}
-        </button>
+            <svg
+              className={`w-4 h-4 ${isReloading ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            {isReloading ? 'Reloading...' : 'Reload Visualizations'}
+          </button>
+        )}
       </div>
 
       {/* Section 1a: Information (Remediate analysis) */}
@@ -693,7 +801,6 @@ export function Visualization() {
                     currentStage={currentQuestionStage || 'required'}
                     nextStage={nextStage}
                     onSubmit={handleQuestionsSubmit}
-                    onSkip={handleQuestionsSkip}
                     onGenerateManifests={handleGenerateManifests}
                     isLoading={isRecommendLoading}
                   />
@@ -717,14 +824,14 @@ export function Visualization() {
                     outputFormat={outputFormat}
                     outputPath={outputPath}
                     onDeploy={handleDeploy}
-                    isDeploying={isRecommendLoading}
-                    deployResults={deployResults || undefined}
+                    isDeploying={isDeploying}
+                    deployResults={deployResponse?.results}
                   />
                 </>
               )}
 
               {/* Stage: Deployed */}
-              {recommendStage === 'deployed' && deployResults && (
+              {recommendStage === 'deployed' && deployResponse && (
                 <>
                   {/* Show selected solution info */}
                   {selectedSolution && (
@@ -735,13 +842,38 @@ export function Visualization() {
                       />
                     </div>
                   )}
+
+                  {/* Deployment status from MCP */}
+                  {deployResponse.success && (
+                    <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 mb-4">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="font-medium text-green-400">
+                          {deployResponse.message || 'Deployment Successful'}
+                        </span>
+                      </div>
+                      {deployResponse.kubectlOutput && (
+                        <details className="mt-3">
+                          <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
+                            View deployment details
+                          </summary>
+                          <pre className="mt-2 p-3 bg-muted/50 rounded text-xs font-mono text-muted-foreground overflow-x-auto whitespace-pre-wrap">
+                            {deployResponse.kubectlOutput}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  )}
+
                   <ManifestPreview
                     files={manifests}
                     outputFormat={outputFormat}
                     outputPath={outputPath}
                     onDeploy={handleDeploy}
                     isDeploying={false}
-                    deployResults={deployResults}
+                    deployResults={deployResponse.results}
                   />
                 </>
               )}
@@ -755,56 +887,60 @@ export function Visualization() {
         <InsightsPanel sessionId={sessionId!} insights={vizData.insights} />
       )}
 
-      {/* Section 3: Visualizations */}
-      {hasVisualization ? (
-        <div className="relative">
-          {/* Loading overlay when refreshing visualizations */}
-          {isReloading && (
-            <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-lg">
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
-                <span>Refreshing visualizations...</span>
-              </div>
-            </div>
-          )}
-          <TabContainer
-            visualizations={vizData!.visualizations}
-            renderContent={(viz) => <VisualizationRenderer visualization={viz} />}
-          />
-        </div>
-      ) : isVizLoading || isReloading ? (
-        <div className="py-6">
-          <div className="flex items-center gap-3 text-muted-foreground">
-            <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
-            <span>{isReloading ? 'Refreshing visualizations...' : 'Loading visualizations...'}</span>
-          </div>
-        </div>
-      ) : (
-        !hasToolData && (
-          <div className="flex items-center justify-center min-h-[50vh]">
-            <div className="text-center max-w-lg">
-              {vizData?.insights && vizData.insights.length > 0 ? (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <svg className="w-6 h-6 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-lg font-medium text-amber-400">
-                      {vizData.title || 'Notice'}
-                    </span>
-                  </div>
-                  <div className="text-sm text-foreground text-left space-y-2">
-                    {vizData.insights.map((insight, idx) => (
-                      <p key={idx}>{insight}</p>
-                    ))}
+      {/* Section 3: Visualizations - skip for recommend sessions (they only show workflow UI) */}
+      {!isRecommend && (
+        <>
+          {hasVisualization ? (
+            <div className="relative">
+              {/* Loading overlay when refreshing visualizations */}
+              {isReloading && (
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-lg">
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                    <span>Refreshing visualizations...</span>
                   </div>
                 </div>
-              ) : (
-                <div className="text-muted-foreground">No visualizations available</div>
               )}
+              <TabContainer
+                visualizations={vizData!.visualizations}
+                renderContent={(viz) => <VisualizationRenderer visualization={viz} />}
+              />
             </div>
-          </div>
-        )
+          ) : isVizLoading || isReloading ? (
+            <div className="py-6">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                <span>{isReloading ? 'Refreshing visualizations...' : 'Loading visualizations...'}</span>
+              </div>
+            </div>
+          ) : (
+            !hasToolData && (
+              <div className="flex items-center justify-center min-h-[50vh]">
+                <div className="text-center max-w-lg">
+                  {vizData?.insights && vizData.insights.length > 0 ? (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <svg className="w-6 h-6 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-lg font-medium text-amber-400">
+                          {vizData.title || 'Notice'}
+                        </span>
+                      </div>
+                      <div className="text-sm text-foreground text-left space-y-2">
+                        {vizData.insights.map((insight, idx) => (
+                          <p key={idx}>{insight}</p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-muted-foreground">No visualizations available</div>
+                  )}
+                </div>
+              </div>
+            )
+          )}
+        </>
       )}
     </div>
   )

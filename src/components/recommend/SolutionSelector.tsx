@@ -80,19 +80,35 @@ function SolutionCard({
       <p className="text-sm text-foreground mb-3">{solution.description}</p>
 
       {/* Primary resources */}
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {solution.primaryResources.map((resource, index) => (
-          <span
-            key={index}
-            className="px-2 py-0.5 rounded text-xs font-mono bg-muted text-muted-foreground"
-          >
-            {resource}
-          </span>
-        ))}
-      </div>
+      {solution.primaryResources && solution.primaryResources.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {solution.primaryResources.map((resource, index) => {
+            // Find full resource info for tooltip
+            // Use kubectl-style format: kind.group (e.g., Cluster.postgresql.cnpg.io)
+            // Core resources (group "core" or empty) don't need a group qualifier
+            const fullResource = solution.resources?.find(r => r.kind === resource)
+            const group = fullResource?.group && fullResource.group !== 'core' ? fullResource.group : ''
+            const tooltip = fullResource
+              ? group
+                ? `${fullResource.kind}.${group}`
+                : fullResource.kind
+              : resource
+
+            return (
+              <span
+                key={index}
+                className="px-2 py-0.5 rounded text-xs font-mono bg-muted text-muted-foreground"
+                title={tooltip}
+              >
+                {resource}
+              </span>
+            )
+          })}
+        </div>
+      )}
 
       {/* Reasons (collapsed by default, show first one) */}
-      {solution.reasons.length > 0 && (
+      {solution.reasons && solution.reasons.length > 0 && (
         <div className="text-xs text-muted-foreground">
           <span className="font-medium">Why: </span>
           {solution.reasons[0]}
@@ -103,7 +119,7 @@ function SolutionCard({
       )}
 
       {/* Applied patterns (if any) */}
-      {solution.appliedPatterns.length > 0 && (
+      {solution.appliedPatterns && solution.appliedPatterns.length > 0 && (
         <div className="mt-2 pt-2 border-t border-border">
           <div className="text-xs text-muted-foreground">
             <span className="font-medium text-green-400">Patterns: </span>
@@ -128,8 +144,8 @@ export function SolutionSelector({
   // Sort solutions by score (highest first), with pattern-using solutions prioritized
   const sortedSolutions = [...solutions].sort((a, b) => {
     // Prioritize solutions using organizational patterns
-    const aUsesPatterns = a.appliedPatterns.length > 0
-    const bUsesPatterns = b.appliedPatterns.length > 0
+    const aUsesPatterns = (a.appliedPatterns?.length ?? 0) > 0
+    const bUsesPatterns = (b.appliedPatterns?.length ?? 0) > 0
     if (aUsesPatterns && !bUsesPatterns) return -1
     if (!aUsesPatterns && bUsesPatterns) return 1
     // Then sort by score
@@ -175,7 +191,7 @@ export function SolutionSelector({
             onSelect={onSelect}
             isLoading={isLoading}
             isSelected={selectedId === solution.solutionId}
-            usesPatterns={solution.appliedPatterns.length > 0}
+            usesPatterns={(solution.appliedPatterns?.length ?? 0) > 0}
           />
         ))}
       </div>
