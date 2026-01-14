@@ -152,13 +152,13 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 
 **Architecture Note**: Original plan assumed UI would use `@kubernetes/client-node` directly. Actual implementation: MCP server handles all K8s API communication; UI only talks to MCP.
 
-### Milestone 3: Frontend Infrastructure
-- [ ] React Query setup for data fetching
-- [ ] Namespace context provider
-- [ ] Generic resource hooks with polling
-- [ ] Caching strategy for MCP data vs K8s status data
+### Milestone 3: Frontend Infrastructure (DEFERRED to PRD #9)
+- [~] React Query setup for data fetching - deferred to [PRD #9](./9-react-query-integration.md)
+- [~] Namespace context provider - deferred to [PRD #9](./9-react-query-integration.md)
+- [~] Generic resource hooks with polling - deferred to [PRD #9](./9-react-query-integration.md)
+- [~] Caching strategy for MCP data vs K8s status data - deferred to [PRD #9](./9-react-query-integration.md)
 
-**Validation**: Hooks successfully fetch, cache, and merge data from both sources
+**Validation**: Deferred - see PRD #9 for validation criteria
 
 ### Milestone 4: Resource List & Detail Views
 - [x] Generic `ResourceListPage` with dynamic columns
@@ -646,7 +646,7 @@ const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
 
 ### Milestone 6: Polish & Error Handling
 - [x] Loading skeletons for resource lists
-- [ ] Error states for K8s connection failures
+- [x] Error states for K8s connection failures (covered by generic MCP error handling - UI only talks to MCP via proxy)
 - [x] Empty states for namespaces with no resources
 - [ ] Mobile-responsive sidebar
 
@@ -824,6 +824,7 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-14 | Manifest download changed to ZIP format | Original "Download All" concatenated files into single YAML, losing directory structure needed for kustomize/helm. | Added jszip dependency; ManifestPreview downloads `manifests.zip` preserving directory structure |
 | 2025-01-14 | Organizational Data deferred to PRD #8 | Feature scope warranted its own PRD with dedicated milestones for patterns and policies CRUD | Removed from Milestone 5 scope; cross-linked to PRD #8 |
 | 2025-01-14 | Skip/previous navigation for Recommend question stages deferred | Core Recommend workflow is functional; users can complete all stages sequentially. Skip/back navigation is a UX enhancement, not a blocker | Marked as deferred in Milestone 5; Recommend tool considered complete for v1 |
+| 2025-01-14 | Milestone 3 (Frontend Infrastructure) deferred to PRD #9 | React Query integration warranted its own PRD with dedicated milestones; dashboard works correctly with current useState/useEffect patterns | Milestone 3 marked as deferred; cross-linked to PRD #9 |
 
 ---
 
@@ -880,4 +881,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-13 | Improved Query tool error handling: When Query returns guidance instead of visualizations (e.g., "use operate tool"), UI now shows user-friendly amber notice box instead of raw JSON. "Session & Insights" panel hidden when showing inline guidance. MCP bug fixed on server side to return valid JSON with empty visualizations array. |
 | 2025-01-13 | Milestone 5 - Recommend tool design COMPLETE. Tested MCP recommend endpoint via HTTP to understand full workflow. Key findings: 6+ stage wizard (intent → solutions → questions × 4 stages → manifests → deploy). Session prefix `sol-`. First tool to use Form section. Solutions array includes score, resources, applied patterns, relevant policies. Question stages: required (name, namespace, outputFormat, outputPath), basic (replicas, image, ports), advanced (resources, strategy, labels), open. Manifest generation returns YAML files. Visualization endpoint returns rich diagrams. New components needed: SolutionSelector, QuestionForm, ManifestPreview. Ready for implementation. |
 | 2025-01-14 | Milestone 5 - Recommend tool implementation COMPLETE. Fixed deployed stage showing empty content by verifying actual MCP response via HTTP (returns `{success, message, kubectlOutput, ...}` not `{status, results[]}`). Updated `RecommendDeployResponse` interface to match. Deployed stage now shows MCP's `message` and expandable `kubectlOutput`. Changed "Download All" from single concatenated YAML to ZIP format (jszip) preserving directory structure for kustomize/helm. Removed visualizations from Recommend workflow (complicated and not helpful). Fixed URL navigation to use single solution ID after selection. |
+| 2025-01-14 | Milestone 6 partial - Marked "Error states for K8s connection failures" as complete. UI only talks to MCP via proxy; existing generic error handling in `src/api/client.ts` already displays MCP error responses appropriately. No special K8s-specific error handling needed. |
 
