@@ -5,6 +5,7 @@
  */
 
 import { APIError } from './client'
+import { fetchWithAuth } from './authHeaders'
 
 const API_PATH = '/api/v1'
 const OPERATE_TIMEOUT = 30 * 60 * 1000 // 30 minutes for complex operations
@@ -125,7 +126,7 @@ export async function operateCluster(intent: string, signal?: AbortSignal): Prom
     const startTime = performance.now()
     console.log(`[Operate API] Analyzing intent: ${intent}`)
 
-    const response = await fetch(`${API_PATH}/tools/operate`, {
+    const response = await fetchWithAuth(`${API_PATH}/tools/operate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -215,7 +216,7 @@ export async function executeOperation(
     const startTime = performance.now()
     console.log(`[Operate API] Executing choice ${executeChoice} for session ${sessionId}`)
 
-    const response = await fetch(`${API_PATH}/tools/operate`, {
+    const response = await fetchWithAuth(`${API_PATH}/tools/operate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -302,7 +303,7 @@ export async function getOperateSession(
   try {
     console.log(`[Operate API] Fetching session: ${sessionId}`)
 
-    const response = await fetch(`${API_PATH}/sessions/${sessionId}`, {
+    const response = await fetchWithAuth(`${API_PATH}/sessions/${sessionId}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',

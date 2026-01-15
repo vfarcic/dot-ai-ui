@@ -37,6 +37,14 @@ spec:
               key: {{ include "dot-ai-ui.secretKey" . }}
               optional: true
         {{- end }}
+        {{- if or .Values.uiAuth.secretRef.name .Values.uiAuth.token }}
+        - name: DOT_AI_UI_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "dot-ai-ui.uiAuthSecretName" . }}
+              key: {{ include "dot-ai-ui.uiAuthSecretKey" . }}
+              optional: true
+        {{- end }}
 {{- with .Values.extraEnv }}
         {{- toYaml . | nindent 8 }}
 {{- end }}

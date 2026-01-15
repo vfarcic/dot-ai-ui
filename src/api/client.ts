@@ -4,6 +4,7 @@
  */
 
 import type { VisualizationResponse } from '@/types'
+import { fetchWithAuth } from './authHeaders'
 
 /**
  * Error types based on actual MCP server responses:
@@ -72,7 +73,7 @@ export async function getVisualization(
     const reloadParam = options?.reload ? '?reload=true' : ''
     console.log(`[API] Fetching visualization for session: ${sessionId}${options?.reload ? ' (reload)' : ''}`)
 
-    const response = await fetch(`${API_PATH}/visualize/${sessionId}${reloadParam}`, {
+    const response = await fetchWithAuth(`${API_PATH}/visualize/${sessionId}${reloadParam}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',

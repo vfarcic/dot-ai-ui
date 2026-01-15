@@ -3,6 +3,8 @@
  * Fetches Kubernetes resource data from the MCP server
  */
 
+import { fetchWithAuth } from './authHeaders'
+
 const API_PATH = '/api/v1'
 
 export interface ResourceKind {
@@ -30,7 +32,7 @@ export async function getResourceKinds(namespace?: string): Promise<ResourceKind
   const queryString = params.toString()
   const url = `${API_PATH}/resources/kinds${queryString ? `?${queryString}` : ''}`
 
-  const response = await fetch(url, {
+  const response = await fetchWithAuth(url, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -91,7 +93,7 @@ export interface NamespacesResponse {
  * Fetch all namespaces available in the cluster
  */
 export async function getNamespaces(): Promise<string[]> {
-  const response = await fetch(`${API_PATH}/namespaces`, {
+  const response = await fetchWithAuth(`${API_PATH}/namespaces`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -616,7 +618,7 @@ export async function getCapabilities(params: GetCapabilitiesParams): Promise<Ge
   })
 
   try {
-    const response = await fetch(`${API_PATH}/capabilities?${queryParams}`, {
+    const response = await fetchWithAuth(`${API_PATH}/capabilities?${queryParams}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -724,7 +726,7 @@ export async function getResources(params: GetResourcesParams): Promise<Resource
     queryParams.set('includeStatus', 'true')
   }
 
-  const response = await fetch(`${API_PATH}/resources?${queryParams}`, {
+  const response = await fetchWithAuth(`${API_PATH}/resources?${queryParams}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -796,7 +798,7 @@ export async function searchResources(params: SearchResourcesParams): Promise<Se
     queryParams.set('minScore', String(minScore))
   }
 
-  const response = await fetch(`${API_PATH}/resources/search?${queryParams}`, {
+  const response = await fetchWithAuth(`${API_PATH}/resources/search?${queryParams}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -869,7 +871,7 @@ export async function getResource(params: GetResourceParams): Promise<GetResourc
   }
 
   try {
-    const response = await fetch(`${API_PATH}/resource?${queryParams}`, {
+    const response = await fetchWithAuth(`${API_PATH}/resource?${queryParams}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -952,7 +954,7 @@ export async function getResourceEvents(
   }
 
   try {
-    const response = await fetch(`${API_PATH}/events?${queryParams}`, {
+    const response = await fetchWithAuth(`${API_PATH}/events?${queryParams}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -1021,7 +1023,7 @@ export async function getPodLogs(params: GetPodLogsParams): Promise<GetPodLogsRe
   }
 
   try {
-    const response = await fetch(`${API_PATH}/logs?${queryParams}`, {
+    const response = await fetchWithAuth(`${API_PATH}/logs?${queryParams}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',

@@ -651,7 +651,7 @@ const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
 
 **Validation**: Dashboard handles edge cases gracefully (no cluster, empty namespace, errors)
 
-### Milestone 7: Search & Agentic Chat (To Be Designed)
+### Milestone 7: Search & Agentic Chat (COMPLETED)
 
 #### Search (COMPLETED)
 - [x] Design: Search UX - global search bar in header, Cmd+K keyboard shortcut, combines with namespace/kind filters
@@ -664,41 +664,46 @@ const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
   - Search query preserved when changing namespace or clicking resource type
   - URL state persistence via `?q=` parameter
 
-#### Agentic Chat
+#### Agentic Chat (DEFERRED to v2)
 
 **Architectural Decisions (Resolved)**
 - [x] Decision: No generic free-form chat for v1 - focus on tool-specific integrations instead
 - [x] Decision: LLM communication stays in MCP server (API keys never exposed to browser)
 - [x] Decision: UI maintains conversation context for tool workflows (stateless MCP for chat)
 - Rationale: Generic chat without tool access provides limited value (just ChatGPT in a sidebar); tool-specific integrations deliver immediate cluster-aware value
+- Rationale: Current tools (Query, Remediate, Operate, Recommend) cover primary K8s workflows; main gap is multi-turn conversation which could be addressed by enhancing Query with session history in v2
 
-**Architecture**
-```
-UI (dot-ai-ui)          Express Proxy           MCP Server (dot-ai)
-+-------------+         +-------------+         +------------------+
-| Tool UI     |  HTTP   | /api/...    |  HTTP   | Tool endpoints   |
-| - Context   |-------->| (proxy)     |-------->| - LLM API keys   |
-| - History   |<--------|             |<--------| - Tool execution |
-+-------------+         +-------------+         +------------------+
-```
+**Deferred to v2**
+- [~] Design: Chat UX - side panel? modal? persistent drawer? conversation history?
+- [~] Design: Chat context - how to pass current resource/namespace context to agent?
+- [~] Design: Action execution - how should chat-suggested actions be presented and executed?
+- [~] Design: Chat backend - streaming responses? conversation memory? tool calling UI?
+- [~] Implementation: Chat component and MCP integration
 
-**Deferred Design Questions**
-- [ ] Design: Chat UX - side panel? modal? persistent drawer? conversation history?
-- [ ] Design: Chat context - how to pass current resource/namespace context to agent?
-- [ ] Design: Action execution - how should chat-suggested actions be presented and executed?
-- [ ] Design: Chat backend - streaming responses? conversation memory? tool calling UI?
-- [ ] Implementation: Chat component and MCP integration
+**Validation**: Search completed; Agentic Chat deferred to v2
 
-**Validation**: Users can search resources and have natural language conversations with AI about their cluster
-
-### Milestone 8: Basic Authentication
+### Milestone 8: Basic Authentication (COMPLETED)
 
 **Note**: This is a minimal authentication implementation to secure the dashboard. A separate PRD should be created for comprehensive authentication (OAuth/OIDC, RBAC, audit logging, etc.).
 
-- [ ] Design: Simple auth mechanism (bearer token? basic auth? environment-based?)
-- [ ] Implementation: Protect dashboard routes from unauthenticated access
-- [ ] Implementation: Protect API proxy endpoints
-- [ ] Documentation: How to configure authentication
+- [x] Design: Simple auth mechanism (bearer token? basic auth? environment-based?)
+- [x] Implementation: Protect dashboard routes from unauthenticated access
+- [x] Implementation: Protect API proxy endpoints
+- [x] Documentation: How to configure authentication
+
+**Design Decisions:**
+- Decision: Bearer token authentication via `Authorization: Bearer <token>` header
+- Decision: Strategy pattern for auth implementation (extensible, replaceable in future)
+- Decision: Auth always required - auto-generates random token if `DOT_AI_UI_AUTH_TOKEN` not set
+- Decision: Token stored in sessionStorage (cleared on tab close)
+- Decision: Constant-time string comparison to prevent timing attacks
+
+**Implementation Details:**
+- Server auth module: `server/auth/` with types, strategies, middleware
+- React auth context: `src/auth/` with AuthContext, AuthGuard, LoginPage
+- API helper: `src/api/authHeaders.ts` with `fetchWithAuth()` wrapper
+- Helm chart: `uiAuth` section in values.yaml, secret template, deployment env var
+- Dev script: `DOT_AI_UI_AUTH_TOKEN=admin` default for development
 
 **Validation**: Dashboard requires authentication; unauthenticated users cannot access resources or trigger AI operations
 
@@ -831,6 +836,8 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-14 | Skip/previous navigation for Recommend question stages deferred | Core Recommend workflow is functional; users can complete all stages sequentially. Skip/back navigation is a UX enhancement, not a blocker | Marked as deferred in Milestone 5; Recommend tool considered complete for v1 |
 | 2025-01-14 | Milestone 3 (Frontend Infrastructure) deferred to PRD #9 | React Query integration warranted its own PRD with dedicated milestones; dashboard works correctly with current useState/useEffect patterns | Milestone 3 marked as deferred; cross-linked to PRD #9 |
 | 2025-01-14 | Mobile-responsive sidebar removed from scope | Kubernetes dashboards are power-user tools primarily used at workstations; complex content (tables, YAML, logs, diagrams) doesn't translate to small screens; AI workflows awkward on mobile; industry norm (Lens, Rancher, K8s Dashboard don't prioritize mobile); on-call engineers use kubectl or alerting apps | Removed from Milestone 6; added to Out of Scope |
+| 2025-01-15 | Agentic Chat deferred to v2 | Generic chat without tool access provides limited value (just ChatGPT in sidebar). Current tools (Query, Remediate, Operate, Recommend) cover primary K8s workflows. Main gap is multi-turn conversation, which could be addressed by enhancing Query with session history in v2 | Milestone 7 complete with Search only; Chat design questions marked as deferred |
+| 2025-01-15 | Bearer token auth with strategy pattern | Bearer tokens are standard HTTP auth, work well with HTTPS encryption. Strategy pattern enables future auth methods (OAuth, API keys) without rewriting. Auth always required (secure by default) with auto-generated token if not configured | New server auth module, React auth context, Helm chart updates for UI auth token |
 
 ---
 
@@ -890,4 +897,6 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-14 | Milestone 6 partial - Marked "Error states for K8s connection failures" as complete. UI only talks to MCP via proxy; existing generic error handling in `src/api/client.ts` already displays MCP error responses appropriately. No special K8s-specific error handling needed. |
 | 2025-01-14 | Milestone 6 COMPLETED - Removed mobile-responsive sidebar from scope. Kubernetes dashboards are power-user tools for workstations; complex content (tables, YAML, logs, diagrams) doesn't translate to small screens; AI workflows awkward on mobile. Added to Out of Scope. |
 | 2025-01-15 | Milestone 7 Search COMPLETED - Implemented semantic search via MCP `/api/v1/resources/search` endpoint (Qdrant backend). SearchInput component with debounce, Cmd+K shortcut, Escape to clear. SearchResultsView with results grouped by kind, sorted by highest relevance score. Color-coded relevance badges (green 70%+, yellow 40%+, gray <40%). minScore dropdown filter defaulting to 50%. Search query preserved across namespace/kind changes. Fixed rounding bug (Math.floor vs Math.round). URL state via `?q=` param. |
+| 2025-01-15 | Milestone 7 COMPLETED - Agentic Chat deferred to v2. Analysis: current tools (Query, Remediate, Operate, Recommend) cover primary K8s workflows. Generic chat without tool access would be limited value. Main gap is multi-turn conversation, addressable via Query session history in future version. |
+| 2025-01-15 | Milestone 8 COMPLETED - Bearer token authentication implemented. Server-side: Express auth middleware with strategy pattern (`server/auth/`), constant-time comparison, auto-generated token if not set. Frontend: React auth context, AuthGuard for protected routes, LoginPage with dashboard design system, sessionStorage for token. Helm chart: `uiAuth` section with secretRef and direct token options. Dev script: default `admin` token for development. Verified full auth flow with Playwright. |
 

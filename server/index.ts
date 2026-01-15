@@ -2,6 +2,13 @@ import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import rateLimit from 'express-rate-limit'
+import {
+  authMiddleware,
+  verifyHandler,
+  statusHandler,
+  isAuthEnabled,
+  getAuthStrategyName,
+} from './auth/index.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -32,7 +39,8 @@ const AUTH_TOKEN = process.env.DOT_AI_AUTH_TOKEN
 const API_TIMEOUT = 5 * 60 * 1000 // 5 minutes for AI generation
 
 console.log(`[Config] MCP_BASE_URL: ${MCP_BASE_URL}`)
-console.log(`[Config] AUTH_TOKEN: ${AUTH_TOKEN ? '***set***' : 'NOT SET'}`)
+console.log(`[Config] AUTH_TOKEN (MCP): ${AUTH_TOKEN ? '***set***' : 'NOT SET'}`)
+console.log(`[Config] UI_AUTH: ${isAuthEnabled() ? `enabled (${getAuthStrategyName()})` : 'disabled'}`)
 
 async function createServer() {
   const app = express()
@@ -49,6 +57,31 @@ async function createServer() {
   app.get('/api/debug', (_req, res) => {
     console.log('[Debug] Hit debug endpoint')
     res.json({ ok: true, mcp: MCP_BASE_URL, hasToken: !!AUTH_TOKEN })
+  })
+
+  // ========================================
+  // Authentication endpoints (before auth middleware)
+  // ========================================
+
+  // Auth status - public endpoint to check if auth is enabled
+  // Used by frontend to decide whether to show login page
+  app.get('/api/v1/auth/status', statusHandler)
+
+  // Auth verify - requires valid token, returns 200 if valid
+  // Used by frontend to validate token before storing
+  app.get('/api/v1/auth/verify', authMiddleware, verifyHandler)
+
+  // ========================================
+  // Protected API routes (auth middleware applied)
+  // ========================================
+
+  // Apply auth middleware to all /api/v1/* routes except auth/status
+  app.use('/api/v1', (req, res, next) => {
+    // Skip auth for the status endpoint (already handled above)
+    if (req.path === '/auth/status') {
+      return next()
+    }
+    return authMiddleware(req, res, next)
   })
 
   // Proxy visualization API requests to MCP server
