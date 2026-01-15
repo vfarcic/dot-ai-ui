@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   getResourceKinds,
   groupKindsByApiGroup,
@@ -15,6 +15,8 @@ interface DashboardSidebarProps {
   onToggleCollapse: () => void
   onResourcesLoaded?: (hasResources: boolean) => void
   onKindsLoaded?: (kinds: ResourceKind[]) => void
+  /** When search is active, filter sidebar to only show these kinds */
+  searchResultKinds?: ResourceKind[] | null
 }
 
 function ChevronIcon({
@@ -114,6 +116,7 @@ export function DashboardSidebar({
   onToggleCollapse,
   onResourcesLoaded,
   onKindsLoaded,
+  searchResultKinds,
 }: DashboardSidebarProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [kindsByGroup, setKindsByGroup] = useState<Map<string, ResourceKind[]>>(new Map())
@@ -186,6 +189,35 @@ export function DashboardSidebar({
     )
   }
 
+  // Compute filtered display data when search is active
+  const { displayGroups, displayKindsByGroup } = useMemo(() => {
+    // If no search results filter, show all kinds
+    if (!searchResultKinds || searchResultKinds.length === 0) {
+      return { displayGroups: sortedGroups, displayKindsByGroup: kindsByGroup }
+    }
+
+    // Create a set of search result kind keys for fast lookup
+    // Normalize: use just kind name since apiGroup/apiVersion formats may differ
+    // between search results and sidebar kinds
+    const searchKindNames = new Set(
+      searchResultKinds.map((k) => k.kind)
+    )
+
+    // Filter kindsByGroup to only include kinds from search results
+    const filteredKindsByGroup = new Map<string, ResourceKind[]>()
+    for (const [group, kinds] of kindsByGroup) {
+      const filteredKinds = kinds.filter((k) => searchKindNames.has(k.kind))
+      if (filteredKinds.length > 0) {
+        filteredKindsByGroup.set(group, filteredKinds)
+      }
+    }
+
+    // Get sorted groups that have matching kinds
+    const filteredGroups = sortApiGroups(Array.from(filteredKindsByGroup.keys()))
+
+    return { displayGroups: filteredGroups, displayKindsByGroup: filteredKindsByGroup }
+  }, [searchResultKinds, sortedGroups, kindsByGroup])
+
   return (
     <aside
       className={`bg-header-bg border-r border-border flex flex-col transition-all duration-300 ${
@@ -221,7 +253,7 @@ export function DashboardSidebar({
           </div>
         )}
 
-        {!loading && !error && sortedGroups.length === 0 && (
+        {!loading && !error && displayGroups.length === 0 && (
           <div className="px-3 py-4 text-sm">
             <div className="text-yellow-500 font-medium mb-2">
               No resources indexed
@@ -241,7 +273,7 @@ export function DashboardSidebar({
         )}
 
         {/* "All" button - shows all resources in selected namespace */}
-        {!loading && !error && sortedGroups.length > 0 && namespace !== 'All Namespaces' && (
+        {!loading && !error && displayGroups.length > 0 && namespace !== 'All Namespaces' && !searchResultKinds && (
           <div className="mb-2 border-b border-border pb-2">
             <button
               onClick={() => onClearSelection?.()}
@@ -278,8 +310,8 @@ export function DashboardSidebar({
           </div>
         )}
 
-        {!loading && !error && sortedGroups.length > 0 && sortedGroups.map((groupName) => {
-          const kinds = kindsByGroup.get(groupName) || []
+        {!loading && !error && displayGroups.length > 0 && displayGroups.map((groupName) => {
+          const kinds = displayKindsByGroup.get(groupName) || []
           const isExpanded = expandedGroups.has(groupName)
           const totalCount = kinds.reduce((sum, k) => sum + k.count, 0)
 

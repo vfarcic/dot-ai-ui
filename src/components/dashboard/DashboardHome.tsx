@@ -30,6 +30,7 @@ export function DashboardHome() {
     availableKinds,
     sidebarCollapsed,
     searchQuery,
+    setSearchResultKinds,
   } = useDashboardContext()
 
   // Capabilities state for resource description and printer columns
@@ -155,6 +156,13 @@ export function DashboardHome() {
     setQueryError(null)
   }
 
+  // Clear search result kinds when search is cleared
+  useEffect(() => {
+    if (!searchQuery) {
+      setSearchResultKinds(null)
+    }
+  }, [searchQuery, setSearchResultKinds])
+
   // If search query is active, show search results
   if (searchQuery) {
     return (
@@ -163,6 +171,7 @@ export function DashboardHome() {
         namespace={selectedNamespace}
         kind={selectedResource?.kind}
         apiVersion={selectedResource?.apiVersion}
+        onKindsFound={setSearchResultKinds}
       />
     )
   }

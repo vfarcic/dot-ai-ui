@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { searchResources, type Resource } from '../../api/dashboard'
+import { searchResources, type Resource, type ResourceKind } from '../../api/dashboard'
 import {
   classifyStatus,
   getStatusColorClasses,
@@ -12,6 +12,7 @@ interface SearchResultsViewProps {
   namespace: string
   kind?: string
   apiVersion?: string
+  onKindsFound?: (kinds: ResourceKind[]) => void
 }
 
 function formatAge(createdAt: string): string {
@@ -83,6 +84,7 @@ export function SearchResultsView({
   namespace,
   kind,
   apiVersion,
+  onKindsFound,
 }: SearchResultsViewProps) {
   const [resources, setResources] = useState<Resource[]>([])
   const [total, setTotal] = useState(0)
@@ -113,6 +115,25 @@ export function SearchResultsView({
         })
         setResources(result.resources)
         setTotal(result.total)
+
+        // Extract unique kinds from results and report to parent
+        if (onKindsFound) {
+          const uniqueKinds = new Map<string, ResourceKind>()
+          for (const resource of result.resources) {
+            const key = `${resource.apiGroup}/${resource.kind}/${resource.apiVersion}`
+            if (!uniqueKinds.has(key)) {
+              uniqueKinds.set(key, {
+                kind: resource.kind,
+                apiGroup: resource.apiGroup,
+                apiVersion: resource.apiVersion,
+                count: 1,
+              })
+            } else {
+              uniqueKinds.get(key)!.count++
+            }
+          }
+          onKindsFound(Array.from(uniqueKinds.values()))
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to search resources')
         setResources([])

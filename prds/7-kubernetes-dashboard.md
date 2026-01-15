@@ -707,38 +707,19 @@ const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
 
 **Validation**: Dashboard requires authentication; unauthenticated users cannot access resources or trigger AI operations
 
-### Milestone 9: Onboarding Guided Tour
+### Milestone 9: Onboarding Guided Tour (REMOVED)
 
-**Problem**: New users arriving at the dashboard may not immediately understand how to navigate the sidebar, use AI tools, or interpret resource information. A guided tour reduces time-to-value and improves user confidence.
+**Status**: Removed from scope
 
-**Design Decisions (To Be Resolved)**
-- [ ] Design: Library choice - React Joyride (most popular) vs Shepherd.js vs Intro.js vs custom?
-- [ ] Design: Tour trigger - first visit per session? localStorage-persisted? user preference in settings?
-- [ ] Design: Tour interruption handling - what happens if user navigates mid-tour?
-- [ ] Design: Mobile experience - should tour be disabled or adapted for small screens?
+**Decision**: After implementation and testing, the guided tour was removed due to:
+1. **Brittleness** - Manipulating React controlled components (select dropdowns, search inputs) requires hacky workarounds that are fragile and browser-dependent
+2. **Maintenance burden** - Tour steps tied to exact DOM structure; any UI refactor can break the tour
+3. **Testing difficulty** - Hard to verify reliable cross-browser behavior
+4. **Diminishing returns** - Complex interactive tours (auto-selecting namespaces, auto-typing searches) introduce more problems than they solve
 
-**Proposed Tour Flow**
-1. **Sidebar Highlight** - Spotlight on left sidebar with modal explaining resource type navigation, prompting user to click a resource type
-2. **Resource List Highlight** - After user clicks sidebar, spotlight on main body explaining the resource table, status indicators, and clickable rows
-3. **ActionBar Introduction** - Spotlight on bottom ActionBar explaining AI tools (Query, Remediate, Operate) and how to ask questions about the cluster
-4. **Completion** - Success message with option to replay tour from settings/help menu
+**Alternative approach**: Rely on intuitive UI design. The dashboard follows established patterns (sidebar navigation, tabbed detail views, bottom action bar) that power users will recognize.
 
-**Implementation**
-- [ ] Choose and install tour library (recommend React Joyride for React ecosystem fit)
-- [ ] Create `GuidedTour` component with step definitions and callbacks
-- [ ] Add tour state to session storage (shown/not shown this session)
-- [ ] Style tour tooltips/modals to match dashboard dark theme
-- [ ] Add "Replay Tour" option in header or help menu
-- [ ] Handle edge cases: navigation during tour, window resize, mobile viewports
-
-**UX Requirements**
-- Tour must be skippable at any step ("Skip tour" button always visible)
-- Each step should have concise text (1-2 sentences max)
-- Highlighted area should be interactive (user can click the actual element)
-- Dim overlay on non-focused areas without blocking the highlighted element
-- Tour should gracefully handle if user navigates away (reset or pause)
-
-**Validation**: New user visits `/dashboard`, guided tour starts automatically, user can complete all steps or skip. Tour doesn't reappear after completion (within session). "Replay Tour" button works.
+**Retained feature**: Sidebar filtering during search - when search is active, sidebar filters to show only resource types that have matching results. This improves navigation without the complexity of a guided tour.
 
 ---
 
@@ -780,7 +761,6 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 
 ### UI Dependencies
 - `@tanstack/react-query` - Server state management (planned, using useState/useEffect currently)
-- `react-joyride` - Guided tour library (planned, for Milestone 9 onboarding)
 - Existing MCP proxy infrastructure (all K8s data flows through MCP)
 
 ### External Dependencies (dot-ai MCP)
@@ -838,6 +818,8 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-14 | Mobile-responsive sidebar removed from scope | Kubernetes dashboards are power-user tools primarily used at workstations; complex content (tables, YAML, logs, diagrams) doesn't translate to small screens; AI workflows awkward on mobile; industry norm (Lens, Rancher, K8s Dashboard don't prioritize mobile); on-call engineers use kubectl or alerting apps | Removed from Milestone 6; added to Out of Scope |
 | 2025-01-15 | Agentic Chat deferred to v2 | Generic chat without tool access provides limited value (just ChatGPT in sidebar). Current tools (Query, Remediate, Operate, Recommend) cover primary K8s workflows. Main gap is multi-turn conversation, which could be addressed by enhancing Query with session history in v2 | Milestone 7 complete with Search only; Chat design questions marked as deferred |
 | 2025-01-15 | Bearer token auth with strategy pattern | Bearer tokens are standard HTTP auth, work well with HTTPS encryption. Strategy pattern enables future auth methods (OAuth, API keys) without rewriting. Auth always required (secure by default) with auto-generated token if not configured | New server auth module, React auth context, Helm chart updates for UI auth token |
+| 2025-01-15 | Guided tour removed from scope | After implementation, interactive tour proved too brittle: React controlled components require hacky DOM manipulation, tour steps tightly coupled to DOM structure, hard to test reliably. Maintenance cost outweighed UX benefit. Dashboard UI follows established patterns that power users recognize. | Removed driver.js dependency, deleted GuidedTour component, removed Tour button from header |
+| 2025-01-15 | Sidebar filtering during search retained | When search is active, sidebar filters to show only resource types that have matching results. Improves navigation without guided tour complexity. Search results report unique kinds to parent; sidebar computes filtered display via useMemo. | New searchResultKinds context state, filtering logic in DashboardSidebar |
 
 ---
 
@@ -899,4 +881,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-15 | Milestone 7 Search COMPLETED - Implemented semantic search via MCP `/api/v1/resources/search` endpoint (Qdrant backend). SearchInput component with debounce, Cmd+K shortcut, Escape to clear. SearchResultsView with results grouped by kind, sorted by highest relevance score. Color-coded relevance badges (green 70%+, yellow 40%+, gray <40%). minScore dropdown filter defaulting to 50%. Search query preserved across namespace/kind changes. Fixed rounding bug (Math.floor vs Math.round). URL state via `?q=` param. |
 | 2025-01-15 | Milestone 7 COMPLETED - Agentic Chat deferred to v2. Analysis: current tools (Query, Remediate, Operate, Recommend) cover primary K8s workflows. Generic chat without tool access would be limited value. Main gap is multi-turn conversation, addressable via Query session history in future version. |
 | 2025-01-15 | Milestone 8 COMPLETED - Bearer token authentication implemented. Server-side: Express auth middleware with strategy pattern (`server/auth/`), constant-time comparison, auto-generated token if not set. Frontend: React auth context, AuthGuard for protected routes, LoginPage with dashboard design system, sessionStorage for token. Helm chart: `uiAuth` section with secretRef and direct token options. Dev script: default `admin` token for development. Verified full auth flow with Playwright. |
+| 2025-01-15 | Milestone 9 REMOVED - Guided tour removed from scope after implementation proved too brittle. Interactive tours that manipulate React controlled components (auto-selecting namespaces, auto-typing searches) require fragile DOM hacks. Maintenance cost outweighed UX benefit. Retained sidebar filtering feature: when search is active, sidebar shows only resource types with matching results. |
 

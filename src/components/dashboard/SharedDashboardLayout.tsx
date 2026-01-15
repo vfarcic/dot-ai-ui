@@ -25,6 +25,8 @@ interface DashboardContextValue {
   sidebarCollapsed: boolean
   searchQuery: string
   setSearchQuery: (query: string) => void
+  searchResultKinds: ResourceKind[] | null
+  setSearchResultKinds: (kinds: ResourceKind[] | null) => void
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null)
@@ -51,6 +53,7 @@ export function SharedDashboardLayout({
   const [searchParams, setSearchParams] = useSearchParams()
   const [hasResources, setHasResources] = useState<boolean | null>(null)
   const [availableKinds, setAvailableKinds] = useState<ResourceKind[]>([])
+  const [searchResultKinds, setSearchResultKinds] = useState<ResourceKind[] | null>(null)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -169,6 +172,8 @@ export function SharedDashboardLayout({
     sidebarCollapsed,
     searchQuery,
     setSearchQuery: handleSearchChange,
+    searchResultKinds,
+    setSearchResultKinds,
   }
 
   return (
@@ -218,6 +223,7 @@ export function SharedDashboardLayout({
               onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
               onResourcesLoaded={setHasResources}
               onKindsLoaded={setAvailableKinds}
+              searchResultKinds={searchResultKinds}
             />
           )}
 
