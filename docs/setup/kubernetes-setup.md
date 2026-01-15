@@ -24,6 +24,9 @@ export DOT_AI_UI_VERSION="..."
 # Use the same auth token as your dot-ai MCP server
 export DOT_AI_AUTH_TOKEN="your-dot-ai-auth-token"
 
+# Token for UI login
+export DOT_AI_UI_AUTH_TOKEN="your-ui-access-token"
+
 # Ingress class - change to match your ingress controller (traefik, haproxy, etc.)
 export INGRESS_CLASS_NAME="nginx"
 ```
@@ -35,6 +38,7 @@ helm install dot-ai-ui \
   oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui:$DOT_AI_UI_VERSION \
   --set dotAi.url="http://dot-ai:3456" \
   --set dotAi.auth.token="$DOT_AI_AUTH_TOKEN" \
+  --set uiAuth.token="$DOT_AI_UI_AUTH_TOKEN" \
   --set ingress.enabled=true \
   --set ingress.className="$INGRESS_CLASS_NAME" \
   --set ingress.host="dot-ai-ui.127.0.0.1.nip.io" \
@@ -73,6 +77,9 @@ Open your browser and navigate to the Web UI hostname. You should see the DevOps
 | `dotAi.auth.secretRef.name` | Name of existing secret with auth token | `dot-ai-secrets` |
 | `dotAi.auth.secretRef.key` | Key in existing secret | `auth-token` |
 | `dotAi.auth.token` | Auth token (if not using secretRef) | `""` |
+| `uiAuth.secretRef.name` | Existing secret with UI auth token | `""` |
+| `uiAuth.secretRef.key` | Key in existing secret | `ui-auth-token` |
+| `uiAuth.token` | UI auth token (if not using secretRef) | `""` |
 | `ingress.enabled` | Enable Ingress resource | `false` |
 | `ingress.className` | Ingress class name | `nginx` |
 | `ingress.host` | Ingress hostname | `dot-ai-ui.127.0.0.1.nip.io` |
@@ -87,7 +94,7 @@ Open your browser and navigate to the Web UI hostname. You should see the DevOps
 
 ## Using Secret Reference
 
-For production, reference an existing secret instead of passing the token directly:
+For production, reference existing secrets instead of passing tokens directly:
 
 ```bash
 helm install dot-ai-ui \
@@ -95,6 +102,8 @@ helm install dot-ai-ui \
   --set dotAi.url="http://dot-ai:3456" \
   --set dotAi.auth.secretRef.name="dot-ai-secrets" \
   --set dotAi.auth.secretRef.key="auth-token" \
+  --set uiAuth.secretRef.name="dot-ai-secrets" \
+  --set uiAuth.secretRef.key="ui-auth-token" \
   --set ingress.enabled=true \
   --set ingress.className="$INGRESS_CLASS_NAME" \
   --set ingress.host="dot-ai-ui.example.com" \
@@ -111,6 +120,8 @@ helm install dot-ai-ui \
   oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui:$DOT_AI_UI_VERSION \
   --set dotAi.url="http://dot-ai:3456" \
   --set dotAi.auth.secretRef.name="dot-ai-secrets" \
+  --set uiAuth.secretRef.name="dot-ai-secrets" \
+  --set uiAuth.secretRef.key="ui-auth-token" \
   --set ingress.enabled=true \
   --set ingress.className="$INGRESS_CLASS_NAME" \
   --set ingress.host="dot-ai-ui.example.com" \
@@ -140,6 +151,8 @@ helm install dot-ai-ui \
   oci://ghcr.io/vfarcic/dot-ai-ui/charts/dot-ai-ui:$DOT_AI_UI_VERSION \
   --set dotAi.url="http://dot-ai:3456" \
   --set dotAi.auth.secretRef.name="dot-ai-secrets" \
+  --set uiAuth.secretRef.name="dot-ai-secrets" \
+  --set uiAuth.secretRef.key="ui-auth-token" \
   --set ingress.enabled=false \
   --set gateway.name="cluster-gateway" \
   --set gateway.namespace="gateway-system" \

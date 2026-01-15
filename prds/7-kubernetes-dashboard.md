@@ -721,6 +721,20 @@ const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
 
 **Retained feature**: Sidebar filtering during search - when search is active, sidebar filters to show only resource types that have matching results. This improves navigation without the complexity of a guided tour.
 
+### Milestone 10: Documentation (COMPLETED)
+
+- [x] Update `docs/index.md` with Dashboard section (write text first with image placeholders)
+- [x] Update `docs/setup/kubernetes-setup.md` with `uiAuth` Helm configuration
+- [x] Capture screenshots via Playwright (125% zoom) to match doc references
+- [~] Create feature request for dot-ai MCP to update tool docs with UI references - deferred (low priority)
+
+**Design Decisions:**
+- Decision: Single page with screenshots sufficient (power users recognize patterns)
+- Decision: Write docs first, then capture matching screenshots (docs-first workflow)
+- Decision: Screenshots at 125% browser zoom for readability
+
+**Validation**: Documentation covers dashboard, AI tools, search, and authentication
+
 ---
 
 ## Out of Scope (Future Considerations)
@@ -820,6 +834,8 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-15 | Bearer token auth with strategy pattern | Bearer tokens are standard HTTP auth, work well with HTTPS encryption. Strategy pattern enables future auth methods (OAuth, API keys) without rewriting. Auth always required (secure by default) with auto-generated token if not configured | New server auth module, React auth context, Helm chart updates for UI auth token |
 | 2025-01-15 | Guided tour removed from scope | After implementation, interactive tour proved too brittle: React controlled components require hacky DOM manipulation, tour steps tightly coupled to DOM structure, hard to test reliably. Maintenance cost outweighed UX benefit. Dashboard UI follows established patterns that power users recognize. | Removed driver.js dependency, deleted GuidedTour component, removed Tour button from header |
 | 2025-01-15 | Sidebar filtering during search retained | When search is active, sidebar filters to show only resource types that have matching results. Improves navigation without guided tour complexity. Search results report unique kinds to parent; sidebar computes filtered display via useMemo. | New searchResultKinds context state, filtering logic in DashboardSidebar |
+| 2025-01-15 | Documentation update required before PRD completion | Current docs only describe original visualization companion features; missing dashboard, AI tools, search, and authentication. Single page with screenshots sufficient (power users recognize patterns). Screenshots at 125% zoom for readability. | New Milestone 10 added; feature request to dot-ai MCP for tool doc updates |
+| 2025-01-15 | Docs-first workflow for screenshots | Write documentation text first with image placeholders, then capture matching screenshots via Playwright at 125% zoom. More efficient than ad-hoc screenshot capture. | Documentation workflow: write text → capture screenshots |
 
 ---
 
@@ -882,4 +898,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-15 | Milestone 7 COMPLETED - Agentic Chat deferred to v2. Analysis: current tools (Query, Remediate, Operate, Recommend) cover primary K8s workflows. Generic chat without tool access would be limited value. Main gap is multi-turn conversation, addressable via Query session history in future version. |
 | 2025-01-15 | Milestone 8 COMPLETED - Bearer token authentication implemented. Server-side: Express auth middleware with strategy pattern (`server/auth/`), constant-time comparison, auto-generated token if not set. Frontend: React auth context, AuthGuard for protected routes, LoginPage with dashboard design system, sessionStorage for token. Helm chart: `uiAuth` section with secretRef and direct token options. Dev script: default `admin` token for development. Verified full auth flow with Playwright. |
 | 2025-01-15 | Milestone 9 REMOVED - Guided tour removed from scope after implementation proved too brittle. Interactive tours that manipulate React controlled components (auto-selecting namespaces, auto-typing searches) require fragile DOM hacks. Maintenance cost outweighed UX benefit. Retained sidebar filtering feature: when search is active, sidebar shows only resource types with matching results. |
+| 2025-01-15 | Milestone 10 COMPLETED - Documentation updated. `docs/index.md` restructured: added Kubernetes Dashboard section with screenshots (overview, resource detail), AI-Powered Operations section with all four tools documented (Query, Remediate, Operate, Recommend) with screenshots and links to devopstoolkit.ai docs, Vector DB architecture explanation, Authentication section. `docs/setup/kubernetes-setup.md` updated with `uiAuth` Helm configuration in all examples. Removed Key Features section (redundant with screenshots). |
 
