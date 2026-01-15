@@ -653,11 +653,16 @@ const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
 
 ### Milestone 7: Search & Agentic Chat (To Be Designed)
 
-#### Search
-- [ ] Design: Search UX - global search bar? keyboard shortcut? scope (current namespace vs all)?
-- [ ] Design: Search backend - Qdrant semantic search? text matching? filters?
-- [ ] Design: Search results presentation - inline dropdown? dedicated page? resource type grouping?
-- [ ] Implementation: Search component and API integration
+#### Search (COMPLETED)
+- [x] Design: Search UX - global search bar in header, Cmd+K keyboard shortcut, combines with namespace/kind filters
+- [x] Design: Search backend - Qdrant semantic search via MCP `/api/v1/resources/search` endpoint with relevance scoring
+- [x] Design: Search results presentation - dedicated view with results grouped by kind, sorted by relevance score
+- [x] Implementation: Search component and API integration
+  - `SearchInput` component with debounce (300ms), Cmd+K shortcut, Escape to clear
+  - `SearchResultsView` component with grouped results, color-coded relevance badges
+  - Relevance filtering with minScore dropdown (default 50%, options: All, 40%+, 50%+, 70%+)
+  - Search query preserved when changing namespace or clicking resource type
+  - URL state persistence via `?q=` parameter
 
 #### Agentic Chat
 
@@ -884,4 +889,5 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-14 | Milestone 5 - Recommend tool implementation COMPLETE. Fixed deployed stage showing empty content by verifying actual MCP response via HTTP (returns `{success, message, kubectlOutput, ...}` not `{status, results[]}`). Updated `RecommendDeployResponse` interface to match. Deployed stage now shows MCP's `message` and expandable `kubectlOutput`. Changed "Download All" from single concatenated YAML to ZIP format (jszip) preserving directory structure for kustomize/helm. Removed visualizations from Recommend workflow (complicated and not helpful). Fixed URL navigation to use single solution ID after selection. |
 | 2025-01-14 | Milestone 6 partial - Marked "Error states for K8s connection failures" as complete. UI only talks to MCP via proxy; existing generic error handling in `src/api/client.ts` already displays MCP error responses appropriately. No special K8s-specific error handling needed. |
 | 2025-01-14 | Milestone 6 COMPLETED - Removed mobile-responsive sidebar from scope. Kubernetes dashboards are power-user tools for workstations; complex content (tables, YAML, logs, diagrams) doesn't translate to small screens; AI workflows awkward on mobile. Added to Out of Scope. |
+| 2025-01-15 | Milestone 7 Search COMPLETED - Implemented semantic search via MCP `/api/v1/resources/search` endpoint (Qdrant backend). SearchInput component with debounce, Cmd+K shortcut, Escape to clear. SearchResultsView with results grouped by kind, sorted by highest relevance score. Color-coded relevance badges (green 70%+, yellow 40%+, gray <40%). minScore dropdown filter defaulting to 50%. Search query preserved across namespace/kind changes. Fixed rounding bug (Math.floor vs Math.round). URL state via `?q=` param. |
 
