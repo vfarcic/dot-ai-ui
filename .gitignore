@@ -36,3 +36,4 @@ vite.config.d.ts
 kubeconfig*.yaml
 
 /tmptest-results/
+tmp/
