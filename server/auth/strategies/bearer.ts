@@ -11,8 +11,6 @@ function generateRandomToken(): string {
 
 // Token is either from env var or auto-generated at startup
 // Auto-generated token is printed to logs for the user to copy
-let authToken: string
-
 function initializeToken(): string {
   const envToken = process.env.DOT_AI_UI_AUTH_TOKEN
 
@@ -36,7 +34,7 @@ function initializeToken(): string {
 }
 
 // Initialize token on module load
-authToken = initializeToken()
+const authToken = initializeToken()
 
 /**
  * Get the current auth token (for display/debugging)
@@ -110,11 +108,14 @@ export const bearerStrategy: AuthStrategy = {
 function constantTimeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) {
     // Still need to do some work to avoid length-based timing
+    // This loop is intentionally performed even though we return false,
+    // to prevent attackers from detecting length mismatches via timing
     let result = 0
     for (let i = 0; i < a.length; i++) {
       result |= a.charCodeAt(i) ^ (b.charCodeAt(i % b.length) || 0)
     }
-    return false
+    // Use result to prevent compiler optimization removing the loop
+    return result < 0 // Always false since result >= 0
   }
 
   let result = 0

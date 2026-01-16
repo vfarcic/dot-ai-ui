@@ -62,7 +62,7 @@ function extractJsonPathValue(obj: unknown, jsonPath: string): unknown {
   if (!jsonPath || !obj) return undefined
 
   const path = jsonPath.startsWith('.') ? jsonPath.slice(1) : jsonPath
-  const parts = path.split(/\.(?![^\[]*\])/)
+  const parts = path.split(/\.(?![^[]*\])/)
 
   let current: unknown = obj
   for (const part of parts) {

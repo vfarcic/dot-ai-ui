@@ -56,15 +56,17 @@ function formatBadgeValue(value: unknown, format?: BadgeConfig['format']): strin
   if (value === null || value === undefined) return ''
 
   switch (format) {
-    case 'percent':
+    case 'percent': {
       const num = typeof value === 'number' ? value : parseFloat(String(value))
       if (isNaN(num)) return String(value)
       // If value > 1, it's already a percentage (e.g., 96), otherwise it's decimal (e.g., 0.96)
       const percentValue = num > 1 ? Math.round(num) : Math.round(num * 100)
       return `${percentValue}%`
-    case 'risk':
+    }
+    case 'risk': {
       const risk = String(value).toLowerCase()
       return risk.charAt(0).toUpperCase() + risk.slice(1) + ' Risk'
+    }
     case 'text':
     default:
       return String(value)

@@ -25,7 +25,7 @@ export function LoginPage() {
       if (!success) {
         // Error will be set by login()
       }
-    } catch (err) {
+    } catch {
       setLocalError('Failed to authenticate')
     } finally {
       setIsSubmitting(false)
