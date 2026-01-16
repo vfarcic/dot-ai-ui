@@ -755,6 +755,8 @@ export interface SearchResourcesParams {
   namespace?: string
   /** Optional kind filter */
   kind?: string
+  /** Optional API group filter (e.g., 'apps', 'events.k8s.io') */
+  apiGroup?: string
   /** Optional API version filter */
   apiVersion?: string
   /** Max results (default: 100) */
@@ -777,7 +779,7 @@ export interface SearchResourcesResponse {
  * Searches names, kinds, labels, and annotations via Qdrant
  */
 export async function searchResources(params: SearchResourcesParams): Promise<SearchResourcesResponse> {
-  const { q, namespace, kind, apiVersion, limit = 100, offset = 0, minScore } = params
+  const { q, namespace, kind, apiGroup, apiVersion, limit = 100, offset = 0, minScore } = params
 
   const queryParams = new URLSearchParams({
     q,
@@ -790,6 +792,9 @@ export async function searchResources(params: SearchResourcesParams): Promise<Se
   }
   if (kind) {
     queryParams.set('kind', kind)
+  }
+  if (apiGroup) {
+    queryParams.set('apiGroup', apiGroup)
   }
   if (apiVersion) {
     queryParams.set('apiVersion', apiVersion)

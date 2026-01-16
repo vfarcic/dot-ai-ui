@@ -21,7 +21,7 @@ The dashboard provides a unified interface for Kubernetes resource management wi
 
 - **Resource Browser**: Navigate resources by API group in the collapsible sidebar
 - **Namespace Filtering**: Filter all views by namespace using the dropdown
-- **Semantic Search**: Find resources using natural language queries (Cmd+K shortcut)
+- **Semantic Search**: Find resources using natural language queries (Cmd+K / Ctrl+K)
 - **Relevance Scoring**: Search results ranked by semantic relevance with color-coded badges
 - **AI Action Bar**: Query, Remediate, Operate, or Recommend actions available from any view
 

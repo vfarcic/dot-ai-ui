@@ -60,7 +60,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // First, check if auth is enabled
       const statusRes = await fetch('/api/v1/auth/status')
+      if (!statusRes.ok) {
+        throw new Error(`Auth status check failed: ${statusRes.status}`)
+      }
       const statusData = await statusRes.json()
+
+      // Validate response payload
+      if (typeof statusData.authEnabled !== 'boolean') {
+        throw new Error('Invalid auth status response')
+      }
 
       setAuthEnabled(statusData.authEnabled)
       setStrategy(statusData.strategy)

@@ -56,8 +56,13 @@ export function SearchInput({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Sync local value when external value changes
+  // Also cancel any pending debounce to prevent stale timers
   useEffect(() => {
     setLocalValue(value)
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = null
+    }
   }, [value])
 
   // Debounced onChange

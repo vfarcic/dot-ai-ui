@@ -32,6 +32,15 @@ const staticLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 })
+
+// Stricter rate limiter for auth endpoints to prevent brute-force attacks
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts, please try again later' },
+})
 const isDev = process.env.NODE_ENV !== 'production'
 const PORT = process.env.PORT || 3000
 const MCP_BASE_URL = process.env.DOT_AI_MCP_URL || 'http://localhost:8080'
@@ -65,11 +74,11 @@ async function createServer() {
 
   // Auth status - public endpoint to check if auth is enabled
   // Used by frontend to decide whether to show login page
-  app.get('/api/v1/auth/status', statusHandler)
+  app.get('/api/v1/auth/status', authLimiter, statusHandler)
 
   // Auth verify - requires valid token, returns 200 if valid
   // Used by frontend to validate token before storing
-  app.get('/api/v1/auth/verify', authMiddleware, verifyHandler)
+  app.get('/api/v1/auth/verify', authLimiter, authMiddleware, verifyHandler)
 
   // ========================================
   // Protected API routes (auth middleware applied)

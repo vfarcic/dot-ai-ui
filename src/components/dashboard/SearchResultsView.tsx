@@ -97,9 +97,13 @@ export function SearchResultsView({
     if (!query) {
       setResources([])
       setTotal(0)
+      setError(null)
       setLoading(false)
+      onKindsFound?.([])
       return
     }
+
+    let cancelled = false
 
     const fetchResults = async () => {
       setLoading(true)
@@ -113,6 +117,10 @@ export function SearchResultsView({
           apiVersion,
           minScore: minScore > 0 ? minScore : undefined,
         })
+
+        // Skip state updates if request was cancelled (new query started)
+        if (cancelled) return
+
         setResources(result.resources)
         setTotal(result.total)
 
@@ -135,16 +143,22 @@ export function SearchResultsView({
           onKindsFound(Array.from(uniqueKinds.values()))
         }
       } catch (err) {
+        if (cancelled) return
         setError(err instanceof Error ? err.message : 'Failed to search resources')
         setResources([])
         setTotal(0)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchResults()
-  }, [query, namespace, kind, apiVersion, minScore])
+
+    // Cleanup: cancel in-flight request when dependencies change
+    return () => {
+      cancelled = true
+    }
+  }, [query, namespace, kind, apiVersion, minScore, onKindsFound])
 
   if (loading) {
     return <LoadingSkeleton />
@@ -220,9 +234,10 @@ export function SearchResultsView({
     )
   }
 
-  // Group resources by kind for display
+  // Group resources by kind and apiVersion for display
+  // Include apiVersion in key to avoid merging different versions (e.g., v1 vs v1beta1)
   const groupedResources = resources.reduce((acc, resource) => {
-    const key = `${resource.apiGroup || 'core'}/${resource.kind}`
+    const key = `${resource.apiGroup || 'core'}/${resource.apiVersion}/${resource.kind}`
     if (!acc[key]) {
       acc[key] = {
         kind: resource.kind,
@@ -287,7 +302,7 @@ export function SearchResultsView({
           : group.apiVersion
 
         return (
-          <div key={`${group.apiGroup}/${group.kind}`} className="mb-6">
+          <div key={`${group.apiGroup || 'core'}/${group.apiVersion}/${group.kind}`} className="mb-6">
             <h2 className="text-base font-medium text-foreground mb-2 flex items-center gap-2">
               {group.kind}
               {group.apiGroup && (
@@ -394,6 +409,15 @@ export function SearchResultsView({
                         </td>
                         <td className="px-2 py-2 text-center">
                           <button
+                            type="button"
+                            aria-label={
+                              isSelectionDisabled
+                                ? 'Selection not available for Recommend tool'
+                                : rowSelected
+                                  ? `Remove from query: ${resource.name}`
+                                  : `Add to query: ${resource.name}`
+                            }
+                            aria-pressed={rowSelected}
                             onClick={() => !isSelectionDisabled && toggleItem(selectedResource)}
                             disabled={isSelectionDisabled}
                             className={`p-1.5 rounded-md transition-all ${

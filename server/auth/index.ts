@@ -11,7 +11,8 @@ import { bearerStrategy } from './strategies/bearer.js'
  * Current strategy: Bearer token
  * Future strategies: OAuth/OIDC, API keys, etc.
  *
- * To disable authentication, don't set DOT_AI_UI_AUTH_TOKEN env var.
+ * Auth is always enabled. If DOT_AI_UI_AUTH_TOKEN is not set, a random
+ * token is auto-generated and printed to the console at startup.
  * To replace this module, update the imports in server/index.ts.
  */
 
