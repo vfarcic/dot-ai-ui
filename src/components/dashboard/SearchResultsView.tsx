@@ -192,8 +192,9 @@ export function SearchResultsView({
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-foreground">Search Results</h1>
           <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground">Min relevance:</label>
+            <label htmlFor="search-empty-min-relevance" className="text-sm text-muted-foreground">Min relevance:</label>
             <select
+              id="search-empty-min-relevance"
               value={minScore}
               onChange={(e) => setMinScore(Number(e.target.value))}
               className="px-2 py-1 text-sm bg-muted/50 border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -281,8 +282,9 @@ export function SearchResultsView({
           </span>
         </h1>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-muted-foreground">Min relevance:</label>
+          <label htmlFor="search-min-relevance" className="text-sm text-muted-foreground">Min relevance:</label>
           <select
+            id="search-min-relevance"
             value={minScore}
             onChange={(e) => setMinScore(Number(e.target.value))}
             className="px-2 py-1 text-sm bg-muted/50 border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"

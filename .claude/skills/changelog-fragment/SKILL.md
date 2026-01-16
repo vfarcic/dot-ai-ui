@@ -1,11 +1,11 @@
 ---
 name: changelog-fragment
-description: Create changelog fragment for release notes. Invoke during /prd-done workflow after PR is merged.
+description: Create changelog fragment for release notes. Invoke during /prd-done workflow during the first push to the PR.
 ---
 
 # Create Changelog Fragment
 
-Create a towncrier changelog fragment for release notes when completing PRD work.
+Create a towncrier changelog fragment for release notes when completing PRD work. This should be included in the PR so the fragment is reviewed along with the code changes.
 
 ## Workflow
 
@@ -81,7 +81,7 @@ See the [Multi-Cluster Setup Guide](https://devopstoolkit.ai/docs/mcp/setup/mult
 Show the user:
 1. The fragment file path created
 2. The content written
-3. Reminder to include in the commit
+3. Reminder to commit and push with the PR
 
 ## Guidelines
 

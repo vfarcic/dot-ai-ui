@@ -100,15 +100,24 @@ export async function verifyHandler(
     return
   }
 
-  const result = await config.strategy.authenticate(req)
+  try {
+    const result = await config.strategy.authenticate(req)
 
-  if (result.authenticated) {
-    res.json({ authenticated: true, authEnabled: true })
-  } else {
-    res.status(401).json({
+    if (result.authenticated) {
+      res.json({ authenticated: true, authEnabled: true })
+    } else {
+      res.status(401).json({
+        authenticated: false,
+        authEnabled: true,
+        error: result.error,
+      })
+    }
+  } catch (error) {
+    console.error('[Auth] Verification error:', error)
+    res.status(500).json({
       authenticated: false,
       authEnabled: true,
-      error: result.error,
+      error: 'Authentication service error',
     })
   }
 }
