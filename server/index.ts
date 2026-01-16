@@ -84,9 +84,10 @@ async function createServer() {
   // Protected API routes (auth middleware applied)
   // ========================================
 
-  // Apply auth middleware to all /api/v1/* routes except auth/status
-  app.use('/api/v1', (req, res, next) => {
-    // Skip auth for the status endpoint (already handled above)
+  // Apply rate limiting and auth middleware to all /api/v1/* routes except auth endpoints
+  // Rate limiting here prevents DoS on the auth check itself
+  app.use('/api/v1', apiLimiter, (req, res, next) => {
+    // Skip auth for the status endpoint (already handled above with authLimiter)
     if (req.path === '/auth/status') {
       return next()
     }
