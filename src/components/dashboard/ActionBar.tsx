@@ -9,7 +9,7 @@ import { useActionSelection, type SelectedResource, type Tool } from '../../cont
 export type { Tool }
 
 // Internal/UI params to exclude from context (version is redundant - group is more meaningful for CRDs)
-const EXCLUDED_PARAMS = new Set(['sb', 'tab', 'version'])
+const EXCLUDED_PARAMS = new Set(['sb', 'tab', 'version', 'q'])
 
 // Friendly labels for param keys
 const PARAM_LABELS: Record<string, string> = {

@@ -5,6 +5,7 @@
  */
 
 import { APIError } from './client'
+import { fetchWithAuth } from './authHeaders'
 
 const API_PATH = '/api/v1'
 const RECOMMEND_TIMEOUT = 30 * 60 * 1000 // 30 minutes for complex operations
@@ -258,7 +259,7 @@ export async function submitRecommendIntent(
       body.final = true
     }
 
-    const response = await fetch(`${API_PATH}/tools/recommend`, {
+    const response = await fetchWithAuth(`${API_PATH}/tools/recommend`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -337,7 +338,7 @@ export async function chooseSolution(
     const startTime = performance.now()
     console.log(`[Recommend API] Choosing solution: ${solutionId}`)
 
-    const response = await fetch(`${API_PATH}/tools/recommend`, {
+    const response = await fetchWithAuth(`${API_PATH}/tools/recommend`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -423,7 +424,7 @@ export async function answerQuestions(
     const startTime = performance.now()
     console.log(`[Recommend API] Answering questions for stage: ${stage}`)
 
-    const response = await fetch(`${API_PATH}/tools/recommend`, {
+    const response = await fetchWithAuth(`${API_PATH}/tools/recommend`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -506,7 +507,7 @@ export async function generateManifests(
     const startTime = performance.now()
     console.log(`[Recommend API] Generating manifests for solution: ${solutionId}`)
 
-    const response = await fetch(`${API_PATH}/tools/recommend`, {
+    const response = await fetchWithAuth(`${API_PATH}/tools/recommend`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -598,7 +599,7 @@ export async function deployManifests(
       body.timeout = timeout
     }
 
-    const response = await fetch(`${API_PATH}/tools/recommend`, {
+    const response = await fetchWithAuth(`${API_PATH}/tools/recommend`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -677,7 +678,7 @@ export async function getRecommendSession(
   try {
     console.log(`[Recommend API] Fetching session: ${sessionId}`)
 
-    const response = await fetch(`${API_PATH}/sessions/${sessionId}`, {
+    const response = await fetchWithAuth(`${API_PATH}/sessions/${sessionId}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',

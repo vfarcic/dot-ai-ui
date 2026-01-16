@@ -1,7 +1,7 @@
 # PRD: Kubernetes Dashboard with AI Enhancement
 
 **Issue**: [#7](https://github.com/vfarcic/dot-ai-ui/issues/7)
-**Status**: Draft
+**Status**: Complete (2025-01-16)
 **Priority**: High
 **Created**: 2025-01-08
 
@@ -152,13 +152,13 @@ Key: Hybrid approach - Qdrant for discovery/metadata, K8s API for live status
 
 **Architecture Note**: Original plan assumed UI would use `@kubernetes/client-node` directly. Actual implementation: MCP server handles all K8s API communication; UI only talks to MCP.
 
-### Milestone 3: Frontend Infrastructure
-- [ ] React Query setup for data fetching
-- [ ] Namespace context provider
-- [ ] Generic resource hooks with polling
-- [ ] Caching strategy for MCP data vs K8s status data
+### Milestone 3: Frontend Infrastructure (DEFERRED to PRD #9)
+- [~] React Query setup for data fetching - deferred to [PRD #9](./9-react-query-integration.md)
+- [~] Namespace context provider - deferred to [PRD #9](./9-react-query-integration.md)
+- [~] Generic resource hooks with polling - deferred to [PRD #9](./9-react-query-integration.md)
+- [~] Caching strategy for MCP data vs K8s status data - deferred to [PRD #9](./9-react-query-integration.md)
 
-**Validation**: Hooks successfully fetch, cache, and merge data from both sources
+**Validation**: Deferred - see PRD #9 for validation criteria
 
 ### Milestone 4: Resource List & Detail Views
 - [x] Generic `ResourceListPage` with dynamic columns
@@ -644,92 +644,96 @@ const RECOMMEND_SOLUTION_TEMPLATE: InfoTemplate = [
 
 **Validation**: Click "Analyze Cluster Health" on dashboard home, see AI analysis rendered inline
 
-### Milestone 6: Polish & Error Handling
+### Milestone 6: Polish & Error Handling (COMPLETED)
 - [x] Loading skeletons for resource lists
-- [ ] Error states for K8s connection failures
+- [x] Error states for K8s connection failures (covered by generic MCP error handling - UI only talks to MCP via proxy)
 - [x] Empty states for namespaces with no resources
-- [ ] Mobile-responsive sidebar
 
 **Validation**: Dashboard handles edge cases gracefully (no cluster, empty namespace, errors)
 
-### Milestone 7: Search & Agentic Chat (To Be Designed)
+### Milestone 7: Search & Agentic Chat (COMPLETED)
 
-#### Search
-- [ ] Design: Search UX - global search bar? keyboard shortcut? scope (current namespace vs all)?
-- [ ] Design: Search backend - Qdrant semantic search? text matching? filters?
-- [ ] Design: Search results presentation - inline dropdown? dedicated page? resource type grouping?
-- [ ] Implementation: Search component and API integration
+#### Search (COMPLETED)
+- [x] Design: Search UX - global search bar in header, Cmd+K keyboard shortcut, combines with namespace/kind filters
+- [x] Design: Search backend - Qdrant semantic search via MCP `/api/v1/resources/search` endpoint with relevance scoring
+- [x] Design: Search results presentation - dedicated view with results grouped by kind, sorted by relevance score
+- [x] Implementation: Search component and API integration
+  - `SearchInput` component with debounce (300ms), Cmd+K shortcut, Escape to clear
+  - `SearchResultsView` component with grouped results, color-coded relevance badges
+  - Relevance filtering with minScore dropdown (default 50%, options: All, 40%+, 50%+, 70%+)
+  - Search query preserved when changing namespace or clicking resource type
+  - URL state persistence via `?q=` parameter
 
-#### Agentic Chat
+#### Agentic Chat (DEFERRED to v2)
 
 **Architectural Decisions (Resolved)**
 - [x] Decision: No generic free-form chat for v1 - focus on tool-specific integrations instead
 - [x] Decision: LLM communication stays in MCP server (API keys never exposed to browser)
 - [x] Decision: UI maintains conversation context for tool workflows (stateless MCP for chat)
 - Rationale: Generic chat without tool access provides limited value (just ChatGPT in a sidebar); tool-specific integrations deliver immediate cluster-aware value
+- Rationale: Current tools (Query, Remediate, Operate, Recommend) cover primary K8s workflows; main gap is multi-turn conversation which could be addressed by enhancing Query with session history in v2
 
-**Architecture**
-```
-UI (dot-ai-ui)          Express Proxy           MCP Server (dot-ai)
-+-------------+         +-------------+         +------------------+
-| Tool UI     |  HTTP   | /api/...    |  HTTP   | Tool endpoints   |
-| - Context   |-------->| (proxy)     |-------->| - LLM API keys   |
-| - History   |<--------|             |<--------| - Tool execution |
-+-------------+         +-------------+         +------------------+
-```
+**Deferred to v2**
+- [~] Design: Chat UX - side panel? modal? persistent drawer? conversation history?
+- [~] Design: Chat context - how to pass current resource/namespace context to agent?
+- [~] Design: Action execution - how should chat-suggested actions be presented and executed?
+- [~] Design: Chat backend - streaming responses? conversation memory? tool calling UI?
+- [~] Implementation: Chat component and MCP integration
 
-**Deferred Design Questions**
-- [ ] Design: Chat UX - side panel? modal? persistent drawer? conversation history?
-- [ ] Design: Chat context - how to pass current resource/namespace context to agent?
-- [ ] Design: Action execution - how should chat-suggested actions be presented and executed?
-- [ ] Design: Chat backend - streaming responses? conversation memory? tool calling UI?
-- [ ] Implementation: Chat component and MCP integration
+**Validation**: Search completed; Agentic Chat deferred to v2
 
-**Validation**: Users can search resources and have natural language conversations with AI about their cluster
-
-### Milestone 8: Basic Authentication
+### Milestone 8: Basic Authentication (COMPLETED)
 
 **Note**: This is a minimal authentication implementation to secure the dashboard. A separate PRD should be created for comprehensive authentication (OAuth/OIDC, RBAC, audit logging, etc.).
 
-- [ ] Design: Simple auth mechanism (bearer token? basic auth? environment-based?)
-- [ ] Implementation: Protect dashboard routes from unauthenticated access
-- [ ] Implementation: Protect API proxy endpoints
-- [ ] Documentation: How to configure authentication
+- [x] Design: Simple auth mechanism (bearer token? basic auth? environment-based?)
+- [x] Implementation: Protect dashboard routes from unauthenticated access
+- [x] Implementation: Protect API proxy endpoints
+- [x] Documentation: How to configure authentication
+
+**Design Decisions:**
+- Decision: Bearer token authentication via `Authorization: Bearer <token>` header
+- Decision: Strategy pattern for auth implementation (extensible, replaceable in future)
+- Decision: Auth always required - auto-generates random token if `DOT_AI_UI_AUTH_TOKEN` not set
+- Decision: Token stored in sessionStorage (cleared on tab close)
+- Decision: Constant-time string comparison to prevent timing attacks
+
+**Implementation Details:**
+- Server auth module: `server/auth/` with types, strategies, middleware
+- React auth context: `src/auth/` with AuthContext, AuthGuard, LoginPage
+- API helper: `src/api/authHeaders.ts` with `fetchWithAuth()` wrapper
+- Helm chart: `uiAuth` section in values.yaml, secret template, deployment env var
+- Dev script: `DOT_AI_UI_AUTH_TOKEN=admin` default for development
 
 **Validation**: Dashboard requires authentication; unauthenticated users cannot access resources or trigger AI operations
 
-### Milestone 9: Onboarding Guided Tour
+### Milestone 9: Onboarding Guided Tour (REMOVED)
 
-**Problem**: New users arriving at the dashboard may not immediately understand how to navigate the sidebar, use AI tools, or interpret resource information. A guided tour reduces time-to-value and improves user confidence.
+**Status**: Removed from scope
 
-**Design Decisions (To Be Resolved)**
-- [ ] Design: Library choice - React Joyride (most popular) vs Shepherd.js vs Intro.js vs custom?
-- [ ] Design: Tour trigger - first visit per session? localStorage-persisted? user preference in settings?
-- [ ] Design: Tour interruption handling - what happens if user navigates mid-tour?
-- [ ] Design: Mobile experience - should tour be disabled or adapted for small screens?
+**Decision**: After implementation and testing, the guided tour was removed due to:
+1. **Brittleness** - Manipulating React controlled components (select dropdowns, search inputs) requires hacky workarounds that are fragile and browser-dependent
+2. **Maintenance burden** - Tour steps tied to exact DOM structure; any UI refactor can break the tour
+3. **Testing difficulty** - Hard to verify reliable cross-browser behavior
+4. **Diminishing returns** - Complex interactive tours (auto-selecting namespaces, auto-typing searches) introduce more problems than they solve
 
-**Proposed Tour Flow**
-1. **Sidebar Highlight** - Spotlight on left sidebar with modal explaining resource type navigation, prompting user to click a resource type
-2. **Resource List Highlight** - After user clicks sidebar, spotlight on main body explaining the resource table, status indicators, and clickable rows
-3. **ActionBar Introduction** - Spotlight on bottom ActionBar explaining AI tools (Query, Remediate, Operate) and how to ask questions about the cluster
-4. **Completion** - Success message with option to replay tour from settings/help menu
+**Alternative approach**: Rely on intuitive UI design. The dashboard follows established patterns (sidebar navigation, tabbed detail views, bottom action bar) that power users will recognize.
 
-**Implementation**
-- [ ] Choose and install tour library (recommend React Joyride for React ecosystem fit)
-- [ ] Create `GuidedTour` component with step definitions and callbacks
-- [ ] Add tour state to session storage (shown/not shown this session)
-- [ ] Style tour tooltips/modals to match dashboard dark theme
-- [ ] Add "Replay Tour" option in header or help menu
-- [ ] Handle edge cases: navigation during tour, window resize, mobile viewports
+**Retained feature**: Sidebar filtering during search - when search is active, sidebar filters to show only resource types that have matching results. This improves navigation without the complexity of a guided tour.
 
-**UX Requirements**
-- Tour must be skippable at any step ("Skip tour" button always visible)
-- Each step should have concise text (1-2 sentences max)
-- Highlighted area should be interactive (user can click the actual element)
-- Dim overlay on non-focused areas without blocking the highlighted element
-- Tour should gracefully handle if user navigates away (reset or pause)
+### Milestone 10: Documentation (COMPLETED)
 
-**Validation**: New user visits `/dashboard`, guided tour starts automatically, user can complete all steps or skip. Tour doesn't reappear after completion (within session). "Replay Tour" button works.
+- [x] Update `docs/index.md` with Dashboard section (write text first with image placeholders)
+- [x] Update `docs/setup/kubernetes-setup.md` with `uiAuth` Helm configuration
+- [x] Capture screenshots via Playwright (125% zoom) to match doc references
+- [~] Create feature request for dot-ai MCP to update tool docs with UI references - deferred (low priority)
+
+**Design Decisions:**
+- Decision: Single page with screenshots sufficient (power users recognize patterns)
+- Decision: Write docs first, then capture matching screenshots (docs-first workflow)
+- Decision: Screenshots at 125% browser zoom for readability
+
+**Validation**: Documentation covers dashboard, AI tools, search, and authentication
 
 ---
 
@@ -739,6 +743,7 @@ UI (dot-ai-ui)          Express Proxy           MCP Server (dot-ai)
 - Real-time WebSocket updates (polling is sufficient for v1)
 - Multi-cluster support
 - Advanced authentication (OAuth/OIDC, SSO, RBAC integration) - separate PRD after Milestone 8
+- Mobile-responsive optimization - dashboard is a power-user tool for workstations; complex content doesn't translate to small screens
 
 ---
 
@@ -770,7 +775,6 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 
 ### UI Dependencies
 - `@tanstack/react-query` - Server state management (planned, using useState/useEffect currently)
-- `react-joyride` - Guided tour library (planned, for Milestone 9 onboarding)
 - Existing MCP proxy infrastructure (all K8s data flows through MCP)
 
 ### External Dependencies (dot-ai MCP)
@@ -824,6 +828,14 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-14 | Manifest download changed to ZIP format | Original "Download All" concatenated files into single YAML, losing directory structure needed for kustomize/helm. | Added jszip dependency; ManifestPreview downloads `manifests.zip` preserving directory structure |
 | 2025-01-14 | Organizational Data deferred to PRD #8 | Feature scope warranted its own PRD with dedicated milestones for patterns and policies CRUD | Removed from Milestone 5 scope; cross-linked to PRD #8 |
 | 2025-01-14 | Skip/previous navigation for Recommend question stages deferred | Core Recommend workflow is functional; users can complete all stages sequentially. Skip/back navigation is a UX enhancement, not a blocker | Marked as deferred in Milestone 5; Recommend tool considered complete for v1 |
+| 2025-01-14 | Milestone 3 (Frontend Infrastructure) deferred to PRD #9 | React Query integration warranted its own PRD with dedicated milestones; dashboard works correctly with current useState/useEffect patterns | Milestone 3 marked as deferred; cross-linked to PRD #9 |
+| 2025-01-14 | Mobile-responsive sidebar removed from scope | Kubernetes dashboards are power-user tools primarily used at workstations; complex content (tables, YAML, logs, diagrams) doesn't translate to small screens; AI workflows awkward on mobile; industry norm (Lens, Rancher, K8s Dashboard don't prioritize mobile); on-call engineers use kubectl or alerting apps | Removed from Milestone 6; added to Out of Scope |
+| 2025-01-15 | Agentic Chat deferred to v2 | Generic chat without tool access provides limited value (just ChatGPT in sidebar). Current tools (Query, Remediate, Operate, Recommend) cover primary K8s workflows. Main gap is multi-turn conversation, which could be addressed by enhancing Query with session history in v2 | Milestone 7 complete with Search only; Chat design questions marked as deferred |
+| 2025-01-15 | Bearer token auth with strategy pattern | Bearer tokens are standard HTTP auth, work well with HTTPS encryption. Strategy pattern enables future auth methods (OAuth, API keys) without rewriting. Auth always required (secure by default) with auto-generated token if not configured | New server auth module, React auth context, Helm chart updates for UI auth token |
+| 2025-01-15 | Guided tour removed from scope | After implementation, interactive tour proved too brittle: React controlled components require hacky DOM manipulation, tour steps tightly coupled to DOM structure, hard to test reliably. Maintenance cost outweighed UX benefit. Dashboard UI follows established patterns that power users recognize. | Removed driver.js dependency, deleted GuidedTour component, removed Tour button from header |
+| 2025-01-15 | Sidebar filtering during search retained | When search is active, sidebar filters to show only resource types that have matching results. Improves navigation without guided tour complexity. Search results report unique kinds to parent; sidebar computes filtered display via useMemo. | New searchResultKinds context state, filtering logic in DashboardSidebar |
+| 2025-01-15 | Documentation update required before PRD completion | Current docs only describe original visualization companion features; missing dashboard, AI tools, search, and authentication. Single page with screenshots sufficient (power users recognize patterns). Screenshots at 125% zoom for readability. | New Milestone 10 added; feature request to dot-ai MCP for tool doc updates |
+| 2025-01-15 | Docs-first workflow for screenshots | Write documentation text first with image placeholders, then capture matching screenshots via Playwright at 125% zoom. More efficient than ad-hoc screenshot capture. | Documentation workflow: write text → capture screenshots |
 
 ---
 
@@ -880,4 +892,11 @@ The MCP server URL can be found via: `kubectl get ingress -n dot-ai`
 | 2025-01-13 | Improved Query tool error handling: When Query returns guidance instead of visualizations (e.g., "use operate tool"), UI now shows user-friendly amber notice box instead of raw JSON. "Session & Insights" panel hidden when showing inline guidance. MCP bug fixed on server side to return valid JSON with empty visualizations array. |
 | 2025-01-13 | Milestone 5 - Recommend tool design COMPLETE. Tested MCP recommend endpoint via HTTP to understand full workflow. Key findings: 6+ stage wizard (intent → solutions → questions × 4 stages → manifests → deploy). Session prefix `sol-`. First tool to use Form section. Solutions array includes score, resources, applied patterns, relevant policies. Question stages: required (name, namespace, outputFormat, outputPath), basic (replicas, image, ports), advanced (resources, strategy, labels), open. Manifest generation returns YAML files. Visualization endpoint returns rich diagrams. New components needed: SolutionSelector, QuestionForm, ManifestPreview. Ready for implementation. |
 | 2025-01-14 | Milestone 5 - Recommend tool implementation COMPLETE. Fixed deployed stage showing empty content by verifying actual MCP response via HTTP (returns `{success, message, kubectlOutput, ...}` not `{status, results[]}`). Updated `RecommendDeployResponse` interface to match. Deployed stage now shows MCP's `message` and expandable `kubectlOutput`. Changed "Download All" from single concatenated YAML to ZIP format (jszip) preserving directory structure for kustomize/helm. Removed visualizations from Recommend workflow (complicated and not helpful). Fixed URL navigation to use single solution ID after selection. |
+| 2025-01-14 | Milestone 6 partial - Marked "Error states for K8s connection failures" as complete. UI only talks to MCP via proxy; existing generic error handling in `src/api/client.ts` already displays MCP error responses appropriately. No special K8s-specific error handling needed. |
+| 2025-01-14 | Milestone 6 COMPLETED - Removed mobile-responsive sidebar from scope. Kubernetes dashboards are power-user tools for workstations; complex content (tables, YAML, logs, diagrams) doesn't translate to small screens; AI workflows awkward on mobile. Added to Out of Scope. |
+| 2025-01-15 | Milestone 7 Search COMPLETED - Implemented semantic search via MCP `/api/v1/resources/search` endpoint (Qdrant backend). SearchInput component with debounce, Cmd+K shortcut, Escape to clear. SearchResultsView with results grouped by kind, sorted by highest relevance score. Color-coded relevance badges (green 70%+, yellow 40%+, gray <40%). minScore dropdown filter defaulting to 50%. Search query preserved across namespace/kind changes. Fixed rounding bug (Math.floor vs Math.round). URL state via `?q=` param. |
+| 2025-01-15 | Milestone 7 COMPLETED - Agentic Chat deferred to v2. Analysis: current tools (Query, Remediate, Operate, Recommend) cover primary K8s workflows. Generic chat without tool access would be limited value. Main gap is multi-turn conversation, addressable via Query session history in future version. |
+| 2025-01-15 | Milestone 8 COMPLETED - Bearer token authentication implemented. Server-side: Express auth middleware with strategy pattern (`server/auth/`), constant-time comparison, auto-generated token if not set. Frontend: React auth context, AuthGuard for protected routes, LoginPage with dashboard design system, sessionStorage for token. Helm chart: `uiAuth` section with secretRef and direct token options. Dev script: default `admin` token for development. Verified full auth flow with Playwright. |
+| 2025-01-15 | Milestone 9 REMOVED - Guided tour removed from scope after implementation proved too brittle. Interactive tours that manipulate React controlled components (auto-selecting namespaces, auto-typing searches) require fragile DOM hacks. Maintenance cost outweighed UX benefit. Retained sidebar filtering feature: when search is active, sidebar shows only resource types with matching results. |
+| 2025-01-15 | Milestone 10 COMPLETED - Documentation updated. `docs/index.md` restructured: added Kubernetes Dashboard section with screenshots (overview, resource detail), AI-Powered Operations section with all four tools documented (Query, Remediate, Operate, Recommend) with screenshots and links to devopstoolkit.ai docs, Vector DB architecture explanation, Authentication section. `docs/setup/kubernetes-setup.md` updated with `uiAuth` Helm configuration in all examples. Removed Key Features section (redundant with screenshots). |
 

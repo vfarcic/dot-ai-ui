@@ -4,6 +4,7 @@
  */
 
 import { APIError } from './client'
+import { fetchWithAuth } from './authHeaders'
 import type { Visualization } from '@/types'
 
 const API_PATH = '/api/v1'
@@ -42,7 +43,7 @@ export async function queryCluster(intent: string, signal?: AbortSignal): Promis
     const startTime = performance.now()
     console.log(`[Query API] Sending query: ${intent}`)
 
-    const response = await fetch(`${API_PATH}/tools/query`, {
+    const response = await fetchWithAuth(`${API_PATH}/tools/query`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

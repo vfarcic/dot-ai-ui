@@ -4,10 +4,12 @@ import { ResourceDetail } from './pages/ResourceDetail'
 import { SharedDashboardLayout } from './components/dashboard/SharedDashboardLayout'
 import { DashboardHome } from './components/dashboard/DashboardHome'
 import { ActionSelectionProvider } from './context/ActionSelectionContext'
+import { AuthGuard } from './auth'
 
 function App() {
   return (
     <BrowserRouter>
+      <AuthGuard>
       <ActionSelectionProvider>
       <Routes>
         {/* Redirect home to dashboard until home page is implemented */}
@@ -28,6 +30,7 @@ function App() {
         </Route>
       </Routes>
       </ActionSelectionProvider>
+      </AuthGuard>
     </BrowserRouter>
   )
 }

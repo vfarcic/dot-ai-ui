@@ -2,6 +2,13 @@ import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import rateLimit from 'express-rate-limit'
+import {
+  authMiddleware,
+  verifyHandler,
+  statusHandler,
+  isAuthEnabled,
+  getAuthStrategyName,
+} from './auth/index.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -25,6 +32,15 @@ const staticLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 })
+
+// Stricter rate limiter for auth endpoints to prevent brute-force attacks
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts, please try again later' },
+})
 const isDev = process.env.NODE_ENV !== 'production'
 const PORT = process.env.PORT || 3000
 const MCP_BASE_URL = process.env.DOT_AI_MCP_URL || 'http://localhost:8080'
@@ -32,7 +48,8 @@ const AUTH_TOKEN = process.env.DOT_AI_AUTH_TOKEN
 const API_TIMEOUT = 5 * 60 * 1000 // 5 minutes for AI generation
 
 console.log(`[Config] MCP_BASE_URL: ${MCP_BASE_URL}`)
-console.log(`[Config] AUTH_TOKEN: ${AUTH_TOKEN ? '***set***' : 'NOT SET'}`)
+console.log(`[Config] AUTH_TOKEN (MCP): ${AUTH_TOKEN ? '***set***' : 'NOT SET'}`)
+console.log(`[Config] UI_AUTH: ${isAuthEnabled() ? `enabled (${getAuthStrategyName()})` : 'disabled'}`)
 
 async function createServer() {
   const app = express()
@@ -49,6 +66,32 @@ async function createServer() {
   app.get('/api/debug', (_req, res) => {
     console.log('[Debug] Hit debug endpoint')
     res.json({ ok: true, mcp: MCP_BASE_URL, hasToken: !!AUTH_TOKEN })
+  })
+
+  // ========================================
+  // Authentication endpoints (before auth middleware)
+  // ========================================
+
+  // Auth status - public endpoint to check if auth is enabled
+  // Used by frontend to decide whether to show login page
+  app.get('/api/v1/auth/status', authLimiter, statusHandler)
+
+  // Auth verify - requires valid token, returns 200 if valid
+  // Used by frontend to validate token before storing
+  app.get('/api/v1/auth/verify', authLimiter, authMiddleware, verifyHandler)
+
+  // ========================================
+  // Protected API routes (auth middleware applied)
+  // ========================================
+
+  // Apply rate limiting and auth middleware to all /api/v1/* routes except auth endpoints
+  // Rate limiting here prevents DoS on the auth check itself
+  app.use('/api/v1', apiLimiter, (req, res, next) => {
+    // Skip auth for the status endpoint (already handled above with authLimiter)
+    if (req.path === '/auth/status') {
+      return next()
+    }
+    return authMiddleware(req, res, next)
   })
 
   // Proxy visualization API requests to MCP server
@@ -147,6 +190,49 @@ async function createServer() {
     } catch (error) {
       console.error('Proxy error:', error)
       res.status(500).json({ error: 'Failed to fetch resources' })
+    }
+  })
+
+  // Proxy dashboard resource search API requests to MCP server
+  app.get('/api/v1/resources/search', apiLimiter, async (req, res) => {
+    try {
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      }
+      if (AUTH_TOKEN) {
+        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
+
+      const queryString = new URLSearchParams(req.query as Record<string, string>).toString()
+      const url = `${MCP_BASE_URL}/api/v1/resources/search${queryString ? `?${queryString}` : ''}`
+      console.log(`[Proxy] Searching resources from MCP: ${url}`)
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to search resources' })
     }
   })
 

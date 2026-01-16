@@ -224,7 +224,6 @@ export function Visualization() {
     setIsDeploying(false)
     // Reset fetch ref to allow fetching for new session
     fetchedSessionRef.current = null
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, navigationState?.remediateData, navigationState?.operateData, navigationState?.recommendData, navigationState?.recommendWorkflow])
 
   const isRemediate = sessionId ? isRemediateSession(sessionId) : false
@@ -282,7 +281,6 @@ export function Visualization() {
     } finally {
       setIsRemediateLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, isRemediate])
 
   // Handle remediate execution choice
@@ -327,7 +325,6 @@ export function Visualization() {
     } finally {
       setIsOperateLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, isOperate])
 
   // Handle operate execution choice
@@ -423,7 +420,6 @@ export function Visualization() {
     } finally {
       setIsRecommendLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, isRecommend])
 
   // Handle solution selection

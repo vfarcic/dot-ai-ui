@@ -3,6 +3,8 @@
  * Fetches Kubernetes resource data from the MCP server
  */
 
+import { fetchWithAuth } from './authHeaders'
+
 const API_PATH = '/api/v1'
 
 export interface ResourceKind {
@@ -30,7 +32,7 @@ export async function getResourceKinds(namespace?: string): Promise<ResourceKind
   const queryString = params.toString()
   const url = `${API_PATH}/resources/kinds${queryString ? `?${queryString}` : ''}`
 
-  const response = await fetch(url, {
+  const response = await fetchWithAuth(url, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -91,7 +93,7 @@ export interface NamespacesResponse {
  * Fetch all namespaces available in the cluster
  */
 export async function getNamespaces(): Promise<string[]> {
-  const response = await fetch(`${API_PATH}/namespaces`, {
+  const response = await fetchWithAuth(`${API_PATH}/namespaces`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -616,7 +618,7 @@ export async function getCapabilities(params: GetCapabilitiesParams): Promise<Ge
   })
 
   try {
-    const response = await fetch(`${API_PATH}/capabilities?${queryParams}`, {
+    const response = await fetchWithAuth(`${API_PATH}/capabilities?${queryParams}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -676,6 +678,7 @@ export interface Resource {
   createdAt: string
   status?: Record<string, unknown> // Raw K8s status object, varies by resource type
   spec?: Record<string, unknown> // Raw K8s spec object
+  score?: number // Semantic search relevance score (0.0-1.0)
   // Allow additional fields for full resource data
   [key: string]: unknown
 }
@@ -723,7 +726,7 @@ export async function getResources(params: GetResourcesParams): Promise<Resource
     queryParams.set('includeStatus', 'true')
   }
 
-  const response = await fetch(`${API_PATH}/resources?${queryParams}`, {
+  const response = await fetchWithAuth(`${API_PATH}/resources?${queryParams}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -738,6 +741,85 @@ export async function getResources(params: GetResourcesParams): Promise<Resource
   return {
     resources: json.data?.resources || [],
     total: json.data?.total || 0,
+  }
+}
+
+// ============================================================================
+// Search Resources API
+// ============================================================================
+
+export interface SearchResourcesParams {
+  /** Search query (semantic search) */
+  q: string
+  /** Optional namespace filter */
+  namespace?: string
+  /** Optional kind filter */
+  kind?: string
+  /** Optional API group filter (e.g., 'apps', 'events.k8s.io') */
+  apiGroup?: string
+  /** Optional API version filter */
+  apiVersion?: string
+  /** Max results (default: 100) */
+  limit?: number
+  /** Skip N results for pagination (default: 0) */
+  offset?: number
+  /** Minimum relevance score to include (0.0-1.0) */
+  minScore?: number
+}
+
+export interface SearchResourcesResponse {
+  resources: Resource[]
+  total: number
+  limit: number
+  offset: number
+}
+
+/**
+ * Search resources using semantic search
+ * Searches names, kinds, labels, and annotations via Qdrant
+ */
+export async function searchResources(params: SearchResourcesParams): Promise<SearchResourcesResponse> {
+  const { q, namespace, kind, apiGroup, apiVersion, limit = 100, offset = 0, minScore } = params
+
+  const queryParams = new URLSearchParams({
+    q,
+    limit: String(limit),
+    offset: String(offset),
+  })
+
+  if (namespace) {
+    queryParams.set('namespace', namespace)
+  }
+  if (kind) {
+    queryParams.set('kind', kind)
+  }
+  if (apiGroup) {
+    queryParams.set('apiGroup', apiGroup)
+  }
+  if (apiVersion) {
+    queryParams.set('apiVersion', apiVersion)
+  }
+  if (minScore !== undefined) {
+    queryParams.set('minScore', String(minScore))
+  }
+
+  const response = await fetchWithAuth(`${API_PATH}/resources/search?${queryParams}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to search resources: ${response.status} ${response.statusText}`)
+  }
+
+  const json = await response.json()
+  return {
+    resources: json.data?.resources || [],
+    total: json.data?.total || 0,
+    limit: json.data?.limit || limit,
+    offset: json.data?.offset || offset,
   }
 }
 
@@ -794,7 +876,7 @@ export async function getResource(params: GetResourceParams): Promise<GetResourc
   }
 
   try {
-    const response = await fetch(`${API_PATH}/resource?${queryParams}`, {
+    const response = await fetchWithAuth(`${API_PATH}/resource?${queryParams}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -877,7 +959,7 @@ export async function getResourceEvents(
   }
 
   try {
-    const response = await fetch(`${API_PATH}/events?${queryParams}`, {
+    const response = await fetchWithAuth(`${API_PATH}/events?${queryParams}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -946,7 +1028,7 @@ export async function getPodLogs(params: GetPodLogsParams): Promise<GetPodLogsRe
   }
 
   try {
-    const response = await fetch(`${API_PATH}/logs?${queryParams}`, {
+    const response = await fetchWithAuth(`${API_PATH}/logs?${queryParams}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
