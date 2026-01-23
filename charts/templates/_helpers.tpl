@@ -85,3 +85,17 @@ Create the key name for UI auth token in secret
 {{- define "dot-ai-ui.uiAuthSecretKey" -}}
 {{- default "ui-auth-token" .Values.uiAuth.secretRef.key }}
 {{- end }}
+
+{{/*
+Merge global annotations with resource-specific annotations.
+Resource-specific annotations take precedence over global annotations.
+Usage: include "dot-ai-ui.annotations" (dict "global" .Values.annotations "local" .Values.ingress.annotations)
+*/}}
+{{- define "dot-ai-ui.annotations" -}}
+{{- $global := .global | default dict -}}
+{{- $local := .local | default dict -}}
+{{- $merged := merge $local $global -}}
+{{- if $merged -}}
+{{- toYaml $merged -}}
+{{- end -}}
+{{- end -}}

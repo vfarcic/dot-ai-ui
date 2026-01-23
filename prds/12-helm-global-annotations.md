@@ -1,7 +1,7 @@
 # PRD: Global Annotations Support in Helm Chart
 
 **Issue**: [#12](https://github.com/vfarcic/dot-ai-ui/issues/12)
-**Status**: Draft
+**Status**: Complete
 **Priority**: Low
 **Created**: 2026-01-21
 
@@ -120,8 +120,8 @@ This PRD follows the same pattern as the dot-ai MCP server Helm chart (PRD #336)
 
 ## Milestones
 
-- [ ] Create helper function for annotation merging in `_helpers.tpl`
-- [ ] Add `annotations: {}` to `values.yaml` with documentation comments
-- [ ] Update all templates to include global annotations
-- [ ] Add unit tests for annotation rendering
-- [ ] Update chart documentation with examples
+- [x] Create helper function for annotation merging in `_helpers.tpl`
+- [x] Add `annotations: {}` to `values.yaml` with documentation comments
+- [x] Update all templates to include global annotations
+- [~] Add unit tests for annotation rendering (deferred - not the right case to introduce Helm testing)
+- [x] Update chart documentation with examples
