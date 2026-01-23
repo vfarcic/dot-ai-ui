@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.11.0] - 2026-01-23
+
+### Features
+
+- **Global Annotations Support in Helm Chart**
+
+  Apply custom annotations to all Kubernetes resources deployed by the Helm chart. Previously, only Ingress and Gateway resources supported annotations, making it impossible to use tools like Reloader for automatic rolling updates when ConfigMaps or Secrets change, or to add organization-wide compliance annotations.
+
+  The new `annotations` field in `values.yaml` applies annotations to all rendered resources: Deployment, Pod template, Service, Secret, HTTPRoute, Ingress, and Gateway. For resources that already have their own annotation fields (Ingress, Gateway), global annotations merge with resource-specific ones, with resource-specific annotations taking precedence on key conflicts.
+
+  Configure global annotations in your values file:
+  ```yaml
+  annotations:
+    reloader.stakater.com/auto: "true"
+    company.com/managed-by: "platform-team"
+  ```
+
+  See the [Kubernetes Setup Guide](https://devopstoolkit.ai/docs/ui/setup/kubernetes-setup) for the full configuration reference. ([#12](https://github.com/vfarcic/dot-ai-ui/issues/12))
+
+
 ## [0.10.0] - 2026-01-16
 
 ### Features
