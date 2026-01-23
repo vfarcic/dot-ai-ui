@@ -5,6 +5,11 @@ metadata:
   name: {{ include "dot-ai-ui.fullname" . }}
   labels:
     {{- include "dot-ai-ui.labels" . | nindent 4 }}
+  {{- $annotations := include "dot-ai-ui.annotations" (dict "global" .Values.annotations "local" nil) -}}
+  {{- if $annotations }}
+  annotations:
+    {{- $annotations | nindent 4 }}
+  {{- end }}
 spec:
   parentRefs:
   - name: {{ if .Values.gateway.name }}{{ .Values.gateway.name }}{{ else }}{{ include "dot-ai-ui.fullname" . }}-http{{ end }}

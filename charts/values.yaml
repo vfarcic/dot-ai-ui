@@ -1,3 +1,11 @@
+# Global annotations applied to ALL Kubernetes resources
+# Use for tools like Reloader, compliance requirements, or consistent metadata
+annotations: {}
+  # Example: Reloader integration
+  # reloader.stakater.com/auto: "true"
+  # Example: Compliance/audit
+  # company.com/managed-by: "platform-team"
+
 # Application image configuration
 image:
   repository: ghcr.io/vfarcic/dot-ai-ui  # Container image repository
