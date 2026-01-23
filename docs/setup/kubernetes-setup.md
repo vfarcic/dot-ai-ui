@@ -70,6 +70,7 @@ Open your browser and navigate to the Web UI hostname. You should see the DevOps
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
+| `annotations` | Global annotations applied to all resources (e.g., `reloader.stakater.com/auto: "true"`) | `{}` |
 | `image.repository` | Container image repository | `ghcr.io/vfarcic/dot-ai-ui` |
 | `image.tag` | Container image tag | Chart appVersion |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
