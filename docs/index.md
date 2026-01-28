@@ -126,7 +126,7 @@ See [Kubernetes Setup](setup/kubernetes-setup.md) for configuration options.
 
 ### Prerequisites
 
-- Kubernetes cluster with [dot-ai MCP server](https://devopstoolkit.ai/docs/mcp/setup/kubernetes-setup/) deployed
+- Kubernetes cluster with [dot-ai MCP server](https://devopstoolkit.ai/docs/mcp/setup/mcp-setup/) deployed
 - Helm 3.x installed
 
 ### Deploy Web UI

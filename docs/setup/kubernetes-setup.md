@@ -10,7 +10,7 @@
 
 - Kubernetes cluster (1.19+) with kubectl access
 - Helm 3.x installed
-- [dot-ai MCP server](https://devopstoolkit.ai/docs/mcp/setup/kubernetes-setup/) deployed and accessible
+- [dot-ai MCP server](https://devopstoolkit.ai/docs/mcp/setup/mcp-setup/) deployed and accessible
 - Auth token for the dot-ai MCP server
 
 ## Quick Start
