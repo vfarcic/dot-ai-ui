@@ -66,7 +66,7 @@ jobs:
       run: npm run test:e2e
       env:
         DOT_AI_MCP_URL: http://localhost:3001
-        DOT_AI_AUTH_TOKEN: test-token
+        DOT_AI_UI_AUTH_TOKEN: test-token
 
     - name: Upload Playwright report
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -23,5 +23,9 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
+    env: {
+      DOT_AI_MCP_URL: 'http://localhost:3001',
+      DOT_AI_UI_AUTH_TOKEN: 'test-token',
+    },
   },
 })
