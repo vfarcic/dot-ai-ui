@@ -2,7 +2,7 @@
 
 **GitHub Issue**: #14
 **Priority**: High
-**Status**: Draft
+**Status**: In Progress
 
 ## Problem Statement
 
@@ -70,11 +70,11 @@ Add Playwright test infrastructure that:
 
 ## Milestones
 
-- [ ] **M1: Playwright infrastructure setup**
-  - Install `@playwright/test` and dependencies
-  - Create `playwright.config.ts` with appropriate settings
-  - Add npm scripts for running tests locally
-  - Verify basic test can navigate to dev server
+- [x] **M1: Playwright infrastructure setup**
+  - [x] Install `@playwright/test` and dependencies
+  - [x] Create `playwright.config.ts` with appropriate settings
+  - [x] Add npm scripts for running tests locally
+  - [x] Verify basic test can navigate to dev server
 
 - [ ] **M2: Mock server integration**
   - Integrate dot-ai mock server startup into test setup
