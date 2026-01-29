@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:mermaid.js.org)",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_snapshot",
+      "Bash(gh issue list:*)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_close",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_network_requests",
+      "mcp__playwright__browser_click",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "mcp__playwright__browser_tabs",
+      "Bash(helm template:*)",
+      "mcp__playwright__browser_select_option",
+      "Bash(kubectl:*)",
+      "WebFetch(domain:a2ui.org)",
+      "mcp__playwright__browser_press_key",
+      "Skill(query-dot-ai)",
+      "Bash(KUBECONFIG=kubeconfig-test.yaml kubectl get:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:zuplo.com)",
+      "mcp__playwright__browser_type",
+      "Bash(./scripts/dev-start.sh:*)",
+      "WebFetch(domain:blog.devops.dev)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:skywork.ai)",
+      "WebFetch(domain:glama.ai)",
+      "WebFetch(domain:www.pulsemcp.com)",
+      "WebFetch(domain:devopstoolkit.ai)",
+      "mcp__coderabbitai__get_review_comments",
+      "Bash(jq:*)",
+      "mcp__coderabbitai__get_coderabbit_reviews",
+      "Bash(gh run list:*)",
+      "Bash(gh auth status:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "dot-ai",
+    "playwright",
+    "coderabbitai"
+  ]
+}
