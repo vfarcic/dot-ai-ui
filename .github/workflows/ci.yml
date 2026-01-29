@@ -34,6 +34,60 @@ jobs:
     - name: Build project
       run: npm run build
 
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '24.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps chromium
+
+    - name: Start mock server
+      run: |
+        docker compose -f e2e/docker-compose.yml up -d
+        # Wait for mock server to be ready
+        timeout 30 bash -c 'until curl -s http://localhost:3001/health > /dev/null 2>&1; do sleep 1; done' || true
+
+    - name: Run Playwright tests
+      run: npm run test:e2e
+      env:
+        DOT_AI_MCP_URL: http://localhost:3001
+        DOT_AI_AUTH_TOKEN: test-token
+
+    - name: Upload Playwright report
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: ${{ !cancelled() }}
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 30
+
+    - name: Upload test results
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: failure()
+      with:
+        name: test-results
+        path: test-results/
+        retention-days: 30
+
+    - name: Stop mock server
+      if: always()
+      run: docker compose -f e2e/docker-compose.yml down
+
   security:
     name: Security Analysis
     runs-on: ubuntu-latest

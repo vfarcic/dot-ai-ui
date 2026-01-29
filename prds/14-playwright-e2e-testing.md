@@ -90,11 +90,11 @@ Add Playwright test infrastructure that:
   - [ ] Cover error states, loading states (deferred to future PRDs)
   - [x] Ensure tests are reliable and not flaky (using mock server)
 
-- [ ] **M5: CI integration**
-  - Add GitHub Actions workflow for Playwright tests
-  - Configure to run on every PR
-  - Add screenshot artifacts on failure
-  - Ensure tests block merge on failure
+- [x] **M5: CI integration**
+  - [x] Add GitHub Actions workflow for Playwright tests
+  - [x] Configure to run on every PR
+  - [x] Add screenshot artifacts on failure
+  - [x] Ensure tests block merge on failure
 
 - [ ] **M6: Documentation and workflow integration**
   - [x] Document how to write new tests (`/generate-e2e-tests` skill created)
