@@ -56,17 +56,16 @@ Add Playwright test infrastructure that:
 
 ## Open Questions
 
-- [ ] **Discuss: Which UI components/flows should be tested first?**
-  - Visualization renderers (Mermaid, Cards, Code, Table)?
-  - Session management and navigation?
-  - Error states and loading states?
-  - Priority order for test coverage
+- [x] **Discuss: Which UI components/flows should be tested first?**
+  - **Decision**: Dashboard first (sidebar resource list, namespace dropdown, resource table)
+  - Visualization page second (Mermaid diagrams)
+  - Error/loading states deferred to future PRDs
 
 ## Dependencies
 
 | Dependency | Status | Notes |
 |------------|--------|-------|
-| dot-ai mock server | In Progress | Feature request submitted, response expected |
+| dot-ai mock server | ✅ Available | `ghcr.io/vfarcic/dot-ai-mock-server:latest` - endpoints for resources/kinds, namespaces, resources, visualize |
 
 ## Milestones
 
@@ -76,20 +75,20 @@ Add Playwright test infrastructure that:
   - [x] Add npm scripts for running tests locally
   - [x] Verify basic test can navigate to dev server
 
-- [ ] **M2: Mock server integration**
-  - Integrate dot-ai mock server startup into test setup
-  - Configure test environment to use mock endpoints
-  - Verify tests receive deterministic mock data
+- [x] **M2: Mock server integration**
+  - [x] Integrate dot-ai mock server startup into test setup (`e2e/docker-compose.yml`)
+  - [x] Configure test environment to use mock endpoints (`DOT_AI_MCP_URL=http://localhost:3001`)
+  - [x] Verify tests receive deterministic mock data (dashboard tests use mock data)
 
-- [ ] **M3: Determine test coverage priorities**
-  - Discuss and decide which components to test first
-  - Document test coverage plan
-  - Create test file structure
+- [x] **M3: Determine test coverage priorities**
+  - [x] Discuss and decide which components to test first (Dashboard → Visualization → Error states)
+  - [x] Document test coverage plan (see Open Questions resolution)
+  - [x] Create test file structure (`e2e/dashboard.spec.ts`)
 
 - [ ] **M4: Implement core component tests**
-  - Tests for priority components identified in M3
-  - Cover success states, error states, loading states
-  - Ensure tests are reliable and not flaky
+  - [x] MVP dashboard tests (sidebar, namespace dropdown, resource list) - 3 passing tests
+  - [ ] Cover error states, loading states (deferred to future PRDs)
+  - [x] Ensure tests are reliable and not flaky (using mock server)
 
 - [ ] **M5: CI integration**
   - Add GitHub Actions workflow for Playwright tests
@@ -98,9 +97,9 @@ Add Playwright test infrastructure that:
   - Ensure tests block merge on failure
 
 - [ ] **M6: Documentation and workflow integration**
-  - Document how to write new tests
-  - Update CLAUDE.md with test workflow
-  - Create test templates for common patterns
+  - [x] Document how to write new tests (`/generate-e2e-tests` skill created)
+  - [ ] Update CLAUDE.md with test workflow
+  - [x] Create test templates for common patterns (skill includes patterns and guidelines)
 
 ## Success Criteria
 
