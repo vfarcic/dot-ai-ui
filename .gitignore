@@ -35,5 +35,9 @@ vite.config.d.ts
 .playwright-mcp
 kubeconfig*.yaml
 
-/tmptest-results/
+# Playwright test artifacts
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
 tmp/

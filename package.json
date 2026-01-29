@@ -11,7 +11,10 @@
     "build": "tsc -b && vite build",
     "start": "NODE_ENV=production node --import tsx server/index.ts",
     "lint": "eslint .",
-    "generate:api": "openapi-generator-cli generate -i http://localhost:8080/api/v1/openapi -g typescript-fetch -o src/api/generated --additional-properties=typescriptThreePlus=true,supportsES6=true"
+    "generate:api": "openapi-generator-cli generate -i http://localhost:8080/api/v1/openapi -g typescript-fetch -o src/api/generated --additional-properties=typescriptThreePlus=true,supportsES6=true",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug"
   },
   "repository": {
     "type": "git",
@@ -42,6 +45,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@openapitools/openapi-generator-cli": "^2.27.0",
+    "@playwright/test": "^1.58.0",
     "@tailwindcss/vite": "^4.1.18",
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.3",
