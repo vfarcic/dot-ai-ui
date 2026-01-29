@@ -2,7 +2,7 @@
 
 **GitHub Issue**: #14
 **Priority**: High
-**Status**: In Progress
+**Status**: Complete
 
 ## Problem Statement
 
@@ -96,9 +96,9 @@ Add Playwright test infrastructure that:
   - [x] Add screenshot artifacts on failure
   - [x] Ensure tests block merge on failure
 
-- [ ] **M6: Documentation and workflow integration**
+- [x] **M6: Documentation and workflow integration**
   - [x] Document how to write new tests (`/generate-e2e-tests` skill created)
-  - [ ] Update CLAUDE.md with test workflow
+  - [x] Update CLAUDE.md with test workflow
   - [x] Create test templates for common patterns (skill includes patterns and guidelines)
 
 ## Success Criteria

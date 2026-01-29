@@ -48,6 +48,45 @@ This ensures visual correctness and catches rendering issues that build checks m
 **Dev server**: `http://localhost:3000`
 **Test route**: `/v/{sessionId}` (get fresh sessionId from MCP server)
 
+## E2E Tests
+
+Automated Playwright tests provide regression protection for UI features.
+
+### Running Tests
+
+```bash
+# Start mock server (provides deterministic test data)
+docker compose -f e2e/docker-compose.yml up -d
+
+# Run all E2E tests
+npm run test:e2e
+
+# Run with interactive UI (for debugging)
+npm run test:e2e:ui
+
+# Run in debug mode (step through tests)
+npm run test:e2e:debug
+```
+
+The mock server runs on port 3001. Tests require `DOT_AI_MCP_URL=http://localhost:3001` (set automatically by playwright.config.ts webServer).
+
+### Adding New Tests
+
+Use the `/generate-e2e-tests` skill to convert manual Playwright MCP verification into automated tests. The skill:
+- Explores features using Playwright MCP
+- Analyzes existing test coverage
+- Proposes scenario-based tests (user journeys, not individual element checks)
+- Implements and runs the tests
+
+### Test Structure
+
+```
+e2e/
+├── dashboard.spec.ts  # Dashboard page tests
+├── smoke.spec.ts      # Basic smoke tests
+└── docker-compose.yml # Mock server config
+```
+
 ## Project Structure
 
 ```
