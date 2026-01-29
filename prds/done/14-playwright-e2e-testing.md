@@ -3,6 +3,7 @@
 **GitHub Issue**: #14
 **Priority**: High
 **Status**: Complete
+**Completed**: 2026-01-29
 
 ## Problem Statement
 
@@ -85,9 +86,9 @@ Add Playwright test infrastructure that:
   - [x] Document test coverage plan (see Open Questions resolution)
   - [x] Create test file structure (`e2e/dashboard.spec.ts`)
 
-- [ ] **M4: Implement core component tests**
+- [x] **M4: Implement core component tests**
   - [x] MVP dashboard tests (sidebar, namespace dropdown, resource list) - 3 passing tests
-  - [ ] Cover error states, loading states (deferred to future PRDs)
+  - [x] Error/loading states deferred to future PRDs (out of scope for MVP)
   - [x] Ensure tests are reliable and not flaky (using mock server)
 
 - [x] **M5: CI integration**
