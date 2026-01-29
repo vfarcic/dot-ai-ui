@@ -80,7 +80,7 @@ Use the `/generate-e2e-tests` skill to convert manual Playwright MCP verificatio
 
 ### Test Structure
 
-```
+```text
 e2e/
 ├── dashboard.spec.ts  # Dashboard page tests
 ├── smoke.spec.ts      # Basic smoke tests

@@ -68,7 +68,7 @@ Tests should represent **user journeys** - sequences of actions a user would tak
 ### Phase 3: Analyze Existing Tests
 
 7. **Read existing test files** in `e2e/` directory:
-   ```
+   ```text
    e2e/*.spec.ts
    ```
 
@@ -124,9 +124,10 @@ test('user can browse resources and view details', async ({ page }) => {
   await page.getByRole('button', { name: 'Pod' }).click()
   await expect(page).toHaveURL(/kind=Pod/)
 
-  // Action 2: Verify list loads
+  // Action 2: Verify list loads with expected data
   await expect(page.getByRole('table')).toBeVisible()
-  await expect(page.getByRole('row')).toHaveCount.greaterThan(1)
+  // Use exact count when mock data is deterministic, or verify non-empty
+  await expect(page.getByRole('row')).toHaveCount(5)
 
   // Action 3: Click on a specific resource
   await page.getByRole('link', { name: 'nginx-pod' }).click()

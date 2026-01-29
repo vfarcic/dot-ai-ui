@@ -60,7 +60,7 @@ jobs:
       run: |
         docker compose -f e2e/docker-compose.yml up -d
         # Wait for mock server to be ready
-        timeout 30 bash -c 'until curl -s http://localhost:3001/health > /dev/null 2>&1; do sleep 1; done' || true
+        timeout 30 bash -c 'until curl -s http://localhost:3001/health > /dev/null 2>&1; do sleep 1; done'
 
     - name: Run Playwright tests
       run: npm run test:e2e
