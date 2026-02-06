@@ -45,6 +45,8 @@ test.describe('Unified Search', () => {
       // Namespace should come before search in DOM order
       const nsBoundingBox = await namespaceSelect.boundingBox()
       const searchBoundingBox = await searchInput.boundingBox()
+      expect(nsBoundingBox).not.toBeNull()
+      expect(searchBoundingBox).not.toBeNull()
       expect(nsBoundingBox!.x).toBeLessThan(searchBoundingBox!.x)
     })
   })
@@ -258,6 +260,7 @@ test.describe('Unified Search', () => {
 
     test('loading page with search params restores search state', async ({ page }) => {
       // Navigate directly with search params
+      // sessionStorage persists across same-origin page.goto() within the same tab
       await page.goto('/dashboard?q=RBAC&scope=knowledge')
 
       // Search input should have the query

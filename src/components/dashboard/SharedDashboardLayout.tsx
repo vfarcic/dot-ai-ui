@@ -158,7 +158,7 @@ export function SharedDashboardLayout({
       if (currentNs) {
         params.set(PARAM_NAMESPACE, currentNs)
       }
-      // Clear search query and scope when navigating via sidebar
+      // Start with fresh params (implicitly clears search query and scope)
       // Preserve sidebar state (sb=1 collapsed, sb=0 expanded)
       params.set(PARAM_SIDEBAR, sidebarCollapsed ? '1' : '0')
 

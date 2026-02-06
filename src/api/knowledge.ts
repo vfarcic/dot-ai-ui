@@ -14,6 +14,7 @@ export interface AskKnowledgeParams {
   query: string
   limit?: number
   uriFilter?: string
+  signal?: AbortSignal
 }
 
 export interface KnowledgeSource {
@@ -39,10 +40,19 @@ export interface KnowledgeAnswer {
  * Returns an AI-synthesized answer with source provenance and raw chunks
  */
 export async function askKnowledge(params: AskKnowledgeParams): Promise<KnowledgeAnswer> {
-  const { query, limit, uriFilter } = params
+  const { query, limit, uriFilter, signal: externalSignal } = params
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), KNOWLEDGE_TIMEOUT)
+
+  // Abort internal controller when external signal fires
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort()
+    } else {
+      externalSignal.addEventListener('abort', () => controller.abort(), { once: true })
+    }
+  }
 
   try {
     const body: Record<string, unknown> = { query }

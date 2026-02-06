@@ -611,7 +611,7 @@ async function createServer() {
 
       const url = `${MCP_BASE_URL}/api/v1/knowledge/ask`
       const body: Record<string, unknown> = { query }
-      if (limit) body.limit = limit
+      if (limit !== undefined) body.limit = limit
       if (uriFilter) body.uriFilter = uriFilter
 
       console.log(`[Proxy] Sending knowledge ask to MCP: ${url}`)

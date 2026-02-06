@@ -110,7 +110,7 @@ export function KnowledgeResultsView({ query }: KnowledgeResultsViewProps) {
       return
     }
 
-    let cancelled = false
+    const controller = new AbortController()
 
     const fetchAnswer = async () => {
       setLoading(true)
@@ -118,11 +118,11 @@ export function KnowledgeResultsView({ query }: KnowledgeResultsViewProps) {
       setErrorCode(null)
 
       try {
-        const answer = await askKnowledge({ query })
-        if (cancelled) return
+        const answer = await askKnowledge({ query, signal: controller.signal })
+        if (controller.signal.aborted) return
         setResult(answer)
       } catch (err) {
-        if (cancelled) return
+        if (controller.signal.aborted) return
         if (err instanceof KnowledgeError) {
           setError(err.message)
           setErrorCode(err.code)
@@ -131,13 +131,13 @@ export function KnowledgeResultsView({ query }: KnowledgeResultsViewProps) {
         }
         setResult(null)
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!controller.signal.aborted) setLoading(false)
       }
     }
 
     fetchAnswer()
     return () => {
-      cancelled = true
+      controller.abort()
     }
   }, [query])
 

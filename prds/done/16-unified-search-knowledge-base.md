@@ -24,7 +24,7 @@ Rework the header search into a unified search with:
 - [x] Enter-to-submit replaces debounced search
 - [x] Submit button visible for discoverability
 - [x] Header reordered: Logo → Namespace → Search
-- [x] Knowledge Base answers rendered with markdown, source links, collapsible chunks
+- [x] Knowledge Base answers rendered with Markdown, source links, collapsible chunks
 - [x] Independent loading states for knowledge and resource sections
 - [x] URL params support bookmarking (q, scope, ns)
 - [x] Express proxy route for POST /api/v1/knowledge/ask
