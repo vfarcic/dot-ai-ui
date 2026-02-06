@@ -584,6 +584,69 @@ async function createServer() {
     }
   })
 
+  // Proxy Knowledge Base ask API requests to MCP server
+  // Used for AI-synthesized answers from ingested documentation
+  app.post('/api/v1/knowledge/ask', apiLimiter, async (req, res) => {
+    try {
+      const { query, limit, uriFilter } = req.body as {
+        query?: string
+        limit?: number
+        uriFilter?: string
+      }
+
+      if (!query) {
+        return res.status(400).json({ error: 'Missing required parameter: query' })
+      }
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+      if (AUTH_TOKEN) {
+        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+
+      const url = `${MCP_BASE_URL}/api/v1/knowledge/ask`
+      const body: Record<string, unknown> = { query }
+      if (limit) body.limit = limit
+      if (uriFilter) body.uriFilter = uriFilter
+
+      console.log(`[Proxy] Sending knowledge ask to MCP: ${url}`)
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('Knowledge ask timeout')
+        return res.status(408).json({ error: 'Knowledge ask timeout - request took too long' })
+      }
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to ask knowledge base' })
+    }
+  })
+
   // Proxy Remediate tool API requests to MCP server
   // Multi-step workflow: analysis → user decision → execution
   app.post('/api/v1/tools/remediate', apiLimiter, async (req, res) => {

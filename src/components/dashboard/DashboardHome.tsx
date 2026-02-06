@@ -4,6 +4,7 @@ import { useDashboardContext } from './SharedDashboardLayout'
 import { ResourceList } from './ResourceList'
 import { AllResourcesView } from './AllResourcesView'
 import { SearchResultsView } from './SearchResultsView'
+import { KnowledgeResultsView } from './KnowledgeResultsView'
 import { ExpandableDescription } from './ExpandableDescription'
 import { LoadingSpinner } from '../LoadingSpinner'
 import { ErrorDisplay } from '../ErrorDisplay'
@@ -30,6 +31,7 @@ export function DashboardHome() {
     availableKinds,
     sidebarCollapsed,
     searchQuery,
+    searchScope,
     setSearchResultKinds,
   } = useDashboardContext()
 
@@ -163,16 +165,23 @@ export function DashboardHome() {
     }
   }, [searchQuery, setSearchResultKinds])
 
-  // If search query is active, show search results
+  // If search query is active, show results based on scope
   if (searchQuery) {
     return (
-      <SearchResultsView
-        query={searchQuery}
-        namespace={selectedNamespace}
-        kind={selectedResource?.kind}
-        apiVersion={selectedResource?.apiVersion}
-        onKindsFound={setSearchResultKinds}
-      />
+      <div>
+        {(searchScope === 'knowledge' || searchScope === 'both') && (
+          <KnowledgeResultsView query={searchQuery} />
+        )}
+        {(searchScope === 'resources' || searchScope === 'both') && (
+          <SearchResultsView
+            query={searchQuery}
+            namespace={selectedNamespace}
+            kind={selectedResource?.kind}
+            apiVersion={selectedResource?.apiVersion}
+            onKindsFound={setSearchResultKinds}
+          />
+        )}
+      </div>
     )
   }
 

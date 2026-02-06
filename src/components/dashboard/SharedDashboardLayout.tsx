@@ -5,6 +5,7 @@ import { NamespaceSelector } from './NamespaceSelector'
 import { SearchInput } from './SearchInput'
 import { ActionBar } from './ActionBar'
 import type { ResourceKind } from '../../api/dashboard'
+import type { SearchScope } from '../../api/knowledge'
 
 // URL param keys (short for cleaner URLs)
 const PARAM_NAMESPACE = 'ns'
@@ -13,6 +14,7 @@ const PARAM_GROUP = 'group'
 const PARAM_VERSION = 'version'
 const PARAM_SIDEBAR = 'sb' // '1' = collapsed
 const PARAM_SEARCH = 'q' // search query
+const PARAM_SCOPE = 'scope' // 'resources' | 'knowledge' (omitted = 'both')
 
 // Context for sharing dashboard state with child components
 interface DashboardContextValue {
@@ -25,6 +27,8 @@ interface DashboardContextValue {
   sidebarCollapsed: boolean
   searchQuery: string
   setSearchQuery: (query: string) => void
+  searchScope: SearchScope
+  setSearchScope: (scope: SearchScope) => void
   searchResultKinds: ResourceKind[] | null
   setSearchResultKinds: (kinds: ResourceKind[] | null) => void
 }
@@ -85,6 +89,11 @@ export function SharedDashboardLayout({
         }
       : null
   const searchQuery = searchFromUrl || ''
+  const scopeFromUrl = searchParams.get(PARAM_SCOPE)
+  const searchScope: SearchScope =
+    scopeFromUrl === 'resources' || scopeFromUrl === 'knowledge'
+      ? scopeFromUrl
+      : 'both'
 
   // Update URL when search query changes
   const handleSearchChange = useCallback(
@@ -95,6 +104,22 @@ export function SharedDashboardLayout({
           next.set(PARAM_SEARCH, query)
         } else {
           next.delete(PARAM_SEARCH)
+        }
+        return next
+      })
+    },
+    [setSearchParams]
+  )
+
+  // Update URL when search scope changes
+  const handleScopeChange = useCallback(
+    (scope: SearchScope) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        if (scope === 'both') {
+          next.delete(PARAM_SCOPE)
+        } else {
+          next.set(PARAM_SCOPE, scope)
         }
         return next
       })
@@ -133,11 +158,7 @@ export function SharedDashboardLayout({
       if (currentNs) {
         params.set(PARAM_NAMESPACE, currentNs)
       }
-      // Preserve search query
-      const currentSearch = searchParams.get(PARAM_SEARCH)
-      if (currentSearch) {
-        params.set(PARAM_SEARCH, currentSearch)
-      }
+      // Clear search query and scope when navigating via sidebar
       // Preserve sidebar state (sb=1 collapsed, sb=0 expanded)
       params.set(PARAM_SIDEBAR, sidebarCollapsed ? '1' : '0')
 
@@ -172,6 +193,8 @@ export function SharedDashboardLayout({
     sidebarCollapsed,
     searchQuery,
     setSearchQuery: handleSearchChange,
+    searchScope,
+    setSearchScope: handleScopeChange,
     searchResultKinds,
     setSearchResultKinds,
   }
@@ -197,15 +220,17 @@ export function SharedDashboardLayout({
             </Link>
           </div>
           {showSidebar && (
-            <div className="flex items-center gap-3 flex-1 max-w-2xl">
-              <SearchInput
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="flex-1"
-              />
+            <div className="flex items-center gap-3 flex-1 max-w-3xl">
               <NamespaceSelector
                 value={selectedNamespace}
                 onChange={handleNamespaceChange}
+              />
+              <SearchInput
+                value={searchQuery}
+                onSubmit={handleSearchChange}
+                scope={searchScope}
+                onScopeChange={handleScopeChange}
+                className="flex-1"
               />
             </div>
           )}

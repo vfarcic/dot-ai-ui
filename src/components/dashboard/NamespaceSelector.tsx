@@ -29,13 +29,7 @@ export function NamespaceSelector({ value, onChange }: NamespaceSelectorProps) {
   }, [])
 
   return (
-    <div className="flex items-center gap-2">
-      <label
-        htmlFor="namespace-select"
-        className="text-sm text-muted-foreground"
-      >
-        Namespace:
-      </label>
+    <div className="flex items-center">
       <select
         id="namespace-select"
         value={value}
