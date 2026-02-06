@@ -20,7 +20,7 @@ test.describe('Dashboard', () => {
   })
 
   test('namespace dropdown has options', async ({ page }) => {
-    const namespaceDropdown = page.getByRole('combobox', { name: 'Namespace:' })
+    const namespaceDropdown = page.locator('#namespace-select')
     await expect(namespaceDropdown).toBeVisible()
 
     // Verify some expected namespaces from mock data

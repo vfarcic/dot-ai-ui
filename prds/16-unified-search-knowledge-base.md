@@ -1,7 +1,7 @@
 # PRD #16: Unified Search with Knowledge Base Integration
 
 **GitHub Issue**: [#16](https://github.com/vfarcic/dot-ai-ui/issues/16)
-**Status**: In Progress
+**Status**: Done
 **Priority**: High
 **Created**: 2026-02-06
 
@@ -28,7 +28,7 @@ Rework the header search into a unified search with:
 - [x] Independent loading states for knowledge and resource sections
 - [x] URL params support bookmarking (q, scope, ns)
 - [x] Express proxy route for POST /api/v1/knowledge/ask
-- [ ] E2E tests covering unified search behavior
+- [x] E2E tests covering unified search behavior
 - [x] Mock server search fixture wired up for resource search
 
 ## User Impact
@@ -60,6 +60,8 @@ Rework the header search into a unified search with:
 | `src/components/dashboard/DashboardHome.tsx` | Conditional rendering based on scope |
 | `src/components/dashboard/NamespaceSelector.tsx` | Removed redundant "Namespace:" label |
 | `e2e/docker-compose.yml` | Added pull_policy: always |
+| `e2e/unified-search.spec.ts` | New E2E tests for unified search (21 tests) |
+| `e2e/dashboard.spec.ts` | Fixed namespace dropdown locator after label removal |
 
 ### Dependencies Added
 
@@ -72,5 +74,5 @@ Rework the header search into a unified search with:
 - [x] KnowledgeResultsView component (answer, sources, chunks)
 - [x] Integration in DashboardHome with scope-based rendering
 - [x] Visual verification with Playwright MCP
-- [ ] E2E test coverage for unified search
+- [x] E2E test coverage for unified search
 - [x] Mock server resource search fixture
