@@ -1,5 +1,6 @@
 services:
   mock-api:
     image: ghcr.io/vfarcic/dot-ai-mock-server:latest
+    pull_policy: always
     ports:
       - "3001:3001"
