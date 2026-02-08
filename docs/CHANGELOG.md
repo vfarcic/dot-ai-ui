@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.12.0] - 2026-02-08
+
+### Features
+
+- ## Unified Search with Knowledge Base
+
+  Search the dashboard for both Kubernetes resources and organizational knowledge from a single input. Previously, the dashboard only supported resource search, and the Knowledge Base was inaccessible from the web UI.
+
+  The header search now includes a scope toggle (Both/Resources/Knowledge) that controls what gets searched. Selecting "Knowledge" or "Both" sends your query to the Knowledge Base API, which returns an AI-synthesized answer with source provenance. Answers render as rich markdown with clickable source links and collapsible raw chunks for full context. Resource results continue to appear below when the scope includes resources. Both sections have independent loading states so results appear as they arrive.
+
+  Search now triggers on Enter or by clicking the submit button, replacing the previous debounced keystroke behavior. The header layout is reordered to Logo, Namespace selector, then Search for a more natural left-to-right workflow. All search parameters (query, scope, namespace) are reflected in URL params for bookmarking and sharing. ([#16](https://github.com/vfarcic/dot-ai-ui/issues/16))
+
+### Bug Fixes
+
+- ## Ingress and Gateway API Timeout Defaults
+
+  Ingress and Gateway API HTTPRoute resources now include timeout defaults (10 minutes) to prevent 504 errors during long-running AI operations such as query, remediate, operate, and recommend.
+
+  The Ingress template defaults to nginx timeout annotations (`proxy-read-timeout` and `proxy-send-timeout`). For other ingress controllers (Traefik, HAProxy, AWS ALB), override `ingress.annotations` with the appropriate controller-specific settings — examples are documented in values.yaml and the setup guide. Gateway API HTTPRoutes now include `timeouts.request` and `timeouts.backendRequest` fields, configurable via `gateway.timeouts.request` and `gateway.timeouts.backendRequest` Helm values.
+
+  See the [Kubernetes Setup Guide](https://devopstoolkit.ai/docs/ui/setup/kubernetes-setup) for controller-specific timeout configuration examples.
+
+### Other Changes
+
+- **Playwright E2E Testing Infrastructure**
+
+  Automated end-to-end tests now run on every pull request, catching visual regressions and component rendering issues before they reach production. Previously, feature verification relied on manual Playwright MCP checks during development, with no automated protection against regressions.
+
+  The E2E test suite uses dot-ai's mock server for deterministic test data, ensuring reliable and non-flaky tests. Dashboard tests verify the sidebar resource list, namespace dropdown, and resource table functionality. Failed tests block PR merges, and screenshot artifacts are captured on failure for debugging.
+
+  Run tests locally with `npm run test:e2e` after starting the mock server (`docker compose -f e2e/docker-compose.yml up -d`). Use the `/generate-e2e-tests` skill to convert manual Playwright MCP verification into automated tests for new features. ([#14](https://github.com/vfarcic/dot-ai-ui/issues/14))
+
+
 ## [0.11.0] - 2026-01-23
 
 ### Features
