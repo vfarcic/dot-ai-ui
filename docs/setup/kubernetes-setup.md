@@ -231,15 +231,23 @@ helm install dot-ai-ui ... \
   --set gateway.timeouts.backendRequest="1800s"
 ```
 
+**Not all Gateway controllers support HTTPRoute timeouts.** For example, GKE's Gateway controller rejects them with error GWCER104. To disable HTTPRoute timeouts, set both values to empty strings:
+
+```bash
+helm install dot-ai-ui ... \
+  --set gateway.timeouts.request="" \
+  --set gateway.timeouts.backendRequest=""
+```
+
 ### Cloud Provider Considerations
 
-Some cloud providers require additional provider-specific configuration beyond HTTPRoute timeouts. Common requirements include:
+Some cloud providers require provider-specific timeout configuration instead of HTTPRoute timeouts:
 
+- **GKE**: Does **not** support HTTPRoute timeouts (GWCER104). You must disable them (set to `""`) and use `GCPBackendPolicy` instead (see below).
 - **Health check configuration**: Custom health check intervals or thresholds.
 - **Security policies**: WAF rules, rate limiting at the gateway level.
-- **Provider-specific timeout overrides**: Some providers (e.g., GKE) may require their own timeout resources in addition to HTTPRoute timeouts.
 
-**GKE Example**: If HTTPRoute timeouts are not sufficient, create a `GCPBackendPolicy`:
+**GKE Example**: Disable HTTPRoute timeouts and create a `GCPBackendPolicy` for timeout configuration:
 
 ```yaml
 apiVersion: networking.gke.io/v1
