@@ -49,6 +49,7 @@ helm install dot-ai-ui \
 **Notes**:
 - Replace `dot-ai-ui.127.0.0.1.nip.io` with your desired hostname.
 - The `dotAi.url` should point to your dot-ai MCP server service. If deployed in the same namespace with default settings, `http://dot-ai:3456` works.
+- The chart includes nginx timeout annotations by default (10 min). **If using a different ingress controller**, override the annotations (see [Ingress Timeout Configuration](#ingress-timeout-configuration)).
 - For all available configuration options, see the [Helm values file](https://github.com/vfarcic/dot-ai-ui/blob/main/charts/values.yaml).
 
 ### Step 3: Configure dot-ai MCP Server
@@ -84,7 +85,7 @@ Open your browser and navigate to the Web UI hostname. You should see the DevOps
 | `ingress.enabled` | Enable Ingress resource | `false` |
 | `ingress.className` | Ingress class name | `nginx` |
 | `ingress.host` | Ingress hostname | `dot-ai-ui.127.0.0.1.nip.io` |
-| `ingress.annotations` | Additional ingress annotations | `{}` |
+| `ingress.annotations` | Ingress annotations (includes nginx timeouts by default) | nginx timeout annotations |
 | `ingress.tls.enabled` | Enable TLS | `false` |
 | `ingress.tls.secretName` | TLS secret name | `""` |
 | `ingress.tls.clusterIssuer` | cert-manager ClusterIssuer | `""` |
@@ -134,6 +135,48 @@ helm install dot-ai-ui \
 
 Then update your `.mcp.json` URL to use `https://`.
 
+## Ingress Timeout Configuration
+
+The Web UI proxies requests to the MCP server for AI-powered operations (query, remediate, operate, recommend) that can take several minutes. The chart includes **nginx timeout annotations by default** (10 minutes). If you use a different ingress controller, override `ingress.annotations` with the appropriate settings:
+
+### Nginx (default)
+
+```yaml
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+```
+
+### Traefik
+
+```yaml
+ingress:
+  className: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: dot-ai-timeout@kubernetescrd
+```
+
+> **Note**: Traefik requires a separate `Middleware` resource for timeout configuration. See the [Traefik docs](https://doc.traefik.io/traefik/middlewares/http/headers/).
+
+### HAProxy
+
+```yaml
+ingress:
+  className: haproxy
+  annotations:
+    haproxy.org/timeout-http-request: "600s"
+```
+
+### AWS ALB
+
+```yaml
+ingress:
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/target-group-attributes: idle_timeout.timeout_seconds=600
+```
+
 ## Gateway API (Alternative to Ingress)
 
 For Kubernetes 1.26+ with Gateway API support, you can use HTTPRoute instead of Ingress.
@@ -170,21 +213,33 @@ helm install dot-ai-ui \
 | `gateway.create` | Create new Gateway (dev/testing only) | `false` |
 | `gateway.className` | GatewayClass name (when create=true) | `""` |
 | `gateway.annotations` | Annotations for Gateway (when create=true) | `{}` |
+| `gateway.timeouts.request` | Max time for entire request (HTTPRoute) | `"600s"` |
+| `gateway.timeouts.backendRequest` | Max time waiting for backend response (HTTPRoute) | `"600s"` |
 | `gateway.listeners.http.enabled` | Enable HTTP listener on port 80 | `true` |
 | `gateway.listeners.http.hostname` | Hostname for HTTP listener | `""` |
 | `gateway.listeners.https.enabled` | Enable HTTPS listener on port 443 | `false` |
 | `gateway.listeners.https.hostname` | Hostname for HTTPS listener | `""` |
 | `gateway.listeners.https.secretName` | TLS secret name for HTTPS | `""` |
 
+### Timeout Configuration
+
+The chart sets HTTPRoute timeouts to **10 minutes** by default (`gateway.timeouts.request` and `gateway.timeouts.backendRequest`), which accommodates AI-powered operations. You can override these values:
+
+```bash
+helm install dot-ai-ui ... \
+  --set gateway.timeouts.request="1800s" \
+  --set gateway.timeouts.backendRequest="1800s"
+```
+
 ### Cloud Provider Considerations
 
-Some cloud providers require additional configuration for Gateway API that cannot be included in the Helm chart due to provider-specific CRDs. Common requirements include:
+Some cloud providers require additional provider-specific configuration beyond HTTPRoute timeouts. Common requirements include:
 
-- **Backend timeouts**: The Web UI proxies requests to the MCP server, which may take time for AI-powered responses. Default gateway timeouts (often 30 seconds) may be insufficient, causing 504 errors on first request or complex queries.
 - **Health check configuration**: Custom health check intervals or thresholds.
 - **Security policies**: WAF rules, rate limiting at the gateway level.
+- **Provider-specific timeout overrides**: Some providers (e.g., GKE) may require their own timeout resources in addition to HTTPRoute timeouts.
 
-**GKE Example**: Create a `GCPBackendPolicy` to extend the timeout:
+**GKE Example**: If HTTPRoute timeouts are not sufficient, create a `GCPBackendPolicy`:
 
 ```yaml
 apiVersion: networking.gke.io/v1

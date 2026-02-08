@@ -34,4 +34,13 @@ spec:
     backendRefs:
     - name: {{ include "dot-ai-ui.fullname" . }}
       port: 3000
+    {{- if and .Values.gateway.timeouts (or .Values.gateway.timeouts.request .Values.gateway.timeouts.backendRequest) }}
+    timeouts:
+      {{- if .Values.gateway.timeouts.request }}
+      request: {{ .Values.gateway.timeouts.request }}
+      {{- end }}
+      {{- if .Values.gateway.timeouts.backendRequest }}
+      backendRequest: {{ .Values.gateway.timeouts.backendRequest }}
+      {{- end }}
+    {{- end }}
 {{- end }}

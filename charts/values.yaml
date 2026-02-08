@@ -56,7 +56,14 @@ ingress:
   enabled: false                 # Create Ingress resource
   className: nginx               # Ingress class name
   host: dot-ai-ui.127.0.0.1.nip.io  # Ingress hostname
-  annotations: {}                # Additional ingress annotations
+  # Timeout annotations for long-running AI requests (query, remediate, operate, etc.)
+  # If using different className, update annotations for your ingress controller:
+  # - Traefik: traefik.ingress.kubernetes.io/service.sticky.cookie.httponly: "true"
+  # - HAProxy: haproxy.org/timeout-http-request: "600s"
+  # - AWS ALB: alb.ingress.kubernetes.io/target-group-attributes: idle_timeout.timeout_seconds=600
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"   # 10 min for AI responses
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"   # 10 min for AI responses
   tls:
     enabled: false               # Enable TLS/HTTPS
     secretName: ""               # TLS secret name (generated if empty when enabled)
@@ -80,6 +87,12 @@ gateway:
 
   # Annotations for Gateway (only used when create=true)
   annotations: {}
+
+  # HTTPRoute timeouts (Gateway API)
+  # Values are durations (e.g., "3600s", "60m", "1h")
+  timeouts:
+    request: "600s"              # Max time for entire request (default: 10 min)
+    backendRequest: "600s"       # Max time waiting for backend response (default: 10 min)
 
   # Listener configuration - only used when create=true
   listeners:
