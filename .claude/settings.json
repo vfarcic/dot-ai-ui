@@ -34,7 +34,6 @@
       "Bash(kubectl:*)",
       "WebFetch(domain:a2ui.org)",
       "mcp__playwright__browser_press_key",
-      "Skill(query-dot-ai)",
       "Bash(KUBECONFIG=kubeconfig-test.yaml kubectl get:*)",
       "Bash(grep:*)",
       "WebFetch(domain:zuplo.com)",
