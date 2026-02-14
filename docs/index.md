@@ -51,7 +51,7 @@ Ask natural language questions about your cluster. Results include tables, diagr
 
 ![Query Results](images/query-results.png)
 
-[Query tool documentation](https://devopstoolkit.ai/docs/mcp/guides/mcp-query-guide)
+[Query tool documentation](https://devopstoolkit.ai/docs/ai-engine/tools/query)
 
 #### Remediate
 
@@ -59,7 +59,7 @@ Diagnose issues and get AI-generated fix suggestions. The workflow shows root ca
 
 ![Remediate Results](images/remediate-results.png)
 
-[Remediate tool documentation](https://devopstoolkit.ai/docs/mcp/guides/mcp-remediate-guide)
+[Remediate tool documentation](https://devopstoolkit.ai/docs/ai-engine/tools/remediate)
 
 #### Operate
 
@@ -69,7 +69,7 @@ Perform Day 2 operations like scaling, updating, or rolling back. The AI shows p
 
 ![Operate Diagram](images/operate-diagram.png)
 
-[Operate tool documentation](https://devopstoolkit.ai/docs/mcp/guides/mcp-operate-guide)
+[Operate tool documentation](https://devopstoolkit.ai/docs/ai-engine/tools/operate)
 
 #### Recommend
 
@@ -77,7 +77,7 @@ Get deployment recommendations for new workloads. A multi-step wizard guides you
 
 ![Recommend Wizard](images/recommend-wizard.png)
 
-[Recommend tool documentation](https://devopstoolkit.ai/docs/mcp/guides/mcp-recommendation-guide)
+[Recommend tool documentation](https://devopstoolkit.ai/docs/ai-engine/tools/recommend)
 
 ## Visualization Companion
 
@@ -126,7 +126,7 @@ See [Kubernetes Setup](setup/kubernetes-setup.md) for configuration options.
 
 ### Prerequisites
 
-- Kubernetes cluster with [dot-ai MCP server](https://devopstoolkit.ai/docs/mcp/setup/mcp-setup/) deployed
+- Kubernetes cluster with [dot-ai MCP server](https://devopstoolkit.ai/docs/ai-engine/setup/deployment) deployed
 - Helm 3.x installed
 
 ### Deploy Web UI
