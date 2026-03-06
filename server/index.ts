@@ -9,6 +9,8 @@ import {
   isAuthEnabled,
   getAuthStrategyName,
 } from './auth/index.js'
+import { registerClient } from './auth/oauth-client.js'
+import { createOAuthRouter } from './auth/oauth-routes.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -51,6 +53,25 @@ console.log(`[Config] MCP_BASE_URL: ${MCP_BASE_URL}`)
 console.log(`[Config] AUTH_TOKEN (MCP): ${AUTH_TOKEN ? '***set***' : 'NOT SET'}`)
 console.log(`[Config] UI_AUTH: ${isAuthEnabled() ? `enabled (${getAuthStrategyName()})` : 'disabled'}`)
 
+/**
+ * Get the authorization token to forward to the MCP server.
+ * If the user authenticated via OAuth (JWT), forward their token.
+ * Otherwise fall back to the static DOT_AI_AUTH_TOKEN.
+ */
+function getUpstreamToken(req: { headers: { authorization?: string } }): string | null {
+  const userToken = req.headers.authorization?.startsWith('Bearer ')
+    ? req.headers.authorization.slice(7)
+    : null
+
+  // If user has a JWT token (OAuth), forward it directly to MCP
+  if (userToken && userToken.includes('.')) {
+    return userToken
+  }
+
+  // Fall back to static MCP auth token
+  return AUTH_TOKEN || null
+}
+
 async function createServer() {
   const app = express()
 
@@ -67,6 +88,12 @@ async function createServer() {
     console.log('[Debug] Hit debug endpoint')
     res.json({ ok: true, mcp: MCP_BASE_URL, hasToken: !!AUTH_TOKEN })
   })
+
+  // ========================================
+  // OAuth browser login routes (before auth middleware)
+  // ========================================
+
+  app.use(createOAuthRouter())
 
   // ========================================
   // Authentication endpoints (before auth middleware)
@@ -108,8 +135,9 @@ async function createServer() {
       const headers: Record<string, string> = {
         Accept: 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -156,8 +184,9 @@ async function createServer() {
       const headers: Record<string, string> = {
         Accept: 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -199,8 +228,9 @@ async function createServer() {
       const headers: Record<string, string> = {
         Accept: 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -237,13 +267,14 @@ async function createServer() {
   })
 
   // Proxy dashboard namespaces API requests to MCP server
-  app.get('/api/v1/namespaces', apiLimiter, async (_req, res) => {
+  app.get('/api/v1/namespaces', apiLimiter, async (req, res) => {
     try {
       const headers: Record<string, string> = {
         Accept: 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -293,8 +324,9 @@ async function createServer() {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -357,8 +389,9 @@ async function createServer() {
       const headers: Record<string, string> = {
         Accept: 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -418,8 +451,9 @@ async function createServer() {
       const headers: Record<string, string> = {
         Accept: 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -482,8 +516,9 @@ async function createServer() {
       const headers: Record<string, string> = {
         Accept: 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -541,8 +576,9 @@ async function createServer() {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -602,8 +638,9 @@ async function createServer() {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -666,8 +703,9 @@ async function createServer() {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -730,8 +768,9 @@ async function createServer() {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -800,8 +839,9 @@ async function createServer() {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -877,8 +917,9 @@ async function createServer() {
       const headers: Record<string, string> = {
         Accept: 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -919,8 +960,9 @@ async function createServer() {
       const headers: Record<string, string> = {
         Accept: 'application/json',
       }
-      if (AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
       }
 
       const controller = new AbortController()
@@ -976,6 +1018,14 @@ async function createServer() {
 
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`)
+
+    // Register as OAuth client with dot-ai server (non-blocking)
+    const callbackUrl = `http://localhost:${PORT}/auth/callback`
+    registerClient(callbackUrl).catch((err) => {
+      console.warn(
+        `[OAuth] Client registration failed (SSO login will be unavailable): ${err.message}`
+      )
+    })
   })
 }
 

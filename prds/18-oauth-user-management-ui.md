@@ -2,7 +2,7 @@
 
 **GitHub Issue:** [#18](https://github.com/vfarcic/dot-ai-ui/issues/18)
 **Priority:** High
-**Status:** Draft
+**Status:** In Progress
 **Created:** 2026-03-03
 **Related:** [dot-ai PRD #380](https://github.com/vfarcic/dot-ai/issues/380) — Gateway Auth RBAC (parent)
 
@@ -121,11 +121,11 @@ Browser                     Express Backend              dot-ai Server         D
 
 ### Milestone 1: OAuth Login
 
-- [ ] Express backend: `/auth/login` (redirect to dot-ai `/authorize`), `/auth/callback` (exchange code for token), `/auth/logout`
-- [ ] Dynamic client registration with dot-ai server on startup (RFC 7591)
-- [ ] LoginPage: add "Login with SSO" button alongside existing token input
-- [ ] AuthContext: support OAuth tokens (JWT), store auth mode, extract user identity
-- [ ] Display user email in UI header/sidebar for OAuth users
+- [x] Express backend: `/auth/login` (redirect to dot-ai `/authorize`), `/auth/callback` (exchange code for token), `/auth/logout`
+- [x] Dynamic client registration with dot-ai server on startup (RFC 7591)
+- [x] LoginPage: add "Login with SSO" button alongside existing token input
+- [x] AuthContext: support OAuth tokens (JWT), store auth mode, extract user identity
+- [x] Display user email in UI header/sidebar for OAuth users
 - [ ] E2E tests: OAuth login flow (mock Dex callback)
 
 ### Milestone 2: User Management Page

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../auth/AuthContext'
 import { stringify as yamlStringify } from 'yaml'
 import Prism from 'prismjs'
 import 'prismjs/components/prism-yaml'
@@ -23,6 +24,48 @@ import {
   type KubernetesEvent,
   type GetPodLogsResult,
 } from '../api/dashboard'
+
+function ResourceDetailUserMenu() {
+  const { authMode, userEmail, logout } = useAuth()
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted"
+      >
+        {authMode === 'oauth' && userEmail ? (
+          <span className="truncate max-w-[150px]">{userEmail}</span>
+        ) : (
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+          </svg>
+        )}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 bg-muted border border-border rounded-md shadow-lg py-1 min-w-[140px]">
+            {authMode === 'oauth' && userEmail && (
+              <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border truncate">
+                {userEmail}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => { setOpen(false); logout() }}
+              className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-background transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 type TabId = 'overview' | 'metadata' | 'spec' | 'status' | 'yaml' | 'events' | 'logs'
 
@@ -717,22 +760,25 @@ export function ResourceDetail() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="bg-header-bg border-b border-border px-4 py-2 flex items-center gap-4">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity"
-        >
-          <img
-            src="/logo.jpeg"
-            alt="DevOps AI Toolkit"
-            className="h-8 w-auto rounded"
-          />
-          <span className="text-sm font-medium text-primary">
-            DevOps AI Toolkit
-          </span>
-        </Link>
-        <span className="text-border">|</span>
-        <span className="text-sm font-medium text-foreground">Dashboard</span>
+      <header className="bg-header-bg border-b border-border px-4 py-2 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
+            <img
+              src="/logo.jpeg"
+              alt="DevOps AI Toolkit"
+              className="h-8 w-auto rounded"
+            />
+            <span className="text-sm font-medium text-primary">
+              DevOps AI Toolkit
+            </span>
+          </Link>
+          <span className="text-border">|</span>
+          <span className="text-sm font-medium text-foreground">Dashboard</span>
+        </div>
+        <ResourceDetailUserMenu />
       </header>
 
       {/* Resource header */}

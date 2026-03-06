@@ -1,22 +1,20 @@
 import type { Request, Response, NextFunction } from 'express'
 import type { AuthConfig } from './types.js'
 import { bearerStrategy } from './strategies/bearer.js'
+import { oauthStrategy } from './strategies/oauth.js'
+import { isOAuthReady } from './oauth-client.js'
 
 /**
  * Authentication Module
  *
- * This module provides request authentication for the dashboard.
- * It uses a strategy pattern to allow easy swapping of auth mechanisms.
- *
- * Current strategy: Bearer token
- * Future strategies: OAuth/OIDC, API keys, etc.
+ * Uses a multi-strategy approach:
+ * 1. If the token looks like a JWT (contains dots), try OAuth strategy first
+ * 2. Fall back to bearer token strategy
  *
  * Auth is always enabled. If DOT_AI_UI_AUTH_TOKEN is not set, a random
  * token is auto-generated and printed to the console at startup.
- * To replace this module, update the imports in server/index.ts.
  */
 
-// Default configuration - can be overridden for testing
 const config: AuthConfig = {
   enabled: true,
   strategy: bearerStrategy,
@@ -43,25 +41,48 @@ export function getAuthStrategyName(): string {
 /**
  * Express middleware for authenticating API requests
  *
- * Usage in server/index.ts:
- *   import { authMiddleware } from './auth/index.js'
- *   app.use('/api', authMiddleware)
- *
- * Or for specific routes:
- *   app.get('/api/v1/resources', authMiddleware, handler)
+ * Tries OAuth JWT strategy first (if token looks like JWT),
+ * then falls back to bearer token strategy.
  */
 export async function authMiddleware(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  // Skip auth if disabled
   if (!isAuthEnabled()) {
     next()
     return
   }
 
   try {
+    const authHeader = req.headers.authorization
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+
+    // Try OAuth strategy first if token looks like a JWT
+    if (token && token.includes('.') && isOAuthReady()) {
+      const oauthResult = await oauthStrategy.authenticate(req)
+      if (oauthResult.authenticated) {
+        if (oauthResult.userId) {
+          ;(req as Request & { userId?: string; userEmail?: string }).userId =
+            oauthResult.userId
+        }
+        if (oauthResult.userEmail) {
+          ;(req as Request & { userId?: string; userEmail?: string }).userEmail =
+            oauthResult.userEmail
+        }
+        next()
+        return
+      }
+      // JWT was invalid — don't fall through to bearer, return the OAuth error
+      res.status(401).json({
+        error: oauthResult.error || 'Unauthorized',
+        authRequired: true,
+        strategy: 'oauth',
+      })
+      return
+    }
+
+    // Fall back to bearer token strategy
     const result = await config.strategy.authenticate(req)
 
     if (!result.authenticated) {
@@ -73,7 +94,6 @@ export async function authMiddleware(
       return
     }
 
-    // Attach user info to request for downstream handlers (future use)
     if (result.userId) {
       ;(req as Request & { userId?: string }).userId = result.userId
     }
@@ -87,9 +107,6 @@ export async function authMiddleware(
 
 /**
  * Endpoint handler for token verification
- *
- * Returns 200 if token is valid, 401 if not.
- * Used by frontend to validate token before storing.
  */
 export async function verifyHandler(
   req: Request,
@@ -101,10 +118,28 @@ export async function verifyHandler(
   }
 
   try {
+    const authHeader = req.headers.authorization
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+
+    // Try OAuth if JWT
+    if (token && token.includes('.') && isOAuthReady()) {
+      const oauthResult = await oauthStrategy.authenticate(req)
+      if (oauthResult.authenticated) {
+        res.json({
+          authenticated: true,
+          authEnabled: true,
+          authMode: 'oauth',
+          userEmail: oauthResult.userEmail,
+        })
+        return
+      }
+    }
+
+    // Try bearer
     const result = await config.strategy.authenticate(req)
 
     if (result.authenticated) {
-      res.json({ authenticated: true, authEnabled: true })
+      res.json({ authenticated: true, authEnabled: true, authMode: 'token' })
     } else {
       res.status(401).json({
         authenticated: false,
@@ -125,12 +160,13 @@ export async function verifyHandler(
 /**
  * Endpoint handler for auth status (no token required)
  *
- * Returns whether auth is enabled and what strategy is in use.
- * Used by frontend to decide whether to show login page.
+ * Returns whether auth is enabled, what strategy is in use,
+ * and whether OAuth login is available.
  */
 export function statusHandler(_req: Request, res: Response): void {
   res.json({
     authEnabled: isAuthEnabled(),
     strategy: isAuthEnabled() ? config.strategy.name : null,
+    oauthEnabled: isOAuthReady(),
   })
 }

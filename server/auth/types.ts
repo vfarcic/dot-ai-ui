@@ -10,6 +10,8 @@ export interface AuthResult {
   error?: string
   /** Optional user identifier (for future multi-user support) */
   userId?: string
+  /** User email extracted from OAuth JWT */
+  userEmail?: string
 }
 
 /**

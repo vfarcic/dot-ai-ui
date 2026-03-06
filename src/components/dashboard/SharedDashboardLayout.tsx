@@ -4,6 +4,7 @@ import { DashboardSidebar } from './DashboardSidebar'
 import { NamespaceSelector } from './NamespaceSelector'
 import { SearchInput } from './SearchInput'
 import { ActionBar } from './ActionBar'
+import { useAuth } from '../../auth/AuthContext'
 import type { ResourceKind } from '../../api/dashboard'
 import type { SearchScope } from '../../api/knowledge'
 
@@ -41,6 +42,48 @@ export function useDashboardContext() {
     throw new Error('useDashboardContext must be used within SharedDashboardLayout')
   }
   return context
+}
+
+function UserMenu() {
+  const { authMode, userEmail, logout } = useAuth()
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted"
+      >
+        {authMode === 'oauth' && userEmail ? (
+          <span className="truncate max-w-[150px]">{userEmail}</span>
+        ) : (
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+          </svg>
+        )}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 bg-muted border border-border rounded-md shadow-lg py-1 min-w-[140px]">
+            {authMode === 'oauth' && userEmail && (
+              <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border truncate">
+                {userEmail}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => { setOpen(false); logout() }}
+              className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-background transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
 
 interface SharedDashboardLayoutProps {
@@ -234,6 +277,7 @@ export function SharedDashboardLayout({
               />
             </div>
           )}
+          <UserMenu />
         </header>
 
         {/* Main content with sidebar */}
