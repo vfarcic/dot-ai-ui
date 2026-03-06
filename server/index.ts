@@ -954,6 +954,154 @@ async function createServer() {
     }
   })
 
+  // ========================================
+  // User management proxy routes
+  // ========================================
+
+  // List users
+  app.get('/api/v1/users', apiLimiter, async (req, res) => {
+    try {
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      }
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+      const url = `${MCP_BASE_URL}/api/v1/users`
+      console.log(`[Proxy] Fetching users from MCP: ${url}`)
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to fetch users' })
+    }
+  })
+
+  // Create user
+  app.post('/api/v1/users', apiLimiter, async (req, res) => {
+    try {
+      const { email, password } = req.body as { email?: string; password?: string }
+
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Missing required parameters: email, password' })
+      }
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+      const url = `${MCP_BASE_URL}/api/v1/users`
+      console.log(`[Proxy] Creating user via MCP: ${url}`)
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email, password }),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to create user' })
+    }
+  })
+
+  // Delete user
+  app.delete('/api/v1/users/:email', apiLimiter, async (req, res) => {
+    try {
+      const { email } = req.params
+
+      // Validate email format to prevent path injection
+      if (!email || !/^[^\s/\\]+@[^\s/\\]+$/.test(email)) {
+        return res.status(400).json({ error: 'Invalid email format' })
+      }
+
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      }
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+      const url = `${MCP_BASE_URL}/api/v1/users/${encodeURIComponent(email)}`
+      console.log(`[Proxy] Deleting user via MCP: ${url}`)
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to delete user' })
+    }
+  })
+
   // Proxy dashboard resource kinds API requests to MCP server
   app.get('/api/v1/resources/kinds', apiLimiter, async (req, res) => {
     try {

@@ -164,18 +164,3 @@ export async function exchangeCode(
   }
 }
 
-/**
- * Decode a JWT payload without verification.
- * We trust the token because we received it directly from the dot-ai server.
- */
-export function decodeJwtPayload(
-  token: string
-): { sub?: string; email?: string; groups?: string[]; exp?: number } {
-  const parts = token.split('.')
-  if (parts.length !== 3) {
-    throw new Error('Invalid JWT format')
-  }
-
-  const payload = Buffer.from(parts[1], 'base64url').toString('utf8')
-  return JSON.parse(payload)
-}

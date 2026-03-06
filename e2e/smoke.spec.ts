@@ -6,8 +6,11 @@ test.describe('App smoke tests', () => {
 
     // Verify the app renders and shows the login page (unauthenticated state)
     await expect(page.getByRole('heading', { name: 'DevOps AI Toolkit' })).toBeVisible()
-    await expect(page.getByLabel('Access Token')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible()
+
+    // Login page may show SSO or Token mode depending on OAuth availability
+    const ssoButton = page.getByRole('button', { name: 'Login with SSO' })
+    const tokenInput = page.getByLabel('Access Token')
+    await expect(ssoButton.or(tokenInput)).toBeVisible()
   })
 
   test('page has correct title', async ({ page }) => {

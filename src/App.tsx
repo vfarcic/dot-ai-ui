@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Visualization } from './pages/Visualization'
 import { ResourceDetail } from './pages/ResourceDetail'
+import { UserManagementPage } from './pages/UserManagementPage'
 import { SharedDashboardLayout } from './components/dashboard/SharedDashboardLayout'
 import { DashboardHome } from './components/dashboard/DashboardHome'
 import { ActionSelectionProvider } from './context/ActionSelectionContext'
@@ -18,6 +19,7 @@ function App() {
         {/* Dashboard routes - sidebar expanded by default */}
         <Route element={<SharedDashboardLayout />}>
           <Route path="/dashboard" element={<DashboardHome />} />
+          <Route path="/users" element={<UserManagementPage />} />
         </Route>
 
         {/* Resource detail page - standalone, has its own layout */}

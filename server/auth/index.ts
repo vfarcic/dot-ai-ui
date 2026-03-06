@@ -1,15 +1,14 @@
 import type { Request, Response, NextFunction } from 'express'
 import type { AuthConfig } from './types.js'
 import { bearerStrategy } from './strategies/bearer.js'
-import { oauthStrategy } from './strategies/oauth.js'
 import { isOAuthReady } from './oauth-client.js'
 
 /**
  * Authentication Module
  *
- * Uses a multi-strategy approach:
- * 1. If the token looks like a JWT (contains dots), try OAuth strategy first
- * 2. Fall back to bearer token strategy
+ * Two auth paths:
+ * 1. JWT tokens (OAuth) — passed through to dot-ai server for validation
+ * 2. Bearer tokens (static) — validated locally against DOT_AI_UI_AUTH_TOKEN
  *
  * Auth is always enabled. If DOT_AI_UI_AUTH_TOKEN is not set, a random
  * token is auto-generated and printed to the console at startup.
@@ -41,8 +40,10 @@ export function getAuthStrategyName(): string {
 /**
  * Express middleware for authenticating API requests
  *
- * Tries OAuth JWT strategy first (if token looks like JWT),
- * then falls back to bearer token strategy.
+ * JWT tokens (OAuth): passed through without local validation.
+ * The dot-ai server validates them when the proxy forwards the request.
+ *
+ * Non-JWT tokens: validated locally using bearer token strategy.
  */
 export async function authMiddleware(
   req: Request,
@@ -58,31 +59,13 @@ export async function authMiddleware(
     const authHeader = req.headers.authorization
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
 
-    // Try OAuth strategy first if token looks like a JWT
-    if (token && token.includes('.') && isOAuthReady()) {
-      const oauthResult = await oauthStrategy.authenticate(req)
-      if (oauthResult.authenticated) {
-        if (oauthResult.userId) {
-          ;(req as Request & { userId?: string; userEmail?: string }).userId =
-            oauthResult.userId
-        }
-        if (oauthResult.userEmail) {
-          ;(req as Request & { userId?: string; userEmail?: string }).userEmail =
-            oauthResult.userEmail
-        }
-        next()
-        return
-      }
-      // JWT was invalid — don't fall through to bearer, return the OAuth error
-      res.status(401).json({
-        error: oauthResult.error || 'Unauthorized',
-        authRequired: true,
-        strategy: 'oauth',
-      })
+    // JWT tokens (OAuth) — pass through, let dot-ai server validate
+    if (token && token.includes('.')) {
+      next()
       return
     }
 
-    // Fall back to bearer token strategy
+    // Non-JWT tokens — validate locally with bearer strategy
     const result = await config.strategy.authenticate(req)
 
     if (!result.authenticated) {
@@ -107,6 +90,9 @@ export async function authMiddleware(
 
 /**
  * Endpoint handler for token verification
+ *
+ * JWT tokens: trusted (came from server-side code exchange), returns authenticated.
+ * Bearer tokens: validated locally.
  */
 export async function verifyHandler(
   req: Request,
@@ -121,21 +107,17 @@ export async function verifyHandler(
     const authHeader = req.headers.authorization
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
 
-    // Try OAuth if JWT
-    if (token && token.includes('.') && isOAuthReady()) {
-      const oauthResult = await oauthStrategy.authenticate(req)
-      if (oauthResult.authenticated) {
-        res.json({
-          authenticated: true,
-          authEnabled: true,
-          authMode: 'oauth',
-          userEmail: oauthResult.userEmail,
-        })
-        return
-      }
+    // JWT tokens — trusted, pass through
+    if (token && token.includes('.')) {
+      res.json({
+        authenticated: true,
+        authEnabled: true,
+        authMode: 'oauth',
+      })
+      return
     }
 
-    // Try bearer
+    // Bearer tokens — validate locally
     const result = await config.strategy.authenticate(req)
 
     if (result.authenticated) {

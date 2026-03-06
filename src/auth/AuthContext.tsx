@@ -35,6 +35,22 @@ const AUTH_MODE_KEY = 'dot-ai-ui-auth-mode'
 const USER_EMAIL_KEY = 'dot-ai-ui-user-email'
 
 /**
+ * Decode a JWT payload client-side to extract user info (email, sub).
+ * No signature verification — the token is trusted because it came from
+ * the server-side OAuth code exchange.
+ */
+function decodeJwtPayload(token: string): { sub?: string; email?: string; exp?: number } | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(payload)
+  } catch {
+    return null
+  }
+}
+
+/**
  * Authentication Provider
  *
  * Wraps the app and provides authentication state/methods.
@@ -116,19 +132,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      // If we got an OAuth callback token, validate and use it
+      // If we got an OAuth callback token, trust it (it came from server-side code exchange)
       if (oauthToken) {
-        const valid = await validateToken(oauthToken)
-        if (valid.authenticated) {
-          sessionStorage.setItem(TOKEN_STORAGE_KEY, oauthToken)
-          sessionStorage.setItem(AUTH_MODE_KEY, 'oauth')
-          if (valid.userEmail) {
-            sessionStorage.setItem(USER_EMAIL_KEY, valid.userEmail)
-          }
-          // Full navigation to dashboard so the router initializes with the correct URL
-          window.location.replace('/dashboard')
-          return
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, oauthToken)
+        sessionStorage.setItem(AUTH_MODE_KEY, 'oauth')
+        const payload = decodeJwtPayload(oauthToken)
+        if (payload?.email) {
+          sessionStorage.setItem(USER_EMAIL_KEY, payload.email)
         }
+        // Full navigation to dashboard so the router initializes with the correct URL
+        window.location.replace('/dashboard')
+        return
       }
 
       // Check for stored token
@@ -137,16 +151,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const storedEmail = sessionStorage.getItem(USER_EMAIL_KEY)
 
       if (storedToken) {
-        const valid = await validateToken(storedToken)
-        if (valid.authenticated) {
-          setToken(storedToken)
-          setAuthMode(storedMode || 'token')
-          setUserEmail(valid.userEmail || storedEmail || null)
-          setIsAuthenticated(true)
+        if (storedMode === 'oauth') {
+          // OAuth JWT — trust it, check expiry client-side
+          const payload = decodeJwtPayload(storedToken)
+          if (payload?.exp && payload.exp * 1000 < Date.now()) {
+            // Token expired, clear it
+            sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+            sessionStorage.removeItem(AUTH_MODE_KEY)
+            sessionStorage.removeItem(USER_EMAIL_KEY)
+          } else {
+            setToken(storedToken)
+            setAuthMode('oauth')
+            setUserEmail(payload?.email || storedEmail || null)
+            setIsAuthenticated(true)
+          }
         } else {
-          sessionStorage.removeItem(TOKEN_STORAGE_KEY)
-          sessionStorage.removeItem(AUTH_MODE_KEY)
-          sessionStorage.removeItem(USER_EMAIL_KEY)
+          // Bearer token — validate with server
+          const valid = await validateToken(storedToken)
+          if (valid.authenticated) {
+            setToken(storedToken)
+            setAuthMode('token')
+            setUserEmail(null)
+            setIsAuthenticated(true)
+          } else {
+            sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+            sessionStorage.removeItem(AUTH_MODE_KEY)
+            sessionStorage.removeItem(USER_EMAIL_KEY)
+          }
         }
       }
     } catch (err) {

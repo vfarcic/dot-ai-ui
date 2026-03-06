@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test'
+import { injectAuth } from './helpers'
 
 test.describe('Unified Search', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/')
-    await page.getByLabel('Access Token').fill('test-token')
-    await page.getByRole('button', { name: 'Sign In' }).click()
+    await injectAuth(page)
+    await page.goto('/dashboard')
     await expect(page).toHaveURL(/\/dashboard/)
   })
 

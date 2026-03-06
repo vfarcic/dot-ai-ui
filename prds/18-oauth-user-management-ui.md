@@ -117,6 +117,35 @@ Browser                     Express Backend              dot-ai Server         D
   │<─────────────────────────────│                           │                  │
 ```
 
+## Design Decisions
+
+### 2026-03-06: Remove Express-local OAuth validation, use pass-through proxy
+
+**Decision**: Remove the Express-local OAuth JWT validation strategy. Instead, the Express backend should forward the JWT to the dot-ai server on every proxied request and let the dot-ai server validate it — the same approach used by the CLI.
+
+**Rationale**:
+- The Express `oauth.ts` strategy decodes JWTs without signature verification — insecure
+- The dot-ai server is the authority on token validity (it issued the token, it should validate it)
+- Having two places that validate tokens (Express + dot-ai server) creates divergence and bugs
+- The CLI already does it correctly: get a token, send it on every request, let the server decide
+- Single source of truth is simpler and more secure
+
+**What the Express backend should do for OAuth**:
+- Handle the OAuth browser flow (`/auth/login` → `/authorize`, `/auth/callback` → `/token`) — browsers need server-side PKCE
+- Store the JWT from the token exchange and pass it to the frontend
+- Forward the JWT on all proxied `/api/v1/*` requests to the dot-ai server
+- NOT validate JWTs locally
+
+**What to remove (dead code cleanup)**:
+- `server/auth/strategies/oauth.ts` — Express-local JWT validation strategy
+- OAuth JWT validation logic in `server/auth/index.ts` (`authMiddleware` OAuth branch, `verifyHandler` OAuth branch)
+- `decodeJwtPayload` in `server/auth/oauth-client.ts` (only used by the removed oauth strategy)
+- Frontend `validateToken` call to `/api/v1/auth/verify` for OAuth tokens — the token is trusted because it came from the server-side code exchange
+
+**Bearer token path**: Unaffected. The static `DOT_AI_UI_AUTH_TOKEN` bearer strategy remains for legacy/fallback use.
+
+**E2E test impact**: Tests should exercise the OAuth login flow through the mock server's OAuth endpoints (`/authorize` → `/token`) instead of the Express-local bearer auth. This matches the CLI's test approach and tests the real production path.
+
 ## Milestones
 
 ### Milestone 1: OAuth Login
@@ -126,16 +155,26 @@ Browser                     Express Backend              dot-ai Server         D
 - [x] LoginPage: add "Login with SSO" button alongside existing token input
 - [x] AuthContext: support OAuth tokens (JWT), store auth mode, extract user identity
 - [x] Display user email in UI header/sidebar for OAuth users
-- [ ] E2E tests: OAuth login flow (mock Dex callback)
+- [x] E2E tests: OAuth login flow (mock Dex callback)
+
+### Milestone 1b: Auth Architecture Fix
+
+- [x] Remove `server/auth/strategies/oauth.ts` (Express-local JWT validation)
+- [x] Remove OAuth JWT validation branches from `authMiddleware` and `verifyHandler` in `server/auth/index.ts`
+- [x] Remove `decodeJwtPayload` from `server/auth/oauth-client.ts`
+- [x] Update `authMiddleware` to forward OAuth JWTs as-is to dot-ai server (pass-through proxy)
+- [x] Update frontend `AuthContext` to trust OAuth tokens from callback without calling `/api/v1/auth/verify`
+- [x] Update E2E tests to use OAuth login flow through mock server's `/authorize` and `/token` endpoints
+- [x] Remove any other dead code from the old Express-local OAuth validation approach
 
 ### Milestone 2: User Management Page
 
-- [ ] New `/users` route with UserManagementPage component
-- [ ] User list table (fetches `GET /api/v1/users`)
-- [ ] Create user form/dialog (calls `POST /api/v1/users` with email + password)
-- [ ] Delete user confirmation dialog (calls `DELETE /api/v1/users/:email`)
-- [ ] Sidebar navigation link to Users page
-- [ ] E2E tests: user CRUD flows
+- [x] New `/users` route with UserManagementPage component
+- [x] User list table (fetches `GET /api/v1/users`)
+- [x] Create user form/dialog (calls `POST /api/v1/users` with email + password)
+- [x] Delete user confirmation dialog (calls `DELETE /api/v1/users/:email`)
+- [x] Sidebar navigation link to Users page
+- [x] E2E tests: user CRUD flows
 
 ### Milestone 3: Feature Request to dot-ai
 

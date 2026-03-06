@@ -55,10 +55,7 @@ Automated Playwright tests provide regression protection for UI features.
 ### Running Tests
 
 ```bash
-# Start mock server (provides deterministic test data)
-docker compose -f e2e/docker-compose.yml up -d
-
-# Run all E2E tests
+# Run all E2E tests (mock server starts/stops automatically)
 npm run test:e2e
 
 # Run with interactive UI (for debugging)
@@ -66,9 +63,15 @@ npm run test:e2e:ui
 
 # Run in debug mode (step through tests)
 npm run test:e2e:debug
+
+# Install Playwright browsers (first time only)
+npm run test:e2e:install
+
+# Start mock server manually (for direct API testing)
+docker compose -f e2e/docker-compose.yml up -d
 ```
 
-The mock server runs on port 3001. Tests require `DOT_AI_MCP_URL=http://localhost:3001` (set automatically by playwright.config.ts webServer).
+The mock server (port 3001) is managed automatically by Playwright's `globalSetup`/`globalTeardown`. Tests require `DOT_AI_MCP_URL=http://localhost:3001` (set automatically by playwright.config.ts webServer).
 
 ### Adding New Tests
 
@@ -77,6 +80,19 @@ Use the `/generate-e2e-tests` skill to convert manual Playwright MCP verificatio
 - Analyzes existing test coverage
 - Proposes scenario-based tests (user journeys, not individual element checks)
 - Implements and runs the tests
+
+### Long-Running Tests
+
+Redirect test output to a file, then check tail for pass/fail:
+
+```bash
+mkdir -p ./tmp
+npm run test:e2e > ./tmp/test-output.log 2>&1
+tail -30 ./tmp/test-output.log  # Check result
+# Read full file only if failures detected
+```
+
+**Temporary Files**: Always use `./tmp` for any temporary files, never `/tmp`.
 
 ### Test Structure
 
