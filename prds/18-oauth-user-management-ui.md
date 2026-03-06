@@ -2,7 +2,7 @@
 
 **GitHub Issue:** [#18](https://github.com/vfarcic/dot-ai-ui/issues/18)
 **Priority:** High
-**Status:** In Progress
+**Status:** Complete
 **Created:** 2026-03-03
 **Related:** [dot-ai PRD #380](https://github.com/vfarcic/dot-ai/issues/380) — Gateway Auth RBAC (parent)
 
@@ -178,7 +178,7 @@ Browser                     Express Backend              dot-ai Server         D
 
 ### Milestone 3: Feature Request to dot-ai
 
-- [ ] Send feature request to `dot-ai` project: update `docs/ai-engine/setup/authentication.md` to link to UI-specific user management page (`https://devopstoolkit.ai/docs/ui/user-management` or similar)
+- [x] Send feature request to `dot-ai` project: update `docs/ai-engine/setup/authentication.md` to link to UI-specific user management page (`https://devopstoolkit.ai/docs/ui/#user-management`)
 
 ## Dependencies
 
