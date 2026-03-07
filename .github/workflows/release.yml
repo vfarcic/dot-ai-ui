@@ -118,7 +118,7 @@ jobs:
 
     - name: Install Devbox
       if: steps.config.outputs.notes_only != 'true'
-      uses: jetify-com/devbox-install-action@a03caf5813591bc882139eba6ae947930a83a427 # v0.11.0
+      uses: jetify-com/devbox-install-action@a0d2d53632934ae004f878c840055956d9f741b0 # v0.14.0
       with:
         enable-cache: true
 
@@ -334,7 +334,7 @@ jobs:
         token: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
 
     - name: Install Devbox
-      uses: jetify-com/devbox-install-action@a03caf5813591bc882139eba6ae947930a83a427 # v0.11.0
+      uses: jetify-com/devbox-install-action@a0d2d53632934ae004f878c840055956d9f741b0 # v0.14.0
       with:
         enable-cache: true
 
