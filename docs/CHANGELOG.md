@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.13.0] - 2026-03-07
+
+### Features
+
+- ## OAuth Browser Login & User Management
+
+  Sign in to the Web UI using enterprise SSO providers (Google, GitHub, LDAP) through Dex for individual user identity. The existing bearer token login remains available alongside the new OAuth option. Previously, all UI users shared a single token with no audit trail or personal identity.
+
+  The login page now offers two modes: "Login with SSO" redirects to Dex for OAuth authentication with PKCE, while "Login with Token" preserves the existing bearer token flow. OAuth-authenticated users see their email displayed in the sidebar. The Express backend handles the full OAuth browser flow server-side (authorization redirect, code exchange, token forwarding) without validating JWTs locally — the dot-ai server remains the single authority on token validity.
+
+  A new User Management page at `/users` lets admins create, list, and delete Dex static users directly from the UI. User creation requires an email and password, and deletion includes a confirmation dialog. All user operations proxy through the Express backend to the dot-ai server's REST API.
+
+  See the [Authentication docs](https://devopstoolkit.ai/docs/ui/#authentication) for setup details. ([#18](https://github.com/vfarcic/dot-ai-ui/issues/18))
+
+
 ## [0.12.0] - 2026-02-08
 
 ### Features
