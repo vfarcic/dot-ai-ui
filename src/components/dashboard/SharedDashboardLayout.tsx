@@ -1,9 +1,10 @@
-import { useState, useCallback, createContext, useContext } from 'react'
+import { useState, useEffect, useCallback, createContext, useContext } from 'react'
 import { Link, Outlet, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { DashboardSidebar } from './DashboardSidebar'
 import { NamespaceSelector } from './NamespaceSelector'
 import { SearchInput } from './SearchInput'
 import { ActionBar } from './ActionBar'
+import { useAuth } from '../../auth/AuthContext'
 import type { ResourceKind } from '../../api/dashboard'
 import type { SearchScope } from '../../api/knowledge'
 
@@ -41,6 +42,63 @@ export function useDashboardContext() {
     throw new Error('useDashboardContext must be used within SharedDashboardLayout')
   }
   return context
+}
+
+function UserMenu() {
+  const { authMode, userEmail, logout } = useAuth()
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [open])
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted"
+      >
+        {authMode === 'oauth' && userEmail ? (
+          <span className="truncate max-w-[150px]">{userEmail}</span>
+        ) : (
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+          </svg>
+        )}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 bg-muted border border-border rounded-md shadow-lg py-1 min-w-[140px]">
+            {authMode === 'oauth' && userEmail && (
+              <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border truncate">
+                {userEmail}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                if (authMode === 'oauth') {
+                  fetch('/auth/logout').catch(() => {})
+                }
+                logout()
+              }}
+              className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-background transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
 
 interface SharedDashboardLayoutProps {
@@ -201,7 +259,7 @@ export function SharedDashboardLayout({
 
   return (
     <DashboardContext.Provider value={contextValue}>
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="h-screen bg-background flex flex-col">
         {/* Header */}
         <header className="bg-header-bg border-b border-border px-3 sm:px-4 py-2 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -234,6 +292,7 @@ export function SharedDashboardLayout({
               />
             </div>
           )}
+          <UserMenu />
         </header>
 
         {/* Main content with sidebar */}
@@ -253,7 +312,7 @@ export function SharedDashboardLayout({
           )}
 
           {/* Content area - renders child routes */}
-          <main className={`flex-1 overflow-auto pb-16 ${!showSidebar ? 'px-3 sm:px-4 md:px-6 py-3 sm:py-4' : ''}`}>
+          <main className={`flex-1 overflow-auto ${!showSidebar ? 'px-3 sm:px-4 md:px-6 py-3 sm:py-4' : ''}`}>
             <Outlet />
           </main>
         </div>

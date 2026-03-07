@@ -99,9 +99,22 @@ When using an MCP client (VS Code, Claude Desktop, etc.), AI responses can inclu
 
 ## Authentication
 
-The dashboard requires authentication to protect access to cluster resources and AI operations. Bearer token authentication is used by default.
+The dashboard supports two authentication methods: **OAuth/SSO** (recommended) and **bearer token** (fallback).
 
-**How it works:**
+### OAuth / SSO Login (Recommended)
+
+When the dot-ai MCP server has OAuth enabled (Dex as OIDC provider), the Web UI automatically detects it and offers SSO login:
+
+1. On first visit, users see a login page with a **"Login with SSO"** button
+2. Clicking it redirects to the Dex login page (supports Google, GitHub, LDAP, and other enterprise IdPs)
+3. After authenticating, the user is redirected back to the dashboard
+4. The user's email is displayed in the sidebar
+
+OAuth is enabled automatically — no extra configuration needed. The Express backend registers itself as an OAuth client with the MCP server on startup using [RFC 7591 Dynamic Client Registration](https://datatracker.ietf.org/doc/html/rfc7591).
+
+### Bearer Token Login (Fallback)
+
+If OAuth is not available, or if users prefer token-based access, the login page also offers a **"Login with Token"** tab:
 
 1. On first visit, users see a login page prompting for an access token
 2. The token is validated against the server
@@ -117,6 +130,18 @@ The dashboard requires authentication to protect access to cluster resources and
   ```
 
 See [Kubernetes Setup](setup/kubernetes-setup.md) for configuration options.
+
+## User Management
+
+When OAuth is enabled, admins can manage Dex static users directly from the Web UI.
+
+Navigate to **Users** in the sidebar to:
+
+- **List users**: See all registered users in a table
+- **Create user**: Add a new user with email and password
+- **Delete user**: Remove a user with a confirmation dialog
+
+Changes take effect immediately through the dot-ai server's user management API.
 
 ## Quick Start
 
