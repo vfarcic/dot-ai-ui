@@ -1168,7 +1168,8 @@ async function createServer() {
     console.log(`Server running on http://localhost:${PORT}`)
 
     // Register as OAuth client with dot-ai server (non-blocking)
-    const callbackUrl = `http://localhost:${PORT}/auth/callback`
+    const baseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`
+    const callbackUrl = `${baseUrl}/auth/callback`
     registerClient(callbackUrl).catch((err) => {
       console.warn(
         `[OAuth] Client registration failed (SSO login will be unavailable): ${err.message}`

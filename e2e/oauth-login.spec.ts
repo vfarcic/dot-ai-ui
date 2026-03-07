@@ -16,17 +16,12 @@ function buildMockJwt(): string {
 }
 
 test.describe('OAuth login flow', () => {
-  test('login page shows SSO button when OAuth is available', async ({ page }) => {
+  test('login page shows SSO button', async ({ page }) => {
     await page.goto('/')
 
-    // Wait for auth status check to complete — SSO button only appears if OAuth registered
-    // If OAuth registration failed (no mock server), the SSO button won't appear,
-    // so we check for either SSO or the token form
+    // SSO button must be visible — mock server provides OAuth registration
     const ssoButton = page.getByRole('button', { name: 'Login with SSO' })
-    const tokenInput = page.getByLabel('Access Token')
-
-    // At least one login method should be visible
-    await expect(ssoButton.or(tokenInput)).toBeVisible()
+    await expect(ssoButton).toBeVisible()
   })
 
   test('SSO login flow stores token and redirects to dashboard', async ({ page }) => {
@@ -44,14 +39,10 @@ test.describe('OAuth login flow', () => {
 
     await page.goto('/')
 
-    // If SSO button is available, click it
+    // Click the SSO button to initiate login
     const ssoButton = page.getByRole('button', { name: 'Login with SSO' })
-    if (await ssoButton.isVisible().catch(() => false)) {
-      await ssoButton.click()
-    } else {
-      // If OAuth isn't registered, navigate directly to simulate callback
-      await page.goto(`/auth/complete#token=${mockJwt}`)
-    }
+    await expect(ssoButton).toBeVisible()
+    await ssoButton.click()
 
     // Should land on the dashboard
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 })
@@ -66,13 +57,13 @@ test.describe('OAuth login flow', () => {
     // Wait for the login page to fully render
     await expect(page.getByRole('heading', { name: 'DevOps AI Toolkit' })).toBeVisible()
 
-    // If OAuth tabs are shown, switch to Token mode
+    // Switch to Token mode
     const tokenTab = page.getByRole('button', { name: 'Token' })
-    if (await tokenTab.isVisible().catch(() => false)) {
-      await tokenTab.click()
-      // Token input should appear
-      await expect(page.getByLabel('Access Token')).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible()
-    }
+    await expect(tokenTab).toBeVisible()
+    await tokenTab.click()
+
+    // Token input should appear
+    await expect(page.getByLabel('Access Token')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible()
   })
 })

@@ -53,9 +53,12 @@ export function LoginPage() {
         <div className="bg-muted rounded-lg p-6 border border-border">
           {/* Mode Tabs (only show if OAuth is available) */}
           {oauthEnabled && (
-            <div className="flex mb-6 bg-background rounded-md p-1">
+            <div className="flex mb-6 bg-background rounded-md p-1" role="tablist">
               <button
                 type="button"
+                role="tab"
+                aria-selected={mode === 'sso'}
+                tabIndex={mode === 'sso' ? 0 : -1}
                 onClick={() => { setMode('sso'); setLocalError(null) }}
                 className={`flex-1 py-2 px-3 text-sm font-medium rounded transition-colors ${
                   mode === 'sso'
@@ -67,6 +70,9 @@ export function LoginPage() {
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={mode === 'token'}
+                tabIndex={mode === 'token' ? 0 : -1}
                 onClick={() => { setMode('token'); setLocalError(null) }}
                 className={`flex-1 py-2 px-3 text-sm font-medium rounded transition-colors ${
                   mode === 'token'

@@ -154,15 +154,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (storedMode === 'oauth') {
           // OAuth JWT — trust it, check expiry client-side
           const payload = decodeJwtPayload(storedToken)
-          if (payload?.exp && payload.exp * 1000 < Date.now()) {
-            // Token expired, clear it
+          if (!payload || !payload.exp || payload.exp * 1000 < Date.now()) {
+            // Token malformed or expired, clear it
             sessionStorage.removeItem(TOKEN_STORAGE_KEY)
             sessionStorage.removeItem(AUTH_MODE_KEY)
             sessionStorage.removeItem(USER_EMAIL_KEY)
           } else {
             setToken(storedToken)
             setAuthMode('oauth')
-            setUserEmail(payload?.email || storedEmail || null)
+            setUserEmail(payload.email || storedEmail || null)
             setIsAuthenticated(true)
           }
         } else {

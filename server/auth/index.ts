@@ -109,10 +109,19 @@ export async function verifyHandler(
 
     // JWT tokens — trusted, pass through
     if (token && token.includes('.')) {
+      let userEmail: string | undefined
+      try {
+        const [, payloadB64] = token.split('.')
+        const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString())
+        userEmail = payload.email
+      } catch {
+        // Ignore decode errors, email is optional
+      }
       res.json({
         authenticated: true,
         authEnabled: true,
         authMode: 'oauth',
+        userEmail,
       })
       return
     }

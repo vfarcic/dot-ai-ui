@@ -2,15 +2,6 @@ import { Router } from 'express'
 import { buildAuthorizeUrl, exchangeCode, isOAuthReady } from './oauth-client.js'
 
 /**
- * Build the callback URL from the request (handles proxies/port forwarding).
- */
-function getCallbackUrl(req: { protocol: string; get: (name: string) => string | undefined }): string {
-  const proto = req.get('x-forwarded-proto') || req.protocol
-  const host = req.get('x-forwarded-host') || req.get('host')
-  return `${proto}://${host}/auth/callback`
-}
-
-/**
  * Create Express router for OAuth browser login flow.
  *
  * Routes:
@@ -34,8 +25,7 @@ export function createOAuthRouter(): Router {
     }
 
     try {
-      const callbackUrl = getCallbackUrl(req)
-      const authorizeUrl = buildAuthorizeUrl(callbackUrl)
+      const authorizeUrl = buildAuthorizeUrl()
       res.redirect(authorizeUrl)
     } catch (err) {
       console.error('[OAuth] Failed to build authorize URL:', err)
@@ -71,8 +61,7 @@ export function createOAuthRouter(): Router {
     }
 
     try {
-      const callbackUrl = getCallbackUrl(req)
-      const { accessToken } = await exchangeCode(code, state, callbackUrl)
+      const { accessToken } = await exchangeCode(code, state)
 
       // Redirect to frontend with token in URL fragment (not query string)
       // Fragment is not sent to the server on subsequent requests

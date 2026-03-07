@@ -5,6 +5,7 @@ const MCP_BASE_URL = process.env.DOT_AI_MCP_URL || 'http://localhost:8080'
 // Registered client credentials (populated by registerClient)
 let clientId: string | null = null
 let clientSecret: string | null = null
+let registeredCallbackUrl: string | null = null
 
 // Pending authorization requests: state → { codeVerifier, redirectUri }
 const pendingAuths = new Map<
@@ -38,11 +39,17 @@ export async function registerClient(callbackUrl: string): Promise<void> {
 
   console.log(`[OAuth] Registering client at ${MCP_BASE_URL}/register`)
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10000)
+
   const res = await fetch(`${MCP_BASE_URL}/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal: controller.signal,
   })
+
+  clearTimeout(timeoutId)
 
   if (!res.ok) {
     const text = await res.text().catch(() => 'unknown error')
@@ -55,6 +62,7 @@ export async function registerClient(callbackUrl: string): Promise<void> {
   clientId = data.client_id
   clientSecret = data.client_secret || null
 
+  registeredCallbackUrl = callbackUrl
   console.log(`[OAuth] Client registered: ${clientId}`)
 }
 
@@ -63,6 +71,17 @@ export async function registerClient(callbackUrl: string): Promise<void> {
  */
 export function isOAuthReady(): boolean {
   return clientId !== null
+}
+
+/**
+ * Get the callback URL used during client registration.
+ * All OAuth operations must use this exact URL to avoid redirect_uri_mismatch.
+ */
+export function getRegisteredCallbackUrl(): string {
+  if (!registeredCallbackUrl) {
+    throw new Error('OAuth client not registered')
+  }
+  return registeredCallbackUrl
 }
 
 /**
@@ -82,8 +101,8 @@ function generatePkce(): { codeVerifier: string; codeChallenge: string } {
  * Build the authorization URL and store PKCE verifier for later exchange.
  * Returns the URL to redirect the browser to.
  */
-export function buildAuthorizeUrl(callbackUrl: string): string {
-  if (!clientId) {
+export function buildAuthorizeUrl(): string {
+  if (!clientId || !registeredCallbackUrl) {
     throw new Error('OAuth client not registered')
   }
 
@@ -99,7 +118,7 @@ export function buildAuthorizeUrl(callbackUrl: string): string {
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
-    redirect_uri: callbackUrl,
+    redirect_uri: registeredCallbackUrl,
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
     state,
@@ -115,9 +134,8 @@ export function buildAuthorizeUrl(callbackUrl: string): string {
 export async function exchangeCode(
   code: string,
   state: string,
-  callbackUrl: string
 ): Promise<{ accessToken: string; expiresIn: number }> {
-  if (!clientId) {
+  if (!clientId || !registeredCallbackUrl) {
     throw new Error('OAuth client not registered')
   }
 
@@ -137,7 +155,7 @@ export async function exchangeCode(
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
-    redirect_uri: callbackUrl,
+    redirect_uri: registeredCallbackUrl,
     client_id: clientId,
     code_verifier: pending.codeVerifier,
   })
@@ -146,11 +164,17 @@ export async function exchangeCode(
     body.set('client_secret', clientSecret)
   }
 
+  const tokenController = new AbortController()
+  const tokenTimeoutId = setTimeout(() => tokenController.abort(), 30000)
+
   const res = await fetch(`${MCP_BASE_URL}/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
+    signal: tokenController.signal,
   })
+
+  clearTimeout(tokenTimeoutId)
 
   if (!res.ok) {
     const text = await res.text().catch(() => 'unknown error')

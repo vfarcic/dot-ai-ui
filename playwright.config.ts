@@ -7,7 +7,6 @@ const TEST_PORT = 3002
 const MOCK_PORT = 3001
 
 export default defineConfig({
-  globalTeardown: './e2e/global-teardown.ts',
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

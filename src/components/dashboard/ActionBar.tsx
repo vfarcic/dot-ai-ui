@@ -473,7 +473,7 @@ export function ActionBar() {
   }
 
   return (
-    <div className="bg-header-bg border-t border-border px-4 py-3 z-50">
+    <div className="bg-header-bg border-t border-border px-4 py-3">
       {/* Error message */}
       {error && (
         <div className="mb-2 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-md text-sm text-red-400">

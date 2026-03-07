@@ -1,4 +1,4 @@
-import { useState, useCallback, createContext, useContext } from 'react'
+import { useState, useEffect, useCallback, createContext, useContext } from 'react'
 import { Link, Outlet, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { DashboardSidebar } from './DashboardSidebar'
 import { NamespaceSelector } from './NamespaceSelector'
@@ -48,6 +48,15 @@ function UserMenu() {
   const { authMode, userEmail, logout } = useAuth()
   const [open, setOpen] = useState(false)
 
+  useEffect(() => {
+    if (!open) return
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [open])
+
   return (
     <div className="relative">
       <button
@@ -74,7 +83,13 @@ function UserMenu() {
             )}
             <button
               type="button"
-              onClick={() => { setOpen(false); logout() }}
+              onClick={() => {
+                setOpen(false)
+                if (authMode === 'oauth') {
+                  fetch('/auth/logout').catch(() => {})
+                }
+                logout()
+              }}
               className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-background transition-colors"
             >
               Sign Out

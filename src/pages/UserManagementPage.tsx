@@ -78,6 +78,7 @@ export function UserManagementPage() {
           <input
             type="email"
             placeholder="Email"
+            aria-label="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -86,6 +87,7 @@ export function UserManagementPage() {
           <input
             type="password"
             placeholder="Password"
+            aria-label="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -147,10 +149,16 @@ export function UserManagementPage() {
 
       {/* Delete confirmation dialog */}
       {deletingEmail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-dialog-title"
+          onKeyDown={(e) => { if (e.key === 'Escape' && !deleteLoading) setDeletingEmail(null) }}
+        >
           <div className="fixed inset-0 bg-black/50" onClick={() => !deleteLoading && setDeletingEmail(null)} />
           <div className="relative bg-background border border-border rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
-            <h3 className="text-sm font-medium text-foreground mb-2">Delete User</h3>
+            <h3 id="delete-dialog-title" className="text-sm font-medium text-foreground mb-2">Delete User</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Are you sure you want to delete <span className="text-foreground font-medium">{deletingEmail}</span>? This action cannot be undone.
             </p>
