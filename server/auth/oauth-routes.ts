@@ -1,5 +1,13 @@
 import { Router } from 'express'
+import rateLimit from 'express-rate-limit'
 import { buildAuthorizeUrl, exchangeCode, isOAuthReady } from './oauth-client.js'
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
 /**
  * Create Express router for OAuth browser login flow.
@@ -18,7 +26,7 @@ export function createOAuthRouter(): Router {
    * Redirects the browser to the dot-ai authorization endpoint.
    * Generates PKCE challenge and stores verifier for the callback.
    */
-  router.get('/auth/login', (req, res) => {
+  router.get('/auth/login', authLimiter, (req, res) => {
     if (!isOAuthReady()) {
       res.status(503).json({ error: 'OAuth not configured' })
       return
@@ -40,7 +48,7 @@ export function createOAuthRouter(): Router {
    * Exchanges the code for a JWT access token, then redirects the browser
    * to the frontend with the token in a URL fragment.
    */
-  router.get('/auth/callback', async (req, res) => {
+  router.get('/auth/callback', authLimiter, async (req, res) => {
     const { code, state, error, error_description } = req.query as {
       code?: string
       state?: string

@@ -1058,7 +1058,7 @@ async function createServer() {
       const { email } = req.params
 
       // Validate email format to prevent path injection
-      if (!email || !/^[^\s/\\]+@[^\s/\\]+$/.test(email)) {
+      if (!email || !email.includes('@') || email.includes('/') || email.includes('\\') || email.length > 254) {
         return res.status(400).json({ error: 'Invalid email format' })
       }
 

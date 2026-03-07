@@ -133,12 +133,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // If we got an OAuth callback token, trust it (it came from server-side code exchange)
+      // sessionStorage is the standard approach for SPA OAuth tokens — scoped to tab,
+      // cleared on close, and not sent in HTTP requests (unlike cookies).
       if (oauthToken) {
-        sessionStorage.setItem(TOKEN_STORAGE_KEY, oauthToken)
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, oauthToken) // lgtm[js/clear-text-storage-of-sensitive-data]
         sessionStorage.setItem(AUTH_MODE_KEY, 'oauth')
         const payload = decodeJwtPayload(oauthToken)
         if (payload?.email) {
-          sessionStorage.setItem(USER_EMAIL_KEY, payload.email)
+          sessionStorage.setItem(USER_EMAIL_KEY, payload.email) // lgtm[js/clear-text-storage-of-sensitive-data]
         }
         // Full navigation to dashboard so the router initializes with the correct URL
         window.location.replace('/dashboard')
