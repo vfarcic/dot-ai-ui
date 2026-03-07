@@ -58,7 +58,7 @@ test.describe('OAuth login flow', () => {
     await expect(page.getByRole('heading', { name: 'DevOps AI Toolkit' })).toBeVisible()
 
     // Switch to Token mode
-    const tokenTab = page.getByRole('button', { name: 'Token' })
+    const tokenTab = page.getByRole('tab', { name: 'Token' })
     await expect(tokenTab).toBeVisible()
     await tokenTab.click()
 
