@@ -1,1 +1,0 @@
-RBAC-aware tool filtering: OAuth users only see tools they're authorized for based on Kubernetes RBAC bindings. Static token users continue to see all tools. Added "Access Denied" error handling for HTTP 403 responses on both tool invocation and resource-level operations.

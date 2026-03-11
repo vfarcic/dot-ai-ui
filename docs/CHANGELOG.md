@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.14.0] - 2026-03-11
+
+### Features
+
+- RBAC-aware tool filtering: OAuth users only see tools they're authorized for based on Kubernetes RBAC bindings. Static token users continue to see all tools. Added "Access Denied" error handling for HTTP 403 responses on both tool invocation and resource-level operations. ([#rbac-tool-filtering](https://github.com/vfarcic/dot-ai-ui/issues/rbac-tool-filtering))
+
+
 ## [0.13.0] - 2026-03-07
 
 ### Features
