@@ -1,7 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
 import type { AuthConfig } from './types.js'
 import { bearerStrategy } from './strategies/bearer.js'
-import { isOAuthReady } from './oauth-client.js'
 
 /**
  * Authentication Module
@@ -158,6 +157,6 @@ export function statusHandler(_req: Request, res: Response): void {
   res.json({
     authEnabled: isAuthEnabled(),
     strategy: isAuthEnabled() ? config.strategy.name : null,
-    oauthEnabled: isOAuthReady(),
+    oauthEnabled: true,
   })
 }

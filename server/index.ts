@@ -9,7 +9,6 @@ import {
   isAuthEnabled,
   getAuthStrategyName,
 } from './auth/index.js'
-import { registerClient } from './auth/oauth-client.js'
 import { createOAuthRouter } from './auth/oauth-routes.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -74,6 +73,12 @@ function getUpstreamToken(req: { headers: { authorization?: string } }): string 
 
 async function createServer() {
   const app = express()
+
+  // Trust proxy headers (X-Forwarded-For, X-Forwarded-Proto, X-Forwarded-Host)
+  // Required when running behind load balancers, gateways, or reverse proxies
+  if (!isDev) {
+    app.set('trust proxy', 1)
+  }
 
   // Log ALL incoming requests
   app.use((req, _res, next) => {
@@ -1209,15 +1214,7 @@ async function createServer() {
 
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`)
-
-    // Register as OAuth client with dot-ai server (non-blocking)
-    const baseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`
-    const callbackUrl = `${baseUrl}/auth/callback`
-    registerClient(callbackUrl).catch((err) => {
-      console.warn(
-        `[OAuth] Client registration failed (SSO login will be unavailable): ${err.message}`
-      )
-    })
+    console.log(`[OAuth] Client registration deferred to first login request`)
   })
 }
 

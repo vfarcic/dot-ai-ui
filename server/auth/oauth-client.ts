@@ -67,21 +67,15 @@ export async function registerClient(callbackUrl: string): Promise<void> {
 }
 
 /**
- * Check if OAuth client is registered and ready
+ * Ensure the OAuth client is registered with the correct callback URL.
+ * Registers on first call, and re-registers if the callback URL changes
+ * (e.g., request came through a different hostname).
  */
-export function isOAuthReady(): boolean {
-  return clientId !== null
-}
-
-/**
- * Get the callback URL used during client registration.
- * All OAuth operations must use this exact URL to avoid redirect_uri_mismatch.
- */
-export function getRegisteredCallbackUrl(): string {
-  if (!registeredCallbackUrl) {
-    throw new Error('OAuth client not registered')
+export async function ensureRegistered(callbackUrl: string): Promise<void> {
+  if (clientId && registeredCallbackUrl === callbackUrl) {
+    return // Already registered with the correct URL
   }
-  return registeredCallbackUrl
+  await registerClient(callbackUrl)
 }
 
 /**
@@ -128,6 +122,24 @@ export function buildAuthorizeUrl(): string {
 }
 
 /**
+ * Send a token exchange request to the MCP server.
+ */
+async function fetchToken(body: URLSearchParams): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+  const res = await fetch(`${MCP_BASE_URL}/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+    signal: controller.signal,
+  })
+
+  clearTimeout(timeoutId)
+  return res
+}
+
+/**
  * Exchange an authorization code for an access token.
  * Validates the state parameter and uses the stored PKCE verifier.
  */
@@ -164,20 +176,36 @@ export async function exchangeCode(
     body.set('client_secret', clientSecret)
   }
 
-  const tokenController = new AbortController()
-  const tokenTimeoutId = setTimeout(() => tokenController.abort(), 30000)
-
-  const res = await fetch(`${MCP_BASE_URL}/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-    signal: tokenController.signal,
-  })
-
-  clearTimeout(tokenTimeoutId)
+  const res = await fetchToken(body)
 
   if (!res.ok) {
     const text = await res.text().catch(() => 'unknown error')
+
+    // Detect invalid_client (e.g., dot-ai server restarted and forgot our registration)
+    // Re-register and retry the token exchange once
+    if (text.includes('invalid_client') && registeredCallbackUrl) {
+      console.warn('[OAuth] Got invalid_client — re-registering and retrying token exchange')
+      await registerClient(registeredCallbackUrl)
+
+      // Update the body with the new client credentials
+      body.set('client_id', clientId!)
+      if (clientSecret) {
+        body.set('client_secret', clientSecret)
+      }
+
+      const retryRes = await fetchToken(body)
+      if (!retryRes.ok) {
+        const retryText = await retryRes.text().catch(() => 'unknown error')
+        throw new Error(`Token exchange failed after re-registration (${retryRes.status}): ${retryText}`)
+      }
+
+      const retryData = await retryRes.json()
+      return {
+        accessToken: retryData.access_token,
+        expiresIn: retryData.expires_in || 3600,
+      }
+    }
+
     throw new Error(`Token exchange failed (${res.status}): ${text}`)
   }
 
