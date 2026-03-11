@@ -14,7 +14,7 @@ import { fetchWithAuth } from './authHeaders'
  * - network: Connection failed (status 0)
  * - timeout: Request aborted (status 408)
  */
-export type ErrorType = 'session-expired' | 'ai-unavailable' | 'server' | 'network' | 'timeout'
+export type ErrorType = 'session-expired' | 'ai-unavailable' | 'permission-denied' | 'server' | 'network' | 'timeout'
 
 export class APIError extends Error {
   public readonly errorType: ErrorType
@@ -37,13 +37,14 @@ export class APIError extends Error {
     // (generic 404s during server restart should be retryable server errors)
     if (errorCode === 'SESSION_NOT_FOUND') return 'session-expired'
     if (status === 503 || errorCode === 'AI_NOT_CONFIGURED') return 'ai-unavailable'
+    if (status === 403) return 'permission-denied'
     if (status === 408) return 'timeout'
     if (status === 0) return 'network'
     return 'server'
   }
 
   get isRetryable(): boolean {
-    return this.errorType !== 'session-expired'
+    return this.errorType !== 'session-expired' && this.errorType !== 'permission-denied'
   }
 }
 

@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getUsers, createUser, deleteUser, type User } from '../api/users'
+import { useToolAccess } from '../context/ToolAccessContext'
+import { AccessDenied } from '../components/AccessDenied'
 
 export function UserManagementPage() {
+  const { isToolAllowed } = useToolAccess()
+
+  if (!isToolAllowed('users')) {
+    return <AccessDenied />
+  }
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

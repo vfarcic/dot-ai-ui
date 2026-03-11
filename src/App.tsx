@@ -5,12 +5,14 @@ import { UserManagementPage } from './pages/UserManagementPage'
 import { SharedDashboardLayout } from './components/dashboard/SharedDashboardLayout'
 import { DashboardHome } from './components/dashboard/DashboardHome'
 import { ActionSelectionProvider } from './context/ActionSelectionContext'
+import { ToolAccessProvider } from './context/ToolAccessContext'
 import { AuthGuard } from './auth'
 
 function App() {
   return (
     <BrowserRouter>
       <AuthGuard>
+      <ToolAccessProvider>
       <ActionSelectionProvider>
       <Routes>
         {/* Redirect home to dashboard until home page is implemented */}
@@ -32,6 +34,7 @@ function App() {
         </Route>
       </Routes>
       </ActionSelectionProvider>
+      </ToolAccessProvider>
       </AuthGuard>
     </BrowserRouter>
   )

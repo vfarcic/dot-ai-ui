@@ -298,7 +298,10 @@ export function Visualization() {
         // Refresh visualization to get updated data after execution
         await fetchVizData(true)
       } catch (err) {
-        setRemediateError(err instanceof Error ? err.message : 'Execution failed')
+        const message = err instanceof APIError && err.errorType === 'permission-denied'
+          ? 'You don\'t have permission to apply these changes. Contact your administrator.'
+          : err instanceof Error ? err.message : 'Execution failed'
+        setRemediateError(message)
       } finally {
         setIsRemediateExecuting(false)
       }
@@ -348,7 +351,10 @@ export function Visualization() {
         // Refresh visualization to get updated data after execution
         await fetchVizData(true)
       } catch (err) {
-        setOperateError(err instanceof Error ? err.message : 'Execution failed')
+        const message = err instanceof APIError && err.errorType === 'permission-denied'
+          ? 'You don\'t have permission to apply these changes. Contact your administrator.'
+          : err instanceof Error ? err.message : 'Execution failed'
+        setOperateError(message)
       } finally {
         setIsOperateExecuting(false)
       }

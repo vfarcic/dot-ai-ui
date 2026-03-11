@@ -5,6 +5,8 @@ import { analyzeIssue } from '../../api/remediate'
 import { operateCluster } from '../../api/operate'
 import { submitRecommendIntent, isSolutionsResponse } from '../../api/recommend'
 import { useActionSelection, type SelectedResource, type Tool } from '../../context/ActionSelectionContext'
+import { useToolAccess } from '../../context/ToolAccessContext'
+import { APIError } from '../../api/client'
 
 export type { Tool }
 
@@ -192,6 +194,13 @@ export function ActionBar() {
 
   // Get selected items and tool from action selection context
   const { selectedItems, selectedTool, setSelectedTool } = useActionSelection()
+  const { isToolAllowed, isLoading: isToolAccessLoading } = useToolAccess()
+
+  // Filter tools based on RBAC permissions
+  const availableTools = useMemo(
+    () => TOOLS.filter((t) => isToolAllowed(t.id)),
+    [isToolAllowed]
+  )
 
   // Extract context from URL (memoized to avoid recalculation)
   const urlContext = useMemo(
@@ -219,7 +228,14 @@ export function ActionBar() {
   const intentRef = useRef<HTMLTextAreaElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  const currentTool = TOOLS.find((t) => t.id === selectedTool)!
+  // Auto-select first available tool if current selection is not allowed
+  useEffect(() => {
+    if (!isToolAccessLoading && availableTools.length > 0 && !isToolAllowed(selectedTool)) {
+      setSelectedTool(availableTools[0].id)
+    }
+  }, [isToolAccessLoading, availableTools, selectedTool, isToolAllowed, setSelectedTool])
+
+  const currentTool = availableTools.find((t) => t.id === selectedTool) || availableTools[0]
 
   // Get sidebar state from URL for preserving across navigation
   const sidebarCollapsed = searchParams.get('sb') === '1'
@@ -322,7 +338,9 @@ export function ActionBar() {
         if (err instanceof Error && err.message === 'Request cancelled') {
           // Silently handle cancellation
         } else {
-          const message = err instanceof Error ? err.message : 'An error occurred'
+          const message = err instanceof APIError && err.errorType === 'permission-denied'
+            ? 'You don\'t have permission to use Query. Contact your administrator.'
+            : err instanceof Error ? err.message : 'An error occurred'
           setError(message)
           console.error('[ActionBar] Query error:', err)
         }
@@ -350,7 +368,9 @@ export function ActionBar() {
         if (err instanceof Error && err.message === 'Request cancelled') {
           // Silently handle cancellation
         } else {
-          const message = err instanceof Error ? err.message : 'An error occurred'
+          const message = err instanceof APIError && err.errorType === 'permission-denied'
+            ? 'You don\'t have permission to use Remediate. Contact your administrator.'
+            : err instanceof Error ? err.message : 'An error occurred'
           setError(message)
           console.error('[ActionBar] Remediate error:', err)
         }
@@ -378,7 +398,9 @@ export function ActionBar() {
         if (err instanceof Error && err.message === 'Request cancelled') {
           // Silently handle cancellation
         } else {
-          const message = err instanceof Error ? err.message : 'An error occurred'
+          const message = err instanceof APIError && err.errorType === 'permission-denied'
+            ? 'You don\'t have permission to use Operate. Contact your administrator.'
+            : err instanceof Error ? err.message : 'An error occurred'
           setError(message)
           console.error('[ActionBar] Operate error:', err)
         }
@@ -426,7 +448,9 @@ export function ActionBar() {
         if (err instanceof Error && err.message === 'Request cancelled') {
           // Silently handle cancellation
         } else {
-          const message = err instanceof Error ? err.message : 'An error occurred'
+          const message = err instanceof APIError && err.errorType === 'permission-denied'
+            ? 'You don\'t have permission to use Recommend. Contact your administrator.'
+            : err instanceof Error ? err.message : 'An error occurred'
           setError(message)
           console.error('[ActionBar] Recommend error:', err)
         }
@@ -448,7 +472,7 @@ export function ActionBar() {
   }
 
   const handleToolSelect = (tool: Tool) => {
-    const toolOption = TOOLS.find((t) => t.id === tool)
+    const toolOption = availableTools.find((t) => t.id === tool)
     if (toolOption && !toolOption.disabled) {
       setSelectedTool(tool)  // Context handles clearing selection for recommend
       setIsDropdownOpen(false)
@@ -470,6 +494,28 @@ export function ActionBar() {
       e.preventDefault()
       handleSubmit()
     }
+  }
+
+  // No tools available — show info message
+  if (!isToolAccessLoading && availableTools.length === 0) {
+    return (
+      <div className="bg-header-bg border-t border-border px-4 py-3">
+        <div className="px-3 py-2 bg-muted/50 border border-border rounded-md text-sm text-muted-foreground text-center">
+          No tools available. Contact your administrator if you need access.
+        </div>
+      </div>
+    )
+  }
+
+  // Still loading tool access or no current tool yet
+  if (!currentTool) {
+    return (
+      <div className="bg-header-bg border-t border-border px-4 py-3">
+        <div className="px-3 py-2 text-sm text-muted-foreground text-center">
+          Loading tools...
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -505,7 +551,7 @@ export function ActionBar() {
             {/* Dropdown menu */}
             {isDropdownOpen && (
               <div className="absolute bottom-full left-0 mb-1 w-56 bg-background border border-border rounded-md shadow-lg py-1">
-                {TOOLS.map((tool) => (
+                {availableTools.map((tool) => (
                   <button
                     key={tool.id}
                     type="button"

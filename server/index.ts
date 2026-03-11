@@ -1103,6 +1103,49 @@ async function createServer() {
   })
 
   // Proxy dashboard resource kinds API requests to MCP server
+  // Tool access (RBAC-filtered list of tools the user can access)
+  app.get('/api/v1/tools', apiLimiter, async (req, res) => {
+    try {
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      }
+      const upstreamToken = getUpstreamToken(req)
+      if (upstreamToken) {
+        headers['Authorization'] = `Bearer ${upstreamToken}`
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+      const url = `${MCP_BASE_URL}/api/v1/tools`
+      console.log(`[Proxy] Fetching tools from MCP: ${url}`)
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        return res.status(502).json({ error: 'Invalid response from upstream server' })
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data)
+      }
+
+      res.json(data)
+    } catch (error) {
+      console.error('Proxy error:', error)
+      res.status(500).json({ error: 'Failed to fetch tools' })
+    }
+  })
+
   app.get('/api/v1/resources/kinds', apiLimiter, async (req, res) => {
     try {
       const headers: Record<string, string> = {

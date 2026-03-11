@@ -6,6 +6,7 @@ import {
   sortApiGroups,
   type ResourceKind,
 } from '../../api/dashboard'
+import { useToolAccess } from '../../context/ToolAccessContext'
 
 interface DashboardSidebarProps {
   selectedResource: ResourceKind | null
@@ -221,6 +222,8 @@ export function DashboardSidebar({
 
   const location = useLocation()
   const isUsersPage = location.pathname === '/users'
+  const { isToolAllowed } = useToolAccess()
+  const showUsersLink = isToolAllowed('users')
 
   return (
     <aside
@@ -382,8 +385,8 @@ export function DashboardSidebar({
 
       </nav>
 
-      {/* Users link - pinned to bottom, always visible above action bar */}
-      <div className="border-t border-border">
+      {/* Users link - pinned to bottom, visible only if user has access */}
+      {showUsersLink && <div className="border-t border-border">
         <Link
           to="/users"
           className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
@@ -409,7 +412,7 @@ export function DashboardSidebar({
             </>
           )}
         </Link>
-      </div>
+      </div>}
     </aside>
   )
 }

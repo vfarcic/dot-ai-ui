@@ -28,6 +28,21 @@ const errorConfig: Record<
       </svg>
     ),
   },
+  'permission-denied': {
+    title: 'Access Denied',
+    description:
+      'You don\'t have permission to perform this action. Contact your administrator if you need access.',
+    icon: (
+      <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+        />
+      </svg>
+    ),
+  },
   'ai-unavailable': {
     title: 'AI Service Unavailable',
     description:
@@ -92,7 +107,7 @@ const errorConfig: Record<
 
 export function ErrorDisplay({ type, message, sessionId, onRetry }: ErrorDisplayProps) {
   const config = errorConfig[type]
-  const showRetry = type !== 'session-expired' && onRetry
+  const showRetry = type !== 'session-expired' && type !== 'permission-denied' && onRetry
 
   const issueUrl = generateGitHubIssueUrl({
     errorName: config.title,
