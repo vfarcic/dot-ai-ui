@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.15.0] - 2026-03-11
+
+### Bug Fixes
+
+- ## OAuth Login in Production
+
+  OAuth login now works correctly behind load balancers and gateways. Previously, the OAuth callback URL was hardcoded to `http://localhost:3000` at startup, causing login redirects to fail in production deployments.
+
+  The callback URL is now derived from the actual request's protocol and host headers, eliminating the need for the `PUBLIC_BASE_URL` environment variable. Express `trust proxy` is enabled in production so `X-Forwarded-Proto` and `X-Forwarded-Host` from load balancers are respected. When the dot-ai server restarts and forgets registered OAuth clients, the UI automatically re-registers instead of requiring a pod restart. ([#oauth-production-fix](https://github.com/vfarcic/dot-ai-ui/issues/oauth-production-fix))
+
+
 ## [0.14.0] - 2026-03-11
 
 ### Features
