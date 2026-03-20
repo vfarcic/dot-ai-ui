@@ -103,7 +103,7 @@ export interface OperateResponse {
 
   // Human-readable messages
   message?: string
-  nextAction?: string
+  agentInstructions?: string
 }
 
 /**
@@ -170,7 +170,7 @@ export async function operateCluster(intent: string, signal?: AbortSignal): Prom
       execution: result.execution,
       executionChoices: result.executionChoices,
       message: result.message,
-      nextAction: result.nextAction,
+      agentInstructions: result.agentInstructions,
     }
   } catch (error) {
     if (error instanceof APIError) {
@@ -260,7 +260,7 @@ export async function executeOperation(
       execution: result.execution,
       executionChoices: result.executionChoices,
       message: result.message,
-      nextAction: result.nextAction,
+      agentInstructions: result.agentInstructions,
     }
   } catch (error) {
     if (error instanceof APIError) {
@@ -349,7 +349,7 @@ export async function getOperateSession(
       execution: data.executionResults ? { results: data.executionResults, validation: '' } : finalAnalysis.execution,
       executionChoices,
       message: finalAnalysis.message,
-      nextAction: finalAnalysis.nextAction,
+      agentInstructions: finalAnalysis.agentInstructions,
     }
   } catch (error) {
     if (error instanceof APIError) {
