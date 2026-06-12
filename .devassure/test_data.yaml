@@ -1,0 +1,7 @@
+default:
+  # Local deterministic stack (started via scripts/devassure-stack.sh).
+  # The UI app runs on :3002 and proxies to the mock MCP server on :3001.
+  url: 'http://localhost:3002'
+  # The app logs in with a single access token, not a username/password.
+  # This value matches DOT_AI_UI_AUTH_TOKEN in the stack launcher.
+  access_token: 'test-token'

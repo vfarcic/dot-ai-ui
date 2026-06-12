@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FEATURE: AI Action Bar — Remediate, Operate (execution)
+#
+# Spec (per docs/index.md):
+#   - Remediate: diagnose an issue → root-cause analysis, contributing factors,
+#     recommended actions with risk levels.
+#   - Operate: Day 2 operations → proposed changes (creates/updates/deletes) with
+#     a preview and dry-run validation before execution.
+#
+# The mock returns the structured analysis shape these UIs parse (data.result with
+# analysis / remediation / proposedChanges).
+#
+# Recommend is intentionally NOT in this suite: it is a stateful multi-stage wizard
+# that only works against a real backend, so it was dropped from the mock suite.
+# (Re-add it as a scenario here when running against a real instance.)
+#
+# Style: actions imperative; outcomes stated as facts (enforced as assertions).
+# ─────────────────────────────────────────────────────────────────────────────
+
+- summary: "Remediate — diagnose an issue and show root cause and recommended actions"
+  steps:
+    - login_with_token
+    - Open the AI Action Bar and choose the "Remediate" tool
+    - Type the intent "the api-gateway pod is crash looping" and submit it
+    - A remediation analysis is shown, including a root cause and one or more recommended actions
+  priority: P2
+  tags: [ai-tools, remediate]
+
+- summary: "Operate — propose a Day 2 operation with a preview"
+  steps:
+    - login_with_token
+    - Open the AI Action Bar and choose the "Operate" tool
+    - Type the intent "scale the nginx deployment to 3 replicas" and submit it
+    - A proposed operation is shown describing the changes to be applied before any execution
+  priority: P2
+  tags: [ai-tools, operate]

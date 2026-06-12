@@ -1,0 +1,9 @@
+description: >
+  DevOps AI Toolkit UI — a web companion for the dot-ai MCP server.
+  It renders a Kubernetes dashboard (resource kinds grouped by API, namespace
+  filtering, resource tables) and visualizations (Mermaid diagrams, cards, code
+  blocks, tables) for MCP tool responses. During this trial it runs locally
+  against a mock MCP server that returns fixed, deterministic data.
+rules:
+  - Authentication uses a single access token entered on the login page (no username/password).
+  - This trial targets the local mock stack only; do not trigger any cluster-mutating actions.

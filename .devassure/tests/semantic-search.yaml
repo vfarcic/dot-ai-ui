@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FEATURE: Semantic Search
+#
+# Spec: Pressing Cmd/Ctrl+K opens a search box from anywhere. A natural-language
+#   query returns resources ranked by semantic relevance, each with a color-coded
+#   relevance/score badge; selecting a result navigates to it. A query with no
+#   matches shows a clear empty state rather than an error.
+#
+# Style: actions are imperative; expected outcomes are stated as facts and are
+#   enforced as assertions (see .devassure/agent_instructions.yaml).
+# ─────────────────────────────────────────────────────────────────────────────
+
+- summary: "Semantic Search — natural-language query returns ranked results"
+  steps:
+    - login_with_token
+    - Press Cmd+K (or Ctrl+K) to open the search interface
+    - A search input field is shown
+    - Type the query "nginx" and submit it
+    - Results are shown, each carrying a relevance/score badge
+    - The results are ordered by relevance, highest score first
+    - Select the top result; the app navigates to that resource and shows its details
+  priority: P1
+  tags: [docs, search]
+
+- summary: "Semantic Search — a query with no matches shows an empty state"
+  steps:
+    - login_with_token
+    - Press Cmd+K (or Ctrl+K) to open the search interface
+    - Type the nonsense query "zzzzqqxxnomatch12345" and submit it
+    - A clear "no results" / empty state is shown, not an error
+  priority: P2
+  tags: [search, negative]
+
+- summary: "Semantic Search — Knowledge scope answers a documentation question"
+  steps:
+    - login_with_token
+    - Set the search scope to "Knowledge"
+    - Open the search, type the question "how do I configure RBAC?" and submit it
+    - An explanatory knowledge-base answer is shown (prose, not a resource list)
+  priority: P2
+  tags: [search, knowledge]

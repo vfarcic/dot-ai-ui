@@ -1,0 +1,6 @@
+name: login_with_token
+description: Sign in to the UI using the access token from test data
+steps:
+  - Open the application url
+  - On the login page, choose the Token sign-in option and sign in using the access token from test data
+  - The dashboard has loaded

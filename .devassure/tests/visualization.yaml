@@ -1,0 +1,21 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FEATURE: Visualization Companion (/v/{sessionId})
+#
+# Spec (per docs/index.md): when an MCP client returns a visualization URL,
+#   opening it in the browser renders rich visuals (Mermaid diagrams, cards, code
+#   blocks, tables) for that session. This is the app's original namesake feature.
+#
+# The mock serves a deterministic session at id "qry-2024-01-15-abc123" via
+# GET /api/v1/visualize/{id} ("Cluster Architecture Overview" topology).
+#
+# Style: actions imperative; outcomes stated as facts (enforced as assertions).
+# ─────────────────────────────────────────────────────────────────────────────
+
+- summary: "Visualization page renders a session's visualizations"
+  steps:
+    - login_with_token
+    - Navigate to the visualization page at the path "/v/qry-2024-01-15-abc123"
+    - A visualization view is shown with a title
+    - At least one visualization is rendered (for example a diagram, table, or cards)
+  priority: P2
+  tags: [visualization]

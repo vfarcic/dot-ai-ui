@@ -1,0 +1,24 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FEATURE: User Management (OAuth admin)
+#
+# Spec: When OAuth is enabled, admins manage Dex static users from the UI. A Users
+#   page lists registered users in a table; a form creates a user (email +
+#   password); each user can be deleted via a confirmation dialog. Changes take
+#   effect immediately. This scenario verifies the controls and the cancel path
+#   WITHOUT actually creating or deleting any user.
+#
+# Style: actions are imperative; expected outcomes are stated as facts and are
+#   enforced as assertions (see .devassure/agent_instructions.yaml).
+# ─────────────────────────────────────────────────────────────────────────────
+
+- summary: "User Management — list users and verify create/delete controls (cancel-safe)"
+  steps:
+    - login_with_token
+    - Open "Users" from the sidebar
+    - A table lists the existing users (for example admin@dot-ai.local, alice@example.com, bob@example.com)
+    - A "Create User" form is present with an email field, a password field, and a create button
+    - Click the "Delete" button for one user; a confirmation dialog appears with a Cancel option and a confirm/Delete option
+    - Click "Cancel"; the dialog closes and that user is NOT removed — they still appear in the table
+    - Do not actually create or delete any user
+  priority: P2
+  tags: [docs, users]

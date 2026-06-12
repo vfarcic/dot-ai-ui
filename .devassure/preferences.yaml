@@ -1,0 +1,8 @@
+browsers:
+  default:
+    browser: chromium
+    resolution: 1920 x 1200
+    # Serial (workers:1) is more reliable than parallel — parallel worker startup
+    # can flake (agents failing to initialize). Bump workers only when speed > reliability.
+    headless: true
+workers: 1

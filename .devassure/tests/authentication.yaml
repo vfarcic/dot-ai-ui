@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FEATURE: Authentication
+#
+# Spec: Access is gated behind a login page. Two methods are offered — OAuth/SSO
+#   (when the server has it enabled) and a bearer-token fallback. A valid token
+#   lands the user on the dashboard for the session; an invalid token is rejected
+#   with a clear message and the dashboard does not load.
+#
+# Style: actions are imperative; expected outcomes are stated as facts and are
+#   enforced as assertions (see .devassure/agent_instructions.yaml).
+# ─────────────────────────────────────────────────────────────────────────────
+
+- summary: "Authentication — sign in with a valid access token"
+  steps:
+    - Open the application url
+    - The login page shows the "DevOps AI Toolkit" heading
+    - A "Token" sign-in option is offered (a "Login with SSO" button may also be present)
+    - Choose the Token option and enter the access token from test data
+    - Submit the sign-in form
+    - The user lands on the dashboard, with the resource sidebar and the namespace selector both visible
+  priority: P0
+  tags: [docs, auth]
+
+- summary: "Authentication — an invalid token is rejected"
+  steps:
+    - Open the application url
+    - Choose the Token sign-in option
+    - Enter the clearly-invalid access token "not-a-real-token"
+    - Submit the sign-in form
+    - Sign-in does not succeed — an invalid-token / error message is shown and the dashboard does not load
+  priority: P1
+  tags: [auth, negative]
+
+- summary: "Authentication — signing out returns to the login page"
+  steps:
+    - login_with_token
+    - Sign out of the application (via the user menu or a logout control)
+    - The login page is shown again
+    - The dashboard is no longer accessible without signing in again
+  priority: P2
+  tags: [auth]

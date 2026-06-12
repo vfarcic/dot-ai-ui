@@ -1,0 +1,30 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FEATURE: Query (AI cluster Q&A)
+#
+# Spec: Query lets a user ask natural-language questions about their cluster and
+#   get back readable answers — not raw kubectl output. It is one of the four
+#   tools on the AI Action Bar, reachable from any view. The user types a
+#   question, sees an in-progress state while the AI works, and gets an answer
+#   that addresses the question (prose insight, plus a table/diagram when the
+#   question implies structured data). Question and answer stay visible together.
+#
+# NOTE: submitting a query navigates to the /v/<session> visualization page. The
+#   mock's session-visualization fixture renders a topology DIAGRAM ("Cluster
+#   Architecture Overview") + insights, which differs from the table in the query
+#   POST fixture (a known mock inconsistency). The doc promises "tables, diagrams,
+#   and insights", so this scenario asserts a visualization + insights generically.
+#
+# Style: actions are imperative; expected outcomes are stated as facts and are
+#   enforced as assertions (see .devassure/agent_instructions.yaml).
+# ─────────────────────────────────────────────────────────────────────────────
+
+- summary: "Query — ask a natural-language question and get a rich answer"
+  steps:
+    - login_with_token
+    - Open the AI Action Bar and choose the "Query" tool
+    - An input inviting a natural-language question is shown
+    - Type the question "What databases are running in the cluster?" and submit it
+    - A results view opens that presents the answer as a visualization (a diagram and/or a table)
+    - Written insights about the result are available (for example in a "Session & Insights" panel)
+  priority: P1
+  tags: [query]

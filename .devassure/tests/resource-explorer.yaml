@@ -1,0 +1,62 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FEATURE: Resource Explorer (dashboard)
+#
+# Spec: From the dashboard a user explores cluster resources: a sidebar groups
+#   resource kinds by API group (collapsible); a namespace dropdown scopes every
+#   view; clicking a resource opens a detail view with tabs (Overview, Metadata,
+#   Spec, Status, YAML, Events — plus Logs for Pods); the YAML tab shows the full
+#   manifest with syntax highlighting and a copy button. This is one continuous
+#   "explore my cluster" journey, so it runs as a single flow with one login.
+#
+# Note: the Namespace column appears only in the "All Namespaces" view; once the
+#   view is scoped to a single namespace it is intentionally dropped.
+#
+# Style: actions are imperative; expected outcomes are stated as facts and are
+#   enforced as assertions (see .devassure/agent_instructions.yaml).
+# ─────────────────────────────────────────────────────────────────────────────
+
+- summary: "Resource Explorer — browse, filter, and inspect a resource end to end"
+  steps:
+    - login_with_token
+    - The sidebar lists resource kinds grouped by API group, including a "core" group and an "apps" group
+    - Click the "core" API group to collapse it
+    - The resource kinds under "core" (such as Pod and Service) are no longer visible
+    - Click the "core" API group again to expand it
+    - The resource kinds under "core" are visible again
+    - With "All Namespaces" selected, click the "Pod" resource kind
+    - The pod table includes "Name", "Namespace", and "Status" columns
+    - Open the namespace dropdown (it offers "All Namespaces" and "default") and select the "default" namespace
+    - The view is scoped to the "default" namespace (the URL or page header reflects "default")
+    - Open the first pod in the table to view its details
+    - The detail view shows tabs named Overview, Metadata, Spec, Status, YAML, and Events, plus a Logs tab
+    - Open the Overview tab; key information is presented as cards (for example status and age)
+    - Open the YAML tab; the full manifest is shown with syntax highlighting and a copy button
+  priority: P0
+  tags: [docs, dashboard]
+
+- summary: "Resource Explorer — switching namespace changes the resource list"
+  steps:
+    - login_with_token
+    - With "All Namespaces" selected, click the "Pod" resource kind and note the pods shown
+    - From the namespace dropdown at the top of the page, choose the option "database" (a native select — pick it by its visible text)
+    - Wait for the pod list to reload after the namespace change
+    - The pod list now shows only resources in the "database" namespace (for example the postgres pod) and no longer shows the "default" namespace pods
+  priority: P2
+  tags: [dashboard]
+
+# Deep detail-tab coverage. Metadata/Spec/Status/YAML come from the /resource
+# manifest (supported); Events and Logs hit /events and /logs, which the mock
+# does not yet implement (501) — expect a red there to triage as a mock gap.
+- summary: "Resource Explorer — inspect every detail tab of a pod"
+  steps:
+    - login_with_token
+    - Click the "Pod" resource kind and open the first pod's details
+    - Open the Overview tab; key fields are shown as cards
+    - Open the Metadata tab; labels and/or annotations are shown
+    - Open the Spec tab; the resource specification is shown
+    - Open the Status tab; the current status is shown
+    - Open the YAML tab; the manifest is syntax-highlighted and a copy button is present
+    - Open the Events tab; related events (or a clear empty state) are shown
+    - Open the Logs tab; container logs (or a clear empty state) are shown
+  priority: P2
+  tags: [dashboard, detail]

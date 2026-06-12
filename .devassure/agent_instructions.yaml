@@ -1,0 +1,22 @@
+instructions:
+  - >-
+    Each test step is either an action to perform or a statement of expected behavior.
+    Treat any step phrased as a statement of fact (for example "An answer is shown" or
+    "The list is sorted by relevance") as an assertion: confirm it holds against the
+    application, and FAIL the step if it does not. Do not treat such statements as mere
+    context or narration.
+  - >-
+    Perform one UI action per step. After any action that changes application state
+    (selecting a dropdown option, switching a filter, submitting a form, opening a tab),
+    wait for the page to settle and for the relevant content to update before asserting
+    the outcome. Do not assert immediately after triggering an asynchronous update.
+  - >-
+    Some controls are native HTML <select> dropdowns (for example the namespace selector
+    and the search-scope selector). Choose an option by selecting it by its visible text
+    via the select mechanism, not by clicking individual option elements, then wait for
+    the dependent list or view to refresh before continuing.
+  - >-
+    If an action appears to have no effect, re-read the current page state once before
+    retrying. Avoid rapidly repeating a toggle or click: repeating a toggle (such as a
+    collapsible sidebar group) can return the UI to its original state and look as though
+    nothing happened. Verify the current state first, then act only if needed.
