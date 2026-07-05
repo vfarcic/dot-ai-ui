@@ -45,3 +45,4 @@ tmp/
 # DevAssure trial (repo-local CLI install + local run artifacts)
 .devassure-cli/
 .devassure/reports/
+/reports
