@@ -382,7 +382,7 @@ export const argoApplications: K8sResource[] = [
 // MOCK: Replace with MCP `listResources` API call
 // This function should become an async API call to MCP with filtering
 export function getResources(kind: string, namespace?: string): K8sResource[] {
-  let resources: K8sResource[] = []
+  let resources: K8sResource[]
 
   switch (kind) {
     case 'Pods':

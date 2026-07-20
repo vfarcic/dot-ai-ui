@@ -421,7 +421,7 @@ export function ResourceList({
       if (valueA === null || valueA === undefined) return sort.direction === 'asc' ? 1 : -1
       if (valueB === null || valueB === undefined) return sort.direction === 'asc' ? -1 : 1
 
-      let comparison = 0
+      let comparison: number
 
       // Type-aware comparison
       if (sortColumn.type === 'date') {
