@@ -45,7 +45,7 @@
     "lodash-es": "4.18.1"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
+    "@eslint/js": "^10.0.0",
     "@openapitools/openapi-generator-cli": "^2.27.0",
     "@playwright/test": "^1.58.0",
     "@tailwindcss/vite": "^4.1.18",
@@ -55,7 +55,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.0",
-    "eslint": "^9.39.2",
+    "eslint": "^10.0.0",
     "globals": "^17.0.0",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",
