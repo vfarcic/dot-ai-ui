@@ -67,3 +67,52 @@ test.describe('OAuth login flow', () => {
     await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible()
   })
 })
+
+/**
+ * Security regression: /api/v1/auth/verify must not trust unverified JWTs.
+ *
+ * The endpoint previously treated any token containing a "." as a trusted
+ * OAuth JWT and returned authenticated:true after decoding its payload with no
+ * signature check — letting a forged alg:none token spoof the UI's auth state.
+ * The dot-ai backend is the sole authority on JWT validity, so /verify must
+ * only authenticate the static bearer token (DOT_AI_UI_AUTH_TOKEN = "test-token"
+ * in this suite) and reject everything else with 401.
+ */
+test.describe('auth/verify endpoint security', () => {
+  // Forged JWT with alg:none and a forged identity, empty signature.
+  const forgedNoneJwt = (() => {
+    const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url')
+    const payload = Buffer.from(JSON.stringify({
+      sub: 'attacker',
+      email: 'attacker@evil.example',
+      exp: 1900000000,
+    })).toString('base64url')
+    return `${header}.${payload}.`
+  })()
+
+  test('rejects a forged alg:none JWT with 401', async ({ request }) => {
+    const res = await request.get('/api/v1/auth/verify', {
+      headers: { Authorization: `Bearer ${forgedNoneJwt}` },
+    })
+    expect(res.status()).toBe(401)
+    const body = await res.json()
+    expect(body.authenticated).toBe(false)
+  })
+
+  test('rejects a non-JWT invalid token with 401', async ({ request }) => {
+    const res = await request.get('/api/v1/auth/verify', {
+      headers: { Authorization: 'Bearer invalidtoken123' },
+    })
+    expect(res.status()).toBe(401)
+  })
+
+  test('accepts the configured static bearer token', async ({ request }) => {
+    const res = await request.get('/api/v1/auth/verify', {
+      headers: { Authorization: 'Bearer test-token' },
+    })
+    expect(res.status()).toBe(200)
+    const body = await res.json()
+    expect(body.authenticated).toBe(true)
+    expect(body.authMode).toBe('token')
+  })
+})

@@ -90,7 +90,13 @@ export async function authMiddleware(
 /**
  * Endpoint handler for token verification
  *
- * JWT tokens: trusted (came from server-side code exchange), returns authenticated.
+ * The dot-ai backend is the single authority on JWT validity and re-verifies
+ * the signature on every proxied data request. This endpoint therefore never
+ * makes an auth decision about a JWT on its own: a JWT presented here falls
+ * through to the static-bearer comparison and, unless it happens to equal the
+ * configured DOT_AI_UI_AUTH_TOKEN, correctly receives 401. (OAuth JWTs are
+ * validated client-side for expiry and never routed through /verify.)
+ *
  * Bearer tokens: validated locally.
  */
 export async function verifyHandler(
@@ -103,29 +109,9 @@ export async function verifyHandler(
   }
 
   try {
-    const authHeader = req.headers.authorization
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
-
-    // JWT tokens — trusted, pass through
-    if (token && token.includes('.')) {
-      let userEmail: string | undefined
-      try {
-        const [, payloadB64] = token.split('.')
-        const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString())
-        userEmail = payload.email
-      } catch {
-        // Ignore decode errors, email is optional
-      }
-      res.json({
-        authenticated: true,
-        authEnabled: true,
-        authMode: 'oauth',
-        userEmail,
-      })
-      return
-    }
-
-    // Bearer tokens — validate locally
+    // Bearer tokens — validate locally. No JWT fast-path: decoding an
+    // unverified JWT payload and returning authenticated:true would let a
+    // forged token (e.g. alg:none) spoof the UI's auth state.
     const result = await config.strategy.authenticate(req)
 
     if (result.authenticated) {
