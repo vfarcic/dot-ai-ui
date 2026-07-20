@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.16.0/.schema/devbox.schema.json",
   "packages": [
-    "kubernetes-helm@3.19.1",
+    "kubernetes-helm@3.20.2",
     "git@2.54.0",
     "vals@0.42.6",
     "kubectl@1.36.2",
