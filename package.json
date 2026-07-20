@@ -56,7 +56,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.0",
     "eslint": "^9.39.2",
-    "globals": "^16.5.0",
+    "globals": "^17.0.0",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
