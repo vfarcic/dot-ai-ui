@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useParams } from 'react-router'
 import { queryCluster } from '../../api/query'
 import { analyzeIssue } from '../../api/remediate'
 import { operateCluster } from '../../api/operate'

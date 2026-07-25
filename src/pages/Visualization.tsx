@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
-import { useParams, useLocation, useSearchParams, useNavigate } from 'react-router-dom'
+import { useParams, useLocation, useSearchParams, useNavigate } from 'react-router'
 import { TabContainer } from '@/components/TabContainer'
 import { InsightsPanel } from '@/components/InsightsPanel'
 import { ErrorDisplay } from '@/components/ErrorDisplay'

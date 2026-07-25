@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router'
 import { DashboardSidebar } from './DashboardSidebar'
 import { NamespaceSelector } from './NamespaceSelector'
 import { ResourceList } from './ResourceList'

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link, useSearchParams } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router'
 import { useAuth } from '../auth/AuthContext'
 import { stringify as yamlStringify } from 'yaml'
 import Prism from 'prismjs'

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react'
-import { Link, Outlet, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
+import { Link, Outlet, useSearchParams, useNavigate, useLocation } from 'react-router'
 import { DashboardSidebar } from './DashboardSidebar'
 import { NamespaceSelector } from './NamespaceSelector'
 import { SearchInput } from './SearchInput'
