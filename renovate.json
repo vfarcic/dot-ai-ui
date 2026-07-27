@@ -1,12 +1,21 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
+  "platformAutomerge": false,
   "packageRules": [
     {
+      "description": "Automerge devbox.json / devbox.lock updates - CI is skipped for these, so no status checks are awaited",
       "matchManagers": ["devbox"],
       "automerge": true,
-      "automergeType": "branch",
+      "automergeType": "pr",
+      "ignoreTests": true,
       "commitMessageSuffix": "[skip ci]"
+    },
+    {
+      "description": "Automerge GitHub Actions workflow updates once CI is green",
+      "matchManagers": ["github-actions"],
+      "automerge": true,
+      "automergeType": "pr"
     }
   ]
 }
