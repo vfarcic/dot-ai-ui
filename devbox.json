@@ -3,7 +3,7 @@
   "packages": [
     "kubernetes-helm@4.2.3",
     "git@2.55.0",
-    "vals@0.44.4",
+    "vals@0.44.5",
     "kubectl@1.36.2",
     "yq-go@4.53.3",
     "kubectl-tree@0.6.0"
