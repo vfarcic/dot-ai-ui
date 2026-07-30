@@ -1,0 +1,27 @@
+# See https://momentic.ai/docs/cli/configuration
+name: dot-ai-ui
+include:
+  - "**/*.test.yaml"
+  - "**/*.module.yaml"
+retries: 0
+parallel: 1
+recordVideo: on-fail
+gitMainBranch: main
+fileFormat: v2
+browser:
+  autoExpandIframes: true
+  disableSecondaryCacheResolution: true
+ai:
+  useMemory: true
+  failureRecovery: true
+  agentConfig:
+    locator: v4.2
+    assertion: v4.1
+    visual-assertion: v4.0
+    text-extraction: v3.0
+    failure-recovery: v2.1
+environments:
+  - name: local
+    baseUrl: http://localhost:3002
+    envVariables:
+      ACCESS_TOKEN: test-token

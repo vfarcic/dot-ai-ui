@@ -1,0 +1,13 @@
+fileType: momentic/test/v2
+id: sunlit-iowa-topic-leap-loosely
+description: Sign in with a valid access token and land on the dashboard
+defaultEnv: local
+steps:
+  - checkPageContains: DevOps AI Toolkit
+  - assert: the login page states that authentication is required and offers a way to sign in
+  - module:
+      path: ./modules/login-with-token.module.yaml
+  # Token mode carries no identity, so the proof of a successful sign-in is the
+  # authenticated shell: search, the namespace scope, and the AI action bar.
+  - assert: the authenticated dashboard shell is available — a search box, a namespace selector, and the AI action bar with a tool selector are all present
+  - checkPageDoesNotContain: Access Token

@@ -15,7 +15,11 @@
     "test:e2e:install": "playwright install chromium",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "test:momentic:stack": "./scripts/mock-stack.sh",
+    "test:momentic": "momentic run momentic",
+    "test:momentic:lint": "momentic lint",
+    "test:momentic:app": "momentic app"
   },
   "repository": {
     "type": "git",
@@ -59,6 +63,7 @@
     "@vitejs/plugin-react": "^6.0.0",
     "eslint": "^10.0.0",
     "globals": "^17.0.0",
+    "momentic": "^3.41.0",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",

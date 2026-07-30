@@ -103,6 +103,65 @@ e2e/
 └── docker-compose.yml # Mock server config
 ```
 
+## Momentic E2E Tests
+
+A second, AI-driven E2E suite lives in `momentic/`. Where the Playwright specs pin
+down exact selectors, these describe intent in natural language and let Momentic's
+AI agents resolve targets and evaluate assertions — so they survive markup churn
+but cost an API call per step (~30-90s per test).
+
+```bash
+# 1. Start the deterministic stack (mock MCP on :3001, app on :3002). Leave running.
+npm run test:momentic:stack
+
+# 2. In another terminal — run the suite (a path arg is required, else the CLI prompts)
+npm run test:momentic
+
+# Validate YAML schema + file references without running anything
+npm run test:momentic:lint
+
+# Interactive authoring/debugging UI
+npm run test:momentic:app
+```
+
+Config is `momentic.config.yaml`; the `local` environment sets `baseUrl`
+(`http://localhost:3002`) and `ACCESS_TOKEN`. Requires a Momentic login
+(`npx momentic login`) — verify setup with `npx momentic doctor`.
+
+### Test Structure
+
+```text
+momentic/
+├── modules/login-with-token.module.yaml  # Shared sign-in flow
+├── authentication-token-login.test.yaml  # Valid token → dashboard
+├── authentication-invalid-token.test.yaml# Invalid token rejected
+├── resource-explorer.test.yaml           # Sidebar, namespace scope, detail tabs
+├── unified-search.test.yaml              # Search scopes, relevance, clear
+├── user-management.test.yaml             # User list + create/delete controls
+├── visualization-session.test.yaml       # /v/{sessionId} diagram + insights
+└── ai-action-bar.test.yaml               # Tool selection + submit gating
+```
+
+Files are Momentic v2 YAML (`fileType: momentic/test/v2`) and are meant to be
+edited directly; run `npm run test:momentic:lint` after changes. Test `id` values
+must stay stable — they key Momentic's step cache.
+
+### Known mock-server gaps
+
+Two things are deliberately *not* asserted, because the mock cannot satisfy them.
+Both are noted inline in the tests; tighten them when the fixtures land:
+
+- **Namespace filtering** — `GET /api/v1/resources` ignores `namespace`, returning
+  pods from every namespace. The UI does send the filter, so this is a fixture gap,
+  not a UI bug. Tests assert re-scoping (URL + dropped Namespace column) only.
+- **AI tool execution** — `POST /api/v1/tools/:toolName` answers `NOT_IMPLEMENTED`
+  for query/remediate/operate, so `ai-action-bar.test.yaml` covers tool selection
+  and submit gating but never submits an intent.
+
+Writing assertions: state only what is observable on screen. Adding a *reason*
+clause ("…because every row is now in one namespace") can make an otherwise-true
+assertion fail when the AI can see something that contradicts the rationale.
+
 ## Project Structure
 
 ```

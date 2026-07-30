@@ -46,3 +46,7 @@ tmp/
 .devassure-cli/
 .devassure/reports/
 /reports
+
+# Momentic local run artifacts (caches, MCP session artifacts, videos)
+.momentic/
+.momentic-mcp/

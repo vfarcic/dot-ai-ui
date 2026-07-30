@@ -1,0 +1,53 @@
+fileType: momentic/test/v2
+id: resource-explorer-browse-inspect
+description: Browse cluster resources from the sidebar, scope by namespace, and
+  inspect a pod's detail tabs
+defaultEnv: local
+steps:
+  - module:
+      path: ./modules/login-with-token.module.yaml
+
+  # Sidebar groups resource kinds by API group and the groups collapse.
+  - assert: the sidebar lists resource kinds grouped by API group, including a
+      core group and an apps group
+  - click: the core API group header in the sidebar
+  - assert: the resource kinds that were listed under the core API group, such
+      as Pod and Service, are no longer visible
+  - click: the core API group header in the sidebar
+  - assert: the resource kinds under the core API group, including Pod and
+      Service, are listed again
+
+  # Pod list, scoped to all namespaces.
+  - click: the Pod resource kind in the sidebar
+  - waitForUrl:
+      substring: kind=Pod
+  - assert: a table of pods is shown with Name, Namespace and Status columns
+  - checkPageContains: nginx-deployment-7d9c67b5f-abc12
+
+  # Scoping to a single namespace re-scopes the view: the URL carries the
+  # namespace and the now-redundant Namespace column is dropped.
+  #
+  # NOTE: there is deliberately no assertion that ONLY database-namespace pods
+  # remain. The mock MCP server ignores the namespace filter and returns pods
+  # from every namespace, so that cannot be verified against this stack.
+  # Verified in a browser: the UI *does* send `namespace=database` on
+  # /api/v1/resources, so the gap is in the mock fixture, not the UI. Restore
+  # the stricter assertion once the mock honours the filter.
+  - select:
+      from: the namespace selector in the page header
+      label: database
+  - waitForUrl:
+      substring: ns=database
+  - assert: the namespace selector now reads database and the pod table's column
+      headers are Name, Status and Age — there is no longer a Namespace column
+  - checkPageContains: postgres-0
+
+  # Detail view with its tabs.
+  - click: the postgres-0 pod name link in the table
+  - assert: a resource detail page for postgres-0 is shown with tabs including
+      Overview, Metadata, Spec, Status, YAML and Events
+  - click: the Metadata tab
+  - assert: the Metadata tab shows the resource's labels and/or annotations
+  - click: the YAML tab
+  - assert: the YAML tab shows the full resource manifest as syntax-highlighted
+      YAML alongside a copy button

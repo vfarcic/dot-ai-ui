@@ -1,0 +1,27 @@
+fileType: momentic/test/v2
+id: user-management-list-controls
+description: List OAuth users and verify the create form and the delete
+  confirmation, cancelling instead of mutating
+defaultEnv: local
+steps:
+  - module:
+      path: ./modules/login-with-token.module.yaml
+
+  - click: the Users link pinned to the bottom of the sidebar
+  - waitForUrl:
+      substring: /users
+  - assert: the User Management page lists the existing users in a table with
+      Email and Actions columns
+  - checkPageContains: admin@dot-ai.local
+  - checkPageContains: alice@example.com
+  - assert: a Create User form is present with an email field, a password field,
+      and a button to create the user
+
+  # Deliberately cancel-only: this suite must not mutate the shared mock's user
+  # list, so it verifies the confirmation gate rather than performing a delete.
+  - click: the Delete button in the table row for bob@example.com
+  - assert: a confirmation dialog appears asking to confirm deleting the user
+      bob@example.com
+  - click: the Cancel button in the confirmation dialog
+  - assert: the confirmation dialog has closed and bob@example.com is still
+      listed in the users table

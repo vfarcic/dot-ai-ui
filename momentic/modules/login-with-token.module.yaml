@@ -1,0 +1,15 @@
+fileType: momentic/module/v2
+description: Sign in to the DevOps AI Toolkit UI with a bearer access token and
+  wait for the dashboard
+id: kindly-curious-notice-drops-equally
+steps:
+  # The mock MCP server advertises OAuth, so the login card opens in SSO mode.
+  # Switch to the bearer-token tab before filling the token in.
+  - click: the Token tab in the sign-in card
+  - type:
+      text: "{{ env.ACCESS_TOKEN }}"
+      into: the Access Token input
+  - click: the Sign In button
+  - waitForUrl:
+      substring: /dashboard
+  - assert: the Kubernetes dashboard has loaded, showing the resource sidebar and the namespace selector

@@ -1,0 +1,45 @@
+fileType: momentic/test/v2
+id: unified-search-scope-switching
+description: Search across resources and the knowledge base, switch scopes, and
+  clear the search
+defaultEnv: local
+steps:
+  - module:
+      path: ./modules/login-with-token.module.yaml
+
+  # Default "Both" scope answers from the knowledge base AND matches resources.
+  - type:
+      text: RBAC policies
+      into: the search box in the page header
+      pressEnter: true
+  - assert: the results show a Knowledge Base section containing a written
+      answer about RBAC, and a separate Search Results section listing matching
+      cluster resources
+  - assert: the knowledge answer cites its sources as links
+
+  # Narrowing the scope drops the other half of the results, without resubmitting.
+  - select:
+      from: the search scope selector in the page header
+      label: Knowledge
+  - assert: only the Knowledge Base answer is shown — there is no resource
+      Search Results section
+  - select:
+      from: the search scope selector in the page header
+      label: Resources
+  - assert: only the resource Search Results section is shown, with a relevance
+      score on each result — there is no Knowledge Base section
+  - assert: the results are grouped into a separate section per resource kind
+      (such as Deployment, Service and StatefulSet), and within the Deployment
+      section the rows run from the highest relevance percentage down to the
+      lowest
+  - assert: a minimum relevance filter is offered for the resource results
+
+  # The query is bookmarkable.
+  - waitForUrl:
+      substring: q=RBAC
+
+  # Clearing resets back to the dashboard.
+  - click: the clear search button inside the search box
+  - assert: the search box is empty and no search results are displayed
+  - waitForUrlNotToMatch:
+      substring: q=RBAC

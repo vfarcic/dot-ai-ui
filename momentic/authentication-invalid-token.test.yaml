@@ -1,0 +1,16 @@
+fileType: momentic/test/v2
+id: auth-invalid-token-rejected
+description: An invalid access token is rejected and the dashboard stays locked
+defaultEnv: local
+steps:
+  - click: the Token tab in the sign-in card
+  - type:
+      text: not-a-real-token
+      into: the Access Token input
+  - click: the Sign In button
+  - assert: sign-in failed — an error message is displayed and the Kubernetes
+      dashboard did not load
+  # Still on the login page: the token field is the proof the app never let us in.
+  - checkPageContains: Access Token
+  - waitForUrlNotToMatch:
+      substring: /dashboard

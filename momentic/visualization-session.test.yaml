@@ -1,0 +1,18 @@
+fileType: momentic/test/v2
+id: visualization-session-renders
+description: A session visualization URL renders its diagram and insights
+defaultEnv: local
+steps:
+  - module:
+      path: ./modules/login-with-token.module.yaml
+
+  # The mock serves a deterministic session fixture at this id.
+  - navigate: /v/qry-2024-01-15-abc123
+  - checkPageContains: Cluster Architecture Overview
+  - assert: a rendered visualization is shown for the session — a Mermaid
+      dependency diagram with connected, labelled nodes rather than raw diagram
+      source text
+  # Insights live in a panel that is collapsed on load, so expand it first.
+  - click: the Session & Insights panel header
+  - assert: written insights about the session are now shown, including that the
+      nginx-ingress controller routes traffic to the api-gateway

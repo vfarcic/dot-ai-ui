@@ -1,0 +1,40 @@
+fileType: momentic/test/v2
+id: action-bar-tool-selection
+description: The AI action bar offers the four tools and adapts its intent field
+  to the selected one
+defaultEnv: local
+# Scope note: this covers tool selection and submit gating only. Submitting a
+# Query / Remediate / Operate intent is NOT covered here because the mock MCP
+# server has no fixture for POST /api/v1/tools/:toolName — it answers
+# NOT_IMPLEMENTED, so any assertion on the returned analysis would be testing
+# the mock, not the UI. Add those scenarios when the fixtures land (or when this
+# suite is pointed at a real dot-ai backend).
+steps:
+  - module:
+      path: ./modules/login-with-token.module.yaml
+
+  - assert: an AI action bar is present at the bottom of the page with a tool
+      selector currently set to Query
+  - assert: the intent field invites a question about the cluster, and the
+      submit button is disabled while the intent is empty
+
+  # The tool dropdown offers all four tools, each with a description.
+  - click: the tool selector button in the AI action bar
+  - assert: a dropdown lists the tools Query, Remediate, Operate and Recommend,
+      each with a short description of what it does
+
+  # Choosing a tool re-labels the intent field to that tool's purpose.
+  - click: the Remediate option in the tool dropdown
+  - assert: the tool selector now reads Remediate and the intent field asks the
+      user to describe the issue to fix
+  - click: the tool selector button in the AI action bar
+  - click: the Operate option in the tool dropdown
+  - assert: the tool selector now reads Operate and the intent field asks the
+      user to describe the operation, mentioning examples such as scaling a
+      deployment
+
+  # Typing an intent arms the submit control (stopping short of submitting).
+  - type:
+      text: scale the nginx deployment to 3 replicas
+      into: the intent field in the AI action bar
+  - assert: the submit button in the AI action bar is now enabled
