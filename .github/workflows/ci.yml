@@ -33,10 +33,14 @@ jobs:
     - name: Run linter
       run: npm run lint
 
+    - name: Run unit tests
+      run: npm run test:unit
+
     - name: Build project
       run: npm run build
 
   e2e:
+    name: E2E & Coverage
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -58,8 +62,21 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install --with-deps chromium
 
-    - name: Run Playwright tests
-      run: npm run test:e2e
+    # Steps are split rather than using `npm run test:coverage` so a failure points at the
+    # exact stage: unit tests, E2E, report generation, or the coverage gate.
+    - name: Collect unit test coverage
+      run: npm run coverage:clean && npm run test:unit:coverage
+
+    - name: Run Playwright tests with coverage
+      run: npm run test:e2e:coverage
+
+    - name: Build merged coverage report
+      if: ${{ !cancelled() }}
+      run: npm run coverage:report
+
+    - name: Check coverage thresholds
+      if: ${{ !cancelled() }}
+      run: npm run coverage:check
 
     - name: Upload Playwright report
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -67,6 +84,14 @@ jobs:
       with:
         name: playwright-report
         path: playwright-report/
+        retention-days: 30
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      if: ${{ !cancelled() }}
+      with:
+        name: coverage-report
+        path: coverage/combined/
         retention-days: 30
 
     - name: Upload test results

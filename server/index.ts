@@ -1212,10 +1212,22 @@ async function createServer() {
     })
   }
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`)
     console.log(`[OAuth] Client registration deferred to first login request`)
   })
+
+  // Shut down on signal instead of dying where we stand. Required for coverage:
+  // V8 only writes its NODE_V8_COVERAGE profile during a normal exit, so the default
+  // SIGTERM behaviour (Playwright stopping the E2E web server) would discard it.
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(signal, () => {
+      console.log(`[Server] ${signal} received, shutting down`)
+      server.close(() => process.exit(0))
+      // Don't let an idle keep-alive connection hold the process open.
+      setTimeout(() => process.exit(0), 2000).unref()
+    })
+  }
 }
 
 createServer()

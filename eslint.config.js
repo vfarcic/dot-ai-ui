@@ -14,7 +14,7 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/', 'node_modules/', 'charts/'],
+    ignores: ['dist/', 'node_modules/', 'charts/', 'coverage/'],
   },
   {
     rules: {

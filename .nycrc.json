@@ -1,0 +1,16 @@
+{
+  "$comment": [
+    "Thresholds for the merged coverage report (coverage/merged, built by scripts/coverage-report.mjs).",
+    "Set a few points under the measured baseline at the time coverage was introduced:",
+    "statements 31.42, branches 15.56, functions 26.83, lines 32.27 — E2E-derived coverage",
+    "moves a little between runs, so the floor is a ratchet, not the current number.",
+    "Raise these as coverage grows; never lower them to make a red build green."
+  ],
+  "temp-directory": "coverage/merged",
+  "report-dir": "coverage/combined",
+  "check-coverage": true,
+  "statements": 29,
+  "branches": 14,
+  "functions": 25,
+  "lines": 30
+}

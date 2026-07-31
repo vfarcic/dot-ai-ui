@@ -44,6 +44,16 @@ For individual component installation:
 
 [Read the Documentation](https://devopstoolkit.ai/docs/ui/)
 
+## Development
+
+```bash
+npm run test:unit      # Unit tests (Vitest)
+npm run test:e2e       # E2E tests (Playwright, mock server starts automatically)
+npm run test:coverage  # Both, plus a merged coverage report and threshold gate
+```
+
+See [CLAUDE.md](CLAUDE.md) for the dev server, testing conventions, and how coverage is measured.
+
 ## Support
 
 - **GitHub Issues**: [Bug reports and feature requests](https://github.com/vfarcic/dot-ai-ui/issues)

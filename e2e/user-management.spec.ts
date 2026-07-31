@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { injectAuth } from './helpers'
 
 test.describe.serial('User Management', () => {

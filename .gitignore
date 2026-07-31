@@ -40,6 +40,10 @@ kubeconfig*.yaml
 /playwright-report/
 /playwright/.cache/
 
+# Coverage output (all layers + merged report)
+/coverage/
+.nyc_output/
+
 tmp/
 
 # DevAssure trial (repo-local CLI install + local run artifacts)
