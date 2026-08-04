@@ -134,8 +134,9 @@ jobs:
     - name: Build project
       run: npm run build
 
-    - name: Run dependency security audit
-      run: npm audit --audit-level moderate
-
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@d1ba80a13dd99fba24a470575428917156a28b43 # v4
+
+    # Runs after CodeQL so an audit failure cannot skip the analysis upload.
+    - name: Run dependency security audit
+      run: npm audit --audit-level moderate
