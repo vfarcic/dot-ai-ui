@@ -16,6 +16,13 @@
       "matchManagers": ["github-actions"],
       "automerge": true,
       "automergeType": "pr"
+    },
+    {
+      "description": "Automerge non-major npm updates once CI is green - majors stay manual for review",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest", "lockFileMaintenance"],
+      "automerge": true,
+      "automergeType": "pr"
     }
   ]
 }
