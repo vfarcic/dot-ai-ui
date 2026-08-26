@@ -214,41 +214,41 @@
         }
       }
     },
-    "vals@0.45.0": {
-      "last_modified": "2026-08-01T16:34:20Z",
-      "resolved": "github:NixOS/nixpkgs/a5cbcfe954791221bfffe2307f7d1a1bf61a871e#vals",
+    "vals@0.46.0": {
+      "last_modified": "2026-08-18T03:07:11Z",
+      "resolved": "github:NixOS/nixpkgs/f165e44f135784a494bca3d4ab4834c139f0b37d#vals",
       "source": "devbox-search",
-      "version": "0.45.0",
+      "version": "0.46.0",
       "systems": {
         "aarch64-darwin": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/ly5j9i93928pzvfy1mm9w7i85xgismga-vals-0.45.0",
+              "path": "/nix/store/wiwrsnnysnfckx57ckmv7m9srph1hzi3-vals-0.46.0",
               "default": true
             }
           ],
-          "store_path": "/nix/store/ly5j9i93928pzvfy1mm9w7i85xgismga-vals-0.45.0"
+          "store_path": "/nix/store/wiwrsnnysnfckx57ckmv7m9srph1hzi3-vals-0.46.0"
         },
         "aarch64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/fgs7as3m9zfnbm7m3dkrn9w3dr8y9763-vals-0.45.0",
+              "path": "/nix/store/0n9jml8k8kjbskbaj4zqx239siipglrs-vals-0.46.0",
               "default": true
             }
           ],
-          "store_path": "/nix/store/fgs7as3m9zfnbm7m3dkrn9w3dr8y9763-vals-0.45.0"
+          "store_path": "/nix/store/0n9jml8k8kjbskbaj4zqx239siipglrs-vals-0.46.0"
         },
         "x86_64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/v2g4nki05zk73h6fjx2mm9j6i2zz5v5i-vals-0.45.0",
+              "path": "/nix/store/ph12pjxqg47rz81v2fdhfgbinxi8h8r9-vals-0.46.0",
               "default": true
             }
           ],
-          "store_path": "/nix/store/v2g4nki05zk73h6fjx2mm9j6i2zz5v5i-vals-0.45.0"
+          "store_path": "/nix/store/ph12pjxqg47rz81v2fdhfgbinxi8h8r9-vals-0.46.0"
         }
       }
     },
