@@ -1,0 +1,79 @@
+name: Security
+
+# Split out of the CI Pipeline so security signal is independent of PR activity:
+#   push     - CodeQL needs an on.push hook for the default branch, otherwise code
+#              scanning alerts never reach the repository Security tab.
+#   schedule - advisories get published against dependencies that have not changed.
+#              Without a periodic run, a new CVE only surfaces on whichever unrelated
+#              PR happens to run next, turning it red and stalling Renovate automerge.
+#   pull_request - unchanged gating for proposed changes.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    branches: [ main ]
+  schedule:
+    # Mondays 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+# Restrict default permissions to read-only for security
+permissions: read-all
+
+jobs:
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        submodules: true
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+      with:
+        languages: typescript
+        config-file: .github/codeql/codeql-config.yml
+
+    - name: Setup Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      with:
+        node-version: '24.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build project
+      run: npm run build
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+    - name: Setup Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      with:
+        node-version: '24.x'
+
+    # --package-lock-only audits the tree the lockfile declares without installing it,
+    # so this needs no npm ci and runs no package install scripts.
+    - name: Run dependency security audit
+      run: npm audit --audit-level moderate --package-lock-only
