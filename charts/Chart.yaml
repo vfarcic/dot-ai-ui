@@ -2,8 +2,8 @@ apiVersion: v2
 name: dot-ai-ui
 description: Web UI visualization companion for dot-ai MCP server - renders Mermaid diagrams, cards, code blocks, and tables
 type: application
-version: "0.15.1"
-appVersion: "0.15.1"
+version: "0.15.2"
+appVersion: "0.15.2"
 home: https://github.com/vfarcic/dot-ai-ui
 sources:
   - https://github.com/vfarcic/dot-ai-ui
