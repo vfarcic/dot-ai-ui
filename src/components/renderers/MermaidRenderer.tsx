@@ -13,6 +13,8 @@ const MERMAID_CALLBACK_NAME = '__mermaidToggle'
 // Initialize mermaid with dark theme matching devopstoolkit.ai brand
 mermaid.initialize({
   startOnLoad: false,
+  layout: 'dagre', // Mermaid 12 defaults to ELK, which re-lays out diagrams and loads a ~450 kB chunk
+  look: 'classic', // Mermaid 12 defaults to 'neo', which replaces the brand-yellow borders with gradients
   theme: 'dark',
   securityLevel: 'loose', // Required for click callbacks to work
   themeVariables: {
