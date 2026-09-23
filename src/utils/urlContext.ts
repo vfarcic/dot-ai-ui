@@ -12,8 +12,10 @@ type ContextField = 'kind' | 'group' | 'namespace' | 'name'
 const DNS_LABEL = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
 // DNS-1123 subdomain: API groups.
 const DNS_SUBDOMAIN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/
-// Kinds are CamelCase identifiers (e.g. Deployment, CompositeResourceDefinition).
-const KIND = /^[A-Za-z][A-Za-z0-9]*$/
+// Kinds are usually CamelCase identifiers (e.g. Deployment, CompositeResourceDefinition), but the
+// API server only requires a CRD's kind to be a DNS-1035 label once lowercased, so internal
+// hyphens are legal (e.g. Foo-Bar): a letter first, an alphanumeric last, hyphens in between.
+const KIND = /^[A-Za-z]([-A-Za-z0-9]*[A-Za-z0-9])?$/
 // Most resource names are DNS subdomains, but some kinds allow more (e.g. RBAC's
 // `system:controller:foo`). Allow that charset without whitespace, quotes or newlines.
 const RESOURCE_NAME = /^[A-Za-z0-9]([A-Za-z0-9._:-]*[A-Za-z0-9])?$/

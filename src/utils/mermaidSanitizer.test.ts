@@ -62,11 +62,11 @@ describe('sanitizeMermaidSource', () => {
     ['tab separator', 'click\tA\t"javascript:alert(1)"'],
     ['non-breaking space indent', ' click A "javascript:alert(1)"'],
     ['BOM prefix', '﻿click A "javascript:alert(1)"'],
-    ['CRLF line ending', 'click A "javascript:alert(1)"\r'],
+    ['CRLF line ending', 'click A "javascript:alert(1)"\r', '\r'],
     ['bare keyword', 'click'],
-  ])('removes click directives written with %s', (_label, directive) => {
+  ])('removes click directives written with %s', (_label, directive, kept = '') => {
     const { code, removed } = sanitizeMermaidSource(flow('  A --> B', directive))
-    expect(code).toBe(flow('  A --> B', ''))
+    expect(code).toBe(flow('  A --> B', kept))
     expect(removed).toHaveLength(1)
   })
 
@@ -83,6 +83,12 @@ describe('sanitizeMermaidSource', () => {
       flow('%%{init: {"theme": "dark"}}%%click A call alert(1)', '  A --> B'),
     )
     expect(code).toBe(flow('%%{init: {"theme": "dark"}}%%', '  A --> B'))
+    expect(removed).toEqual(['click A call alert(1)'])
+  })
+
+  it('removes click statements after a lone carriage return (Mermaid reads it as a newline)', () => {
+    const { code, removed } = sanitizeMermaidSource(flow('  A --> B\rclick A call alert(1)'))
+    expect(code).toBe(flow('  A --> B\r'))
     expect(removed).toEqual(['click A call alert(1)'])
   })
 
@@ -154,5 +160,47 @@ describe('sanitizeMermaidSource', () => {
     expect(sanitizeMermaidSource(flowchartSource).removed).toEqual([])
     expect(sanitizeMermaidSource(ganttSource).removed).toEqual([])
     expect(sanitizeMermaidSource(mindmapSource).removed).toEqual([])
+  })
+
+  describe('diagram type detection matches Mermaid', () => {
+    const classWithLink = (...preamble: string[]) =>
+      [...preamble, 'classDiagram', '  class Shape', '  link Shape "javascript:alert(1)"'].join('\n')
+
+    it('skips consistently indented front matter', () => {
+      const source = ['  ---', '  title: Indented', '  ---', 'gantt', '  Link accounts :a1, 2026-01-01, 1d']
+      expect(sanitizeMermaidSource(source.join('\n')).removed).toEqual([])
+      const { removed } = sanitizeMermaidSource(classWithLink('  ---', '  title: Indented', '  ---'))
+      expect(removed).toEqual(['link Shape "javascript:alert(1)"'])
+    })
+
+    it('does not close front matter on a delimiter with different indentation', () => {
+      // Mermaid only closes on the column-0 `---`, so the indented one and `flowchart` are YAML
+      // and the diagram is a classDiagram. Reading `flowchart` as the type would keep the link.
+      const { code, removed } = sanitizeMermaidSource(
+        classWithLink('---', 'title: |', '  ---', '  flowchart', '---'),
+      )
+      expect(removed).toEqual(['link Shape "javascript:alert(1)"'])
+      expect(code).not.toMatch(/javascript/)
+    })
+
+    it('treats unterminated front matter as an undeterminable type and keeps the link rule', () => {
+      const source = ['---', 'title: x', '  ---', 'flowchart', '  link Shape "u"']
+      const { removed } = sanitizeMermaidSource(source.join('\n'))
+      expect(removed).toEqual(['link Shape "u"'])
+    })
+
+    it('skips the full contents of a multi-line init directive', () => {
+      // The directive body's `flowchart:` line must not be read as the diagram type.
+      const { code, removed } = sanitizeMermaidSource(
+        classWithLink('%%{init: {', '  flowchart: { curve: "basis" }', '}}%%'),
+      )
+      expect(removed).toEqual(['link Shape "javascript:alert(1)"'])
+      expect(code).not.toMatch(/javascript/)
+    })
+
+    it('still recognizes a no-link diagram after a multi-line directive', () => {
+      const source = ['%%{init: {', '  "theme": "dark"', '}}%%', 'mindmap', '  root', '    Links to docs']
+      expect(sanitizeMermaidSource(source.join('\n')).removed).toEqual([])
+    })
   })
 })

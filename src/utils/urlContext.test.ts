@@ -20,6 +20,12 @@ describe('extractUrlContext', () => {
     expect(context).toBe('kind: Node\nname: worker-0')
   })
 
+  it('keeps CRD kinds with internal hyphens (DNS-1035 once lowercased)', () => {
+    const route = extractUrlContext({ group: 'example.com', kind: 'Foo-Bar', name: 'x' }, params(''))
+    expect(route).toBe('kind: Foo-Bar\ngroup: example.com\nname: x')
+    expect(extractUrlContext({}, params('kind=Foo-Bar'))).toBe('kind: Foo-Bar')
+  })
+
   it('builds context from dashboard query params', () => {
     const context = extractUrlContext({}, params('ns=kube-system&kind=Pod&version=v1&sb=1&q=x&tab=2'))
     expect(context).toBe('kind: Pod\nnamespace: kube-system')
@@ -59,7 +65,10 @@ describe('extractUrlContext', () => {
 describe('isValidContextValue', () => {
   it.each([
     ['kind', 'CompositeResourceDefinition', true],
+    ['kind', 'Foo-Bar', true],
     ['kind', '1Pod', false],
+    ['kind', '-Pod', false],
+    ['kind', 'Pod-', false],
     ['group', 'apiextensions.crossplane.io', true],
     ['group', 'Apps', false],
     ['namespace', 'team-a', true],
