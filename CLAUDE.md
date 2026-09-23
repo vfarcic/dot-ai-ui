@@ -131,6 +131,7 @@ e2e/
 ├── fixtures.ts             # Shared test/expect — adds coverage collection
 ├── helpers.ts              # Auth injection and login helpers
 ├── dashboard.spec.ts       # Dashboard page tests
+├── mermaid-renderer.spec.ts # Diagram collapse/expand, click-directive XSS
 ├── oauth-login.spec.ts     # OAuth + token login flows
 ├── smoke.spec.ts           # Basic smoke tests
 ├── unified-search.spec.ts  # Search scopes, results, URL state
