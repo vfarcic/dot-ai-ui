@@ -36,14 +36,6 @@ const staticLimiter = rateLimit({
   legacyHeaders: false,
 })
 
-// Stricter rate limiter for auth endpoints to prevent brute-force attacks
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per 15 minutes per IP
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many authentication attempts, please try again later' },
-})
 const isDev = process.env.NODE_ENV !== 'production'
 const PORT = process.env.PORT || 3000
 const MCP_BASE_URL = process.env.DOT_AI_MCP_URL || 'http://localhost:8080'
@@ -110,8 +102,9 @@ async function createServer() {
   // top of the SameSite=Strict session cookie)
   app.use('/api/v1', csrfProtection)
 
-  // /api/v1/auth/{status,verify,session,login,logout} - each handles its own auth
-  app.use('/api/v1/auth', createAuthApiRouter({ authLimiter, apiLimiter }))
+  // /api/v1/auth/{status,verify,session,login,logout} - each handles its own
+  // auth and carries its own rate limiter (see createAuthApiRouter)
+  app.use('/api/v1/auth', createAuthApiRouter())
 
   // ========================================
   // Protected API routes (auth middleware applied)
@@ -120,7 +113,7 @@ async function createServer() {
   // Apply rate limiting and auth middleware to all /api/v1/* routes except auth endpoints
   // Rate limiting here prevents DoS on the auth check itself
   app.use('/api/v1', apiLimiter, (req, res, next) => {
-    // Skip auth for the status endpoint (already handled above with authLimiter)
+    // Skip auth for the status endpoint (answered above by the auth router)
     if (req.path === '/auth/status') {
       return next()
     }

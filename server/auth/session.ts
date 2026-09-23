@@ -289,25 +289,37 @@ export function oauthCookieMaxAge(token: string, expiresIn: number | undefined, 
 /**
  * OAuth login binding cookie.
  *
- * GET /auth/login stores the OAuth `state` in this cookie, and
+ * GET /auth/login binds the OAuth `state` to the browser with this cookie, and
  * GET /auth/callback only redeems a code whose `state` matches it. Without it
  * any browser presenting a valid code+state pair (e.g. one an attacker
  * obtained by starting a login themselves) would be signed in as that
  * attacker (login CSRF / session fixation).
  *
+ * The cookie holds HMAC-SHA256(state), never the state itself, keyed with a
+ * random secret generated when this process starts. The pending authorization
+ * the state refers to lives in this process's memory too (oauth-client.ts),
+ * so a restart invalidates both together.
+ *
  * SameSite=Lax, not Strict: the return from the identity provider is a
  * cross-site top-level navigation, and Lax cookies are sent on those.
  * On HTTPS it uses the `__Host-` prefix so a sibling subdomain cannot plant it.
  */
-export const OAUTH_STATE_COOKIE = 'dot-ai-ui-oauth-state'
-export const SECURE_OAUTH_STATE_COOKIE = `__Host-${OAUTH_STATE_COOKIE}`
+export const OAUTH_STATE_HASH_COOKIE = 'dot-ai-ui-oauth-state'
+export const SECURE_OAUTH_STATE_HASH_COOKIE = `__Host-${OAUTH_STATE_HASH_COOKIE}`
 
 /** Matches the server-side pending-authorization TTL. */
-export const OAUTH_STATE_SECONDS = 10 * 60
+export const STATE_COOKIE_SECONDS = 10 * 60
 
-function serializeOAuthStateCookie(value: string, maxAgeSeconds: number, secure: boolean): string {
+const STATE_HASH_KEY = crypto.randomBytes(32)
+
+/** HMAC-SHA256 of an OAuth `state`, base64url: the value the binding cookie holds. */
+export function hashOAuthState(state: string): string {
+  return crypto.createHmac('sha256', STATE_HASH_KEY).update(state).digest('base64url')
+}
+
+function serializeStateHashCookie(stateHash: string, maxAgeSeconds: number, secure: boolean): string {
   const parts = [
-    `${secure ? SECURE_OAUTH_STATE_COOKIE : OAUTH_STATE_COOKIE}=${encodeURIComponent(value)}`,
+    `${secure ? SECURE_OAUTH_STATE_HASH_COOKIE : OAUTH_STATE_HASH_COOKIE}=${encodeURIComponent(stateHash)}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
@@ -319,26 +331,29 @@ function serializeOAuthStateCookie(value: string, maxAgeSeconds: number, secure:
 }
 
 export function setOAuthStateCookie(req: Request, res: Response, state: string): void {
-  appendSetCookie(res, serializeOAuthStateCookie(state, OAUTH_STATE_SECONDS, isSecureRequest(req)))
+  appendSetCookie(res, serializeStateHashCookie(hashOAuthState(state), STATE_COOKIE_SECONDS, isSecureRequest(req)))
   res.setHeader('Cache-Control', 'no-store')
 }
 
 export function clearOAuthStateCookie(res: Response): void {
-  appendSetCookie(res, serializeOAuthStateCookie('', 0, true))
-  appendSetCookie(res, serializeOAuthStateCookie('', 0, false))
+  appendSetCookie(res, serializeStateHashCookie('', 0, true))
+  appendSetCookie(res, serializeStateHashCookie('', 0, false))
 }
 
 /**
  * Whether the callback's `state` matches the one this browser was given at
- * /auth/login. Constant-time; on HTTPS only the `__Host-` cookie counts.
+ * /auth/login: HMAC(state) is compared to the cookie in constant time. On
+ * HTTPS only the `__Host-` cookie counts.
  */
 export function oauthStateMatches(req: Request, state: string): boolean {
   const cookies = parseCookies(req.headers.cookie)
-  const expected = acceptsOnlyPrefixedCookies(req)
-    ? cookies[SECURE_OAUTH_STATE_COOKIE]
-    : cookies[SECURE_OAUTH_STATE_COOKIE] ?? cookies[OAUTH_STATE_COOKIE]
-  if (!expected || !state) return false
-  const a = crypto.createHash('sha256').update(expected).digest()
-  const b = crypto.createHash('sha256').update(state).digest()
-  return crypto.timingSafeEqual(a, b)
+  const expectedHash = acceptsOnlyPrefixedCookies(req)
+    ? cookies[SECURE_OAUTH_STATE_HASH_COOKIE]
+    : cookies[SECURE_OAUTH_STATE_HASH_COOKIE] ?? cookies[OAUTH_STATE_HASH_COOKIE]
+  if (!expectedHash || !state) return false
+  const expected = Buffer.from(expectedHash)
+  const actual = Buffer.from(hashOAuthState(state))
+  // Both are fixed-length HMAC encodings unless the cookie was tampered with;
+  // the length check only rejects malformed cookies.
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual)
 }

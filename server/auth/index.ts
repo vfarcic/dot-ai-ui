@@ -1,5 +1,6 @@
 import { Router } from 'express'
-import type { Request, Response, NextFunction, RequestHandler } from 'express'
+import type { Request, Response, NextFunction } from 'express'
+import rateLimit from 'express-rate-limit'
 import type { AuthConfig } from './types.js'
 import { bearerStrategy, isValidStaticToken } from './strategies/bearer.js'
 import {
@@ -257,35 +258,56 @@ export function logoutHandler(req: Request, res: Response): void {
 }
 
 /**
- * Router for /api/v1/auth/*. Mount at `/api/v1/auth` before the /api/v1 auth
- * gate; every route here handles its own authentication.
+ * Rate limiters for /api/v1/auth/*. They are created here and placed directly
+ * in each route's middleware chain (not injected), so the limit on every route
+ * is visible where the route is declared.
+ *
+ * - authApiLimiter: the general API budget (same as the /api/v1 limiter in
+ *   server/index.ts). For routes that run on every page load or take no
+ *   credential; a stricter limit here caused 429s on ordinary navigation.
+ * - credentialLimiter: strict brute-force guard for routes that check a
+ *   submitted credential. One shared budget for /login and /verify.
  */
-export function createAuthApiRouter({
-  authLimiter,
-  apiLimiter,
-}: {
-  authLimiter: RequestHandler
-  apiLimiter: RequestHandler
-}): Router {
+const authApiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 1000, // 1000 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+})
+
+const credentialLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts, please try again later' },
+})
+
+/**
+ * Router for /api/v1/auth/*. Mount at `/api/v1/auth` before the /api/v1 auth
+ * gate; every route here handles its own authentication and rate limiting.
+ */
+export function createAuthApiRouter(): Router {
   const router = Router()
 
   // Public: is auth enabled, which strategy, is SSO available. Takes no
   // credential and is called on every page load, so like /session it gets the
-  // general API limiter; the strict auth limiter guards credential checks.
-  router.get('/status', apiLimiter, statusHandler)
+  // general API limiter; the strict limiter guards credential checks.
+  router.get('/status', authApiLimiter, statusHandler)
 
   // Static token check for API clients (Authorization header or cookie)
-  router.get('/verify', authLimiter, authMiddleware, verifyHandler)
+  router.get('/verify', credentialLimiter, authMiddleware, verifyHandler)
 
   // Session state for the browser app. Called on every page load, so it only
-  // gets the general API limiter, not the strict auth one.
-  router.get('/session', apiLimiter, sessionHandler)
+  // gets the general API limiter, not the strict one.
+  router.get('/session', authApiLimiter, sessionHandler)
 
   // Static-token sign-in: validates the token and sets the HttpOnly cookie
-  router.post('/login', authLimiter, loginHandler)
+  router.post('/login', credentialLimiter, loginHandler)
 
   // Sign-out: clears the cookie
-  router.post('/logout', apiLimiter, logoutHandler)
+  router.post('/logout', authApiLimiter, logoutHandler)
 
   return router
 }

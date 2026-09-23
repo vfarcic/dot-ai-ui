@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
 import express from 'express'
+import rateLimit from 'express-rate-limit'
 import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 
@@ -27,12 +28,15 @@ import { createOAuthRouter } from './oauth-routes.js'
 import {
   SESSION_COOKIE,
   SECURE_SESSION_COOKIE,
-  OAUTH_STATE_COOKIE,
-  SECURE_OAUTH_STATE_COOKIE,
+  OAUTH_STATE_HASH_COOKIE,
+  SECURE_OAUTH_STATE_HASH_COOKIE,
+  hashOAuthState,
 } from './session.js'
 
 const STATIC = 'unit-static-token'
-const passthrough: express.RequestHandler = (_req, _res, next) => next()
+
+/** Stands in for server/index.ts's /api/v1 limiter; high enough never to trip in tests */
+const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 10000, standardHeaders: true, legacyHeaders: false })
 
 function jwt(payload: Record<string, unknown>): string {
   const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
@@ -46,8 +50,8 @@ function buildApp(): express.Express {
   app.use(express.json())
   app.use(createOAuthRouter())
   app.use('/api/v1', csrfProtection)
-  app.use('/api/v1/auth', createAuthApiRouter({ authLimiter: passthrough, apiLimiter: passthrough }))
-  app.use('/api/v1', authMiddleware)
+  app.use('/api/v1/auth', createAuthApiRouter())
+  app.use('/api/v1', apiLimiter, authMiddleware)
   app.get('/api/v1/whoami', (req, res) => {
     const credential = getRequestCredential(req)
     res.json({ hasCredential: Boolean(credential), jwt: Boolean(credential?.includes('.')) })
@@ -77,7 +81,7 @@ beforeEach(() => {
 })
 
 /** The binding cookie /auth/login gives the browser that starts a login */
-const STATE_COOKIE = (state: string) => `${OAUTH_STATE_COOKIE}=${state}`
+const STATE_COOKIE = (state: string) => `${OAUTH_STATE_HASH_COOKIE}=${hashOAuthState(state)}`
 
 function req(path: string, init: RequestInit = {}): Promise<Response> {
   return fetch(`${base}${path}`, { redirect: 'manual', ...init })
@@ -303,7 +307,7 @@ describe('GET /auth/callback', () => {
 
     const setCookies = res.headers.getSetCookie()
     // The single-use state cookie is expired
-    expect(setCookies.some((c) => c.startsWith(`${OAUTH_STATE_COOKIE}=;`) && c.includes('Max-Age=0'))).toBe(true)
+    expect(setCookies.some((c) => c.startsWith(`${OAUTH_STATE_HASH_COOKIE}=;`) && c.includes('Max-Age=0'))).toBe(true)
     const cookie = setCookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`))!
     expect(cookie.startsWith(`${SESSION_COOKIE}=${accessToken};`)).toBe(true)
     expect(cookie).toContain('HttpOnly')
@@ -367,7 +371,7 @@ describe('GET /auth/callback', () => {
     expect(oauthMocks.exchangeCode).not.toHaveBeenCalled()
 
     const ok = await req('/auth/callback?code=c&state=s', {
-      headers: { 'X-Forwarded-Proto': 'https', Cookie: `${SECURE_OAUTH_STATE_COOKIE}=s` },
+      headers: { 'X-Forwarded-Proto': 'https', Cookie: `${SECURE_OAUTH_STATE_HASH_COOKIE}=${hashOAuthState('s')}` },
     })
     expect(ok.headers.get('location')).toBe('/dashboard')
     expect(ok.headers.getSetCookie().some((c) => c.startsWith(`${SECURE_SESSION_COOKIE}=${accessToken};`))).toBe(true)
@@ -378,7 +382,7 @@ describe('GET /auth/callback', () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const res = await req('/auth/callback?error=access_denied', { headers: { Cookie: STATE_COOKIE('s') } })
     expect(res.headers.get('location')).toBe('/dashboard?auth_error=access_denied')
-    expect(res.headers.getSetCookie().some((c) => c.startsWith(`${OAUTH_STATE_COOKIE}=;`))).toBe(true)
+    expect(res.headers.getSetCookie().some((c) => c.startsWith(`${OAUTH_STATE_HASH_COOKIE}=;`))).toBe(true)
     errSpy.mockRestore()
   })
 })
@@ -397,7 +401,7 @@ describe('GET /auth/login', () => {
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('http://idp.example/authorize?state=abc123')
     const [cookie] = res.headers.getSetCookie()
-    expect(cookie).toMatch(new RegExp(`^${OAUTH_STATE_COOKIE}=abc123; `))
+    expect(cookie.startsWith(`${OAUTH_STATE_HASH_COOKIE}=${hashOAuthState('abc123')}; `)).toBe(true)
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('SameSite=Lax') // the IdP return is a cross-site top-level navigation
     expect(cookie).toContain('Path=/')
@@ -406,17 +410,40 @@ describe('GET /auth/login', () => {
     expect(oauthMocks.ensureRegistered).toHaveBeenCalledWith(expect.stringMatching(/^http:\/\/127\.0\.0\.1:\d+\/auth\/callback$/))
   })
 
+  it('stores only an HMAC of the state, never the raw state, and the callback accepts it', async () => {
+    const state = 'raw-state-5f1c9e0a7b3d42e8'
+    oauthMocks.buildAuthorizeUrl.mockReturnValue({ authorizeUrl: `http://idp.example/authorize?state=${state}`, state })
+
+    const res = await req('/auth/login')
+    const setCookie = res.headers.getSetCookie().join('\n')
+    expect(setCookie).not.toContain(state)
+    expect(setCookie).toContain(`${OAUTH_STATE_HASH_COOKIE}=${hashOAuthState(state)};`)
+
+    oauthMocks.exchangeCode.mockResolvedValue({ accessToken: jwt({ email: 'sso@example.com' }), expiresIn: 3600 })
+    const callback = await req(`/auth/callback?code=c&state=${state}`, { headers: { Cookie: cookiePair(res) } })
+    expect(callback.headers.get('location')).toBe('/dashboard')
+    expect(oauthMocks.exchangeCode).toHaveBeenCalledWith('c', state)
+  })
+
+  it('refuses a callback whose cookie carries the raw state instead of its HMAC', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const res = await req('/auth/callback?code=c&state=s', { headers: { Cookie: `${OAUTH_STATE_HASH_COOKIE}=s` } })
+    expect(res.headers.get('location')).toMatch(/auth_error=/)
+    expect(oauthMocks.exchangeCode).not.toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
   it('uses a __Host- Secure state cookie on HTTPS', async () => {
     const res = await req('/auth/login', { headers: { 'X-Forwarded-Proto': 'https' } })
     const [cookie] = res.headers.getSetCookie()
-    expect(cookie).toMatch(new RegExp(`^${SECURE_OAUTH_STATE_COOKIE}=abc123; `))
+    expect(cookie.startsWith(`${SECURE_OAUTH_STATE_HASH_COOKIE}=${hashOAuthState('abc123')}; `)).toBe(true)
     expect(cookie).toContain('; Secure')
   })
 
   it('with DOT_AI_UI_SECURE_COOKIES=true registers an https callback even when the proxy hop says http', async () => {
     process.env.DOT_AI_UI_SECURE_COOKIES = 'true'
     const res = await req('/auth/login', { headers: { 'X-Forwarded-Proto': 'http' } })
-    expect(res.headers.getSetCookie()[0]).toMatch(new RegExp(`^${SECURE_OAUTH_STATE_COOKIE}=`))
+    expect(res.headers.getSetCookie()[0]).toMatch(new RegExp(`^${SECURE_OAUTH_STATE_HASH_COOKIE}=`))
     expect(oauthMocks.ensureRegistered).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\//))
   })
 })
