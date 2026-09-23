@@ -10,6 +10,7 @@ import {
   getRequestCredential,
   csrfProtection,
   createAuthApiRouter,
+  clearRejectedSessionCookie,
 } from './auth/index.js'
 import { createOAuthRouter } from './auth/oauth-routes.js'
 
@@ -111,8 +112,9 @@ async function createServer() {
   // ========================================
 
   // Apply rate limiting and auth middleware to all /api/v1/* routes except auth endpoints
-  // Rate limiting here prevents DoS on the auth check itself
-  app.use('/api/v1', apiLimiter, (req, res, next) => {
+  // Rate limiting here prevents DoS on the auth check itself. A 401 for a
+  // cookie credential (local or relayed from dot-ai) also expires the cookie.
+  app.use('/api/v1', apiLimiter, clearRejectedSessionCookie, (req, res, next) => {
     // Skip auth for the status endpoint (answered above by the auth router)
     if (req.path === '/auth/status') {
       return next()

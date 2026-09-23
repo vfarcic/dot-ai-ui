@@ -214,12 +214,24 @@ export function getSessionCookie(req: Request): string | null {
  * this function only answers where the credential comes from.
  */
 export function getRequestCredential(req: Request): string | null {
+  return getBearerCredential(req) ?? getSessionCookie(req)
+}
+
+function getBearerCredential(req: Request): string | null {
   const authHeader = req.headers.authorization
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim()
     if (token) return token
   }
-  return getSessionCookie(req)
+  return null
+}
+
+/**
+ * True when the credential getRequestCredential() picks for this request is
+ * the session cookie (no Bearer header took precedence).
+ */
+export function credentialIsFromCookie(req: Request): boolean {
+  return getBearerCredential(req) === null && getSessionCookie(req) !== null
 }
 
 /**

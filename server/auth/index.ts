@@ -6,6 +6,7 @@ import { bearerStrategy, isValidStaticToken } from './strategies/bearer.js'
 import {
   getRequestCredential,
   getSessionCookie,
+  credentialIsFromCookie,
   setSessionCookie,
   clearSessionCookie,
   isJwtShaped,
@@ -103,6 +104,42 @@ export async function authMiddleware(
     console.error('[Auth] Authentication error:', error)
     res.status(500).json({ error: 'Authentication service error' })
   }
+}
+
+/**
+ * Middleware for the protected /api/v1 routes: when a response goes out as
+ * 401 and the request's credential was the session cookie, expire that
+ * cookie on the same response.
+ *
+ * A JWT cookie is only verified by the dot-ai server; when it rejects the
+ * token (expired, revoked, re-keyed issuer) the proxy relays the 401. Without
+ * clearing the cookie, /api/v1/auth/session would keep reporting the
+ * decodable JWT as signed in and the tab would stay "signed in" with every
+ * call failing. With it, the frontend's 401 -> session re-check lands on the
+ * login page. A local 401 for a stale static-token cookie is treated alike.
+ *
+ * Left alone: credentials sent in an Authorization header, any status other
+ * than 401 (403 means "signed in, not allowed"), and a cookie holding the
+ * current static UI token. That token is never forwarded upstream (the
+ * server's DOT_AI_AUTH_TOKEN is), so an upstream 401 cannot be about it.
+ *
+ * The Set-Cookie is added in writeHead, the last point before headers are
+ * sent, so every handler is covered without changes to each one.
+ */
+export function clearRejectedSessionCookie(req: Request, res: Response, next: NextFunction): void {
+  if (!credentialIsFromCookie(req) || isValidStaticToken(getSessionCookie(req))) {
+    next()
+    return
+  }
+  const writeHead = res.writeHead
+  res.writeHead = function (this: Response, ...args: unknown[]) {
+    const status = typeof args[0] === 'number' ? args[0] : this.statusCode
+    if (status === 401 && !this.headersSent) {
+      clearSessionCookie(req, this)
+    }
+    return (writeHead as (...a: unknown[]) => Response).apply(this, args)
+  } as typeof res.writeHead
+  next()
 }
 
 /**

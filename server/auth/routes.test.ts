@@ -21,6 +21,7 @@ import {
   authMiddleware,
   createAuthApiRouter,
   csrfProtection,
+  clearRejectedSessionCookie,
   getRequestCredential,
   describeSession,
 } from './index.js'
@@ -51,7 +52,11 @@ function buildApp(): express.Express {
   app.use(createOAuthRouter())
   app.use('/api/v1', csrfProtection)
   app.use('/api/v1/auth', createAuthApiRouter())
-  app.use('/api/v1', apiLimiter, authMiddleware)
+  app.use('/api/v1', apiLimiter, clearRejectedSessionCookie, authMiddleware)
+  // Stands in for a proxy handler relaying the dot-ai server's status
+  app.get('/api/v1/upstream/:status', (req, res) => {
+    res.status(Number(req.params.status)).json({ error: 'from upstream' })
+  })
   app.get('/api/v1/whoami', (req, res) => {
     const credential = getRequestCredential(req)
     res.json({ hasCredential: Boolean(credential), jwt: Boolean(credential?.includes('.')) })
@@ -291,6 +296,57 @@ describe('protected API with the session cookie', () => {
     expect((await req('/api/v1/auth/verify', { headers: { Cookie: `${SESSION_COOKIE}=${STATIC}` } })).status).toBe(200)
     expect((await req('/api/v1/auth/verify', { headers: { Authorization: `Bearer ${jwt({ alg: 'none' })}` } })).status)
       .toBe(401)
+  })
+})
+
+/** Set-Cookie headers that expire a session cookie */
+function sessionCookiesCleared(res: Response): string[] {
+  return res.headers
+    .getSetCookie()
+    .filter((c) => c.startsWith(`${SESSION_COOKIE}=;`) || c.startsWith(`${SECURE_SESSION_COOKIE}=;`))
+    .filter((c) => c.includes('Max-Age=0'))
+}
+
+describe('session cookie rejected by the dot-ai server', () => {
+  const token = jwt({ email: 'sso@example.com', exp: Math.floor(Date.now() / 1000) + 600 })
+
+  it('expires the cookie when an upstream 401 answers a cookie JWT, so the next session check signs out', async () => {
+    const res = await req('/api/v1/upstream/401', { headers: { Cookie: `${SESSION_COOKIE}=${token}` } })
+    expect(res.status).toBe(401)
+    expect(await res.json()).toEqual({ error: 'from upstream' })
+    expect(sessionCookiesCleared(res)).toHaveLength(2) // prefixed and plain name
+
+    // What the browser holds after applying the clearing Set-Cookie
+    const session = await req('/api/v1/auth/session')
+    expect(await session.json()).toEqual({ authenticated: false, authEnabled: true })
+  })
+
+  it('leaves the cookie alone when the rejected JWT came in an Authorization header', async () => {
+    const res = await req('/api/v1/upstream/401', {
+      headers: { Authorization: `Bearer ${token}`, Cookie: `${SESSION_COOKIE}=${token}` },
+    })
+    expect(res.status).toBe(401)
+    expect(res.headers.getSetCookie()).toEqual([])
+  })
+
+  it('does not clear the cookie on 403 or other non-401 statuses', async () => {
+    for (const status of [403, 200, 404, 500]) {
+      const res = await req(`/api/v1/upstream/${status}`, { headers: { Cookie: `${SESSION_COOKIE}=${token}` } })
+      expect(res.status).toBe(status)
+      expect(res.headers.getSetCookie()).toEqual([])
+    }
+  })
+
+  it('does not clear a valid static-token cookie on an upstream 401 (that token is never forwarded upstream)', async () => {
+    const res = await req('/api/v1/upstream/401', { headers: { Cookie: `${SESSION_COOKIE}=${STATIC}` } })
+    expect(res.status).toBe(401)
+    expect(res.headers.getSetCookie()).toEqual([])
+  })
+
+  it('expires a stale static-token cookie rejected by the local auth check', async () => {
+    const res = await req('/api/v1/whoami', { headers: { Cookie: `${SESSION_COOKIE}=old-static-token` } })
+    expect(res.status).toBe(401)
+    expect(sessionCookiesCleared(res)).toHaveLength(2)
   })
 })
 
