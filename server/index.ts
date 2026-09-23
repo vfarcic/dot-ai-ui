@@ -2,6 +2,7 @@ import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import rateLimit from 'express-rate-limit'
+import { securityHeaders } from './security-headers.js'
 import {
   authMiddleware,
   verifyHandler,
@@ -79,6 +80,9 @@ async function createServer() {
   if (!isDev) {
     app.set('trust proxy', 1)
   }
+
+  // Content-Security-Policy header (policy lives in security-headers.ts)
+  app.use(securityHeaders({ isDev }))
 
   // Log ALL incoming requests
   app.use((req, _res, next) => {

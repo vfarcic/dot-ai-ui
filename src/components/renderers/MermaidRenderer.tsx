@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import mermaid from 'mermaid'
+import DOMPurify from 'dompurify'
 import { parseMermaid, generateCollapsedCode, type ParsedMermaid } from '../../utils/mermaidParser'
+import { sanitizeMermaidSource } from '../../utils/mermaidSanitizer'
 import { generateGitHubIssueUrl, GitHubIcon } from '@/utils/errorReporting'
 
 interface MermaidRendererProps {
   content: string
 }
-
-// Callback name for Mermaid click handlers
-const MERMAID_CALLBACK_NAME = '__mermaidToggle'
 
 // Initialize mermaid with dark theme matching devopstoolkit.ai brand
 mermaid.initialize({
@@ -16,7 +15,10 @@ mermaid.initialize({
   layout: 'dagre', // Mermaid 12 defaults to ELK, which re-lays out diagrams and loads a ~450 kB chunk
   look: 'classic', // Mermaid 12 defaults to 'neo', which replaces the brand-yellow borders with gradients
   theme: 'dark',
-  securityLevel: 'loose', // Required for click callbacks to work
+  // Diagram source is MCP/AI-generated and untrusted. 'strict' disables Mermaid click callbacks
+  // and sanitizes link URLs. Collapse/expand does not rely on Mermaid callbacks: the renderer
+  // attaches its own DOM listeners after rendering (see attachCollapsedPlaceholderHandlers).
+  securityLevel: 'strict',
   themeVariables: {
     primaryColor: '#FACB00',
     primaryTextColor: '#2D2D2D',
@@ -37,6 +39,31 @@ mermaid.initialize({
   },
 })
 
+/**
+ * DOMPurify config for Mermaid's SVG output, applied on top of Mermaid's own strict-mode pass.
+ * SVG profile plus HTML so labels rendered inside <foreignObject> (div/span/p) survive, with the
+ * same foreignObject/dominant-baseline allowances Mermaid uses. <style> is kept because Mermaid
+ * scopes its theme CSS in an inline <style> element. Scripts, event-handler attributes and
+ * javascript: URLs are removed.
+ */
+const SVG_SANITIZE_CONFIG = {
+  USE_PROFILES: { svg: true, svgFilters: true, html: true },
+  ADD_TAGS: ['foreignObject'],
+  ADD_ATTR: ['dominant-baseline'],
+  HTML_INTEGRATION_POINTS: { foreignobject: true },
+}
+
+/**
+ * Extract the Mermaid node ID from a rendered flowchart node element.
+ * Mermaid renders node DOM IDs as `<renderId>-flowchart-<nodeId>-<counter>`.
+ */
+function getFlowchartNodeId(element: Element): string | null {
+  const dataId = element.getAttribute('data-id')
+  if (dataId) return dataId
+  const match = element.id.match(/(?:^|-)flowchart-(.+)-\d+$/)
+  return match ? match[1] : null
+}
+
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 3
 const ZOOM_STEP = 0.25
@@ -54,10 +81,20 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [isFullscreen, setIsFullscreen] = useState(false)
 
+  // Strip every interaction directive (click/href/call/link/callback) from the untrusted source.
+  // All clickable behaviour is attached by this component, never taken from the diagram source.
+  const safeContent = useMemo(() => {
+    const { code, removed } = sanitizeMermaidSource(content)
+    if (removed.length > 0) {
+      console.warn(`[MermaidRenderer] Removed ${removed.length} interaction directive(s) from diagram source`)
+    }
+    return code
+  }, [content])
+
   // Parse Mermaid content to extract subgraph structure
   const parsedMermaid = useMemo<ParsedMermaid>(() => {
-    return parseMermaid(content)
-  }, [content])
+    return parseMermaid(safeContent)
+  }, [safeContent])
 
   // Collapsible subgraphs state - initialized empty, effect sets based on parsed content
   const [collapsedSubgraphs, setCollapsedSubgraphs] = useState<Set<string>>(new Set())
@@ -91,26 +128,13 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     })
   }, [])
 
-  // Register the callback on window for Mermaid's click handlers
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Mermaid's click callback receives the node ID as the argument
-      (window as unknown as Record<string, (id: string) => void>)[MERMAID_CALLBACK_NAME] = toggleSubgraph
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        delete (window as unknown as Record<string, unknown>)[MERMAID_CALLBACK_NAME]
-      }
-    }
-  }, [toggleSubgraph])
-
   // Generate display code based on collapsed state
   const displayCode = useMemo(() => {
     if (parsedMermaid.type !== 'flowchart' || collapsedSubgraphs.size === 0) {
-      return content
+      return safeContent
     }
-    return generateCollapsedCode(parsedMermaid, collapsedSubgraphs, MERMAID_CALLBACK_NAME)
-  }, [content, parsedMermaid, collapsedSubgraphs])
+    return generateCollapsedCode(parsedMermaid, collapsedSubgraphs)
+  }, [safeContent, parsedMermaid, collapsedSubgraphs])
 
   // Track previous content to know when to reset zoom/pan and pulse animation
   // Initialize to empty string so first render is detected as "new content"
@@ -207,6 +231,25 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     }
   }, [parsedMermaid, collapsedSubgraphs, toggleSubgraph])
 
+  // Make collapsed-subgraph placeholder nodes clickable (expands the subgraph).
+  // Replaces Mermaid's `click <id> <callback>` mechanism, which needs securityLevel 'loose'.
+  const attachCollapsedPlaceholderHandlers = useCallback((container: HTMLElement) => {
+    if (parsedMermaid.type !== 'flowchart' || collapsedSubgraphs.size === 0) return
+
+    for (const node of container.querySelectorAll('.node')) {
+      const nodeId = getFlowchartNodeId(node)
+      if (!nodeId || !collapsedSubgraphs.has(nodeId)) continue
+
+      node.classList.add('clickable')
+      ;(node as HTMLElement).style.cursor = 'pointer'
+      node.addEventListener('click', (e: Event) => {
+        e.stopPropagation()
+        e.preventDefault()
+        toggleSubgraph(nodeId)
+      })
+    }
+  }, [parsedMermaid, collapsedSubgraphs, toggleSubgraph])
+
   // Apply pulse animation to collapsed placeholder nodes
   const applyPulseToCollapsedNodes = useCallback((container: HTMLElement) => {
     console.log('[Pulse] Checking - type:', parsedMermaid.type, 'collapsedCount:', collapsedSubgraphs.size)
@@ -232,13 +275,13 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
       try {
         const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`
         await mermaid.parse(displayCode)
-        const { svg, bindFunctions } = await mermaid.render(id, displayCode)
+        // bindFunctions is intentionally not used: no Mermaid-managed callbacks are trusted.
+        const { svg } = await mermaid.render(id, displayCode)
 
         if (svgContainerRef.current) {
-          svgContainerRef.current.innerHTML = svg
-          // Call bindFunctions to enable click callbacks for collapsed placeholders
-          bindFunctions?.(svgContainerRef.current)
-          // Add click handlers for expanded subgraph headers
+          svgContainerRef.current.innerHTML = DOMPurify.sanitize(svg, SVG_SANITIZE_CONFIG)
+          // Add click handlers for collapsed placeholders and expanded subgraph headers
+          attachCollapsedPlaceholderHandlers(svgContainerRef.current)
           attachExpandedSubgraphHandlers(svgContainerRef.current)
 
           // Only reset zoom/pan and apply pulse when the original content changes, not on collapse/expand
@@ -265,7 +308,7 @@ export function MermaidRenderer({ content }: MermaidRendererProps) {
     }
 
     renderDiagram()
-  }, [displayCode, content, attachExpandedSubgraphHandlers, applyPulseToCollapsedNodes])
+  }, [displayCode, content, attachCollapsedPlaceholderHandlers, attachExpandedSubgraphHandlers, applyPulseToCollapsedNodes])
 
   const handleZoomIn = useCallback(() => {
     setZoom(z => Math.min(z + ZOOM_STEP, MAX_ZOOM))

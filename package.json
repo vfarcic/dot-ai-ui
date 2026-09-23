@@ -40,6 +40,7 @@
   },
   "homepage": "https://github.com/vfarcic/dot-ai-ui#readme",
   "dependencies": {
+    "dompurify": "^3.4.15",
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
     "jszip": "^3.10.1",
