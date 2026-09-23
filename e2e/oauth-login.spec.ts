@@ -225,6 +225,38 @@ test.describe('Session and CSRF endpoints', () => {
   })
 })
 
+test.describe('GET /auth/logout (forced-logout CSRF)', () => {
+  test('a cross-site navigation to /auth/logout leaves the session intact; a typed URL signs out', async ({ page, context, baseURL }) => {
+    await injectAuth(page)
+    const token = (await sessionCookie(context))!.value
+
+    // Another site sends the browser to our logout URL with a top-level navigation.
+    // SameSite=Strict keeps the cookie off that request, but the browser would still
+    // apply a clearing Set-Cookie from the response, so the server must not send one.
+    await page.route('http://evil.test/**', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: `<script>location = ${JSON.stringify(`${baseURL}/auth/logout`)}</script>`,
+      }),
+    )
+    const logoutResponse = page.waitForResponse((r) => r.url().endsWith('/auth/logout'))
+    await page.goto('http://evil.test/')
+    const res = await logoutResponse
+    expect(res.status()).toBe(302)
+    await page.waitForURL(`${baseURL}/`)
+
+    expect((await sessionCookie(context))?.value).toBe(token)
+    await page.goto('/dashboard')
+    await expect(page.getByText('test@dot-ai.local')).toBeVisible()
+
+    // The user opening the URL themselves (Sec-Fetch-Site: none) still signs out,
+    // which also shows the cross-site attempt above was what kept the session
+    await page.goto('/auth/logout')
+    await expect(page.getByRole('button', { name: 'Login with SSO' })).toBeVisible()
+    expect(await sessionCookie(context)).toBeUndefined()
+  })
+})
+
 test.describe('Session ending under an open tab', () => {
   test('a cookie that disappears (expiry) sends the tab back to the login page on the next API call', async ({ page, context }) => {
     await injectAuth(page)

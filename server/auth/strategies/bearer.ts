@@ -58,7 +58,8 @@ export function isValidStaticToken(candidate: string | null | undefined): boolea
  *
  * Validates the static UI token, presented either as the HttpOnly session
  * cookie (browser app) or as `Authorization: Bearer <token>` (API clients).
- * See getRequestCredential() for the lookup order.
+ * See getRequestCredential() for the lookup order; this strategy uses exactly
+ * that rule, so it never disagrees with /api/v1/auth/session.
  *
  * Token is configured via DOT_AI_UI_AUTH_TOKEN environment variable.
  * If the env var is not set, a random token is generated and logged at startup.
@@ -77,15 +78,10 @@ export const bearerStrategy: AuthStrategy = {
   },
 
   authenticate: async (req: Request): Promise<AuthResult> => {
-    const authHeader = req.headers.authorization
-
-    if (authHeader && !authHeader.startsWith('Bearer ')) {
-      return {
-        authenticated: false,
-        error: 'Invalid authorization format. Expected: Bearer <token>',
-      }
-    }
-
+    // Same resolution rule as /api/v1/auth/session and the proxy: a
+    // non-Bearer Authorization header (e.g. `Basic` added by oauth2-proxy's
+    // pass_basic_auth in front of the UI) is not a UI credential and is
+    // ignored, so the session cookie still counts.
     const providedToken = getRequestCredential(req)
 
     if (!providedToken) {

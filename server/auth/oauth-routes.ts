@@ -12,6 +12,7 @@ import {
   oauthStateMatches,
   MAX_CREDENTIAL_LENGTH,
 } from './session.js'
+import { requestIsSameOrigin } from './csrf.js'
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -26,7 +27,7 @@ const authLimiter = rateLimit({
  * Routes:
  *   GET /auth/login    - Initiate OAuth flow (redirect to Dex via dot-ai)
  *   GET /auth/callback - Handle OAuth callback (exchange code for token)
- *   GET /auth/logout   - Clear the session cookie and redirect to login
+ *   GET /auth/logout   - Clear the session cookie (same-origin only) and redirect to login
  */
 export function createOAuthRouter(): Router {
   const router = Router()
@@ -119,10 +120,22 @@ export function createOAuthRouter(): Router {
    * GET /auth/logout
    *
    * Clears the session cookie and redirects to the login page. The browser
-   * app signs out with POST /api/v1/auth/logout; this GET remains for links.
+   * app signs out with POST /api/v1/auth/logout; this GET remains for links
+   * and bookmarks.
+   *
+   * SameSite=Strict does not protect this route: a cross-site top-level
+   * navigation still applies the clearing Set-Cookie, so any site could sign
+   * users out. The cookie is therefore only cleared when the request is
+   * provably same-origin or user-initiated (see requestIsSameOrigin);
+   * otherwise this is a plain redirect and the session is left alone.
    */
   router.get('/auth/logout', (req, res) => {
-    clearSessionCookie(req, res)
+    if (requestIsSameOrigin(req)) {
+      clearSessionCookie(req, res)
+    } else {
+      console.warn('[Auth] Ignoring GET /auth/logout that is not same-origin; session left intact')
+    }
+    res.setHeader('Cache-Control', 'no-store')
     res.redirect('/')
   })
 

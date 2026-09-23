@@ -269,8 +269,10 @@ export function createAuthApiRouter({
 }): Router {
   const router = Router()
 
-  // Public: is auth enabled, which strategy, is SSO available
-  router.get('/status', authLimiter, statusHandler)
+  // Public: is auth enabled, which strategy, is SSO available. Takes no
+  // credential and is called on every page load, so like /session it gets the
+  // general API limiter; the strict auth limiter guards credential checks.
+  router.get('/status', apiLimiter, statusHandler)
 
   // Static token check for API clients (Authorization header or cookie)
   router.get('/verify', authLimiter, authMiddleware, verifyHandler)

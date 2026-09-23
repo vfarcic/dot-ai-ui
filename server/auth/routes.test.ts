@@ -250,11 +250,28 @@ describe('protected API with the session cookie', () => {
     expect(res.status).toBe(200)
   })
 
-  it('rejects a non-Bearer Authorization scheme', async () => {
-    const res = await req('/api/v1/whoami', {
-      headers: { Authorization: 'Basic abc', Cookie: `${SESSION_COOKIE}=${STATIC}` },
-    })
+  it('ignores a non-Bearer Authorization header and uses the cookie, like /auth/session', async () => {
+    // e.g. oauth2-proxy with pass_basic_auth in front of the UI
+    const headers = { Authorization: 'Basic dXNlcjpwYXNz', Cookie: `${SESSION_COOKIE}=${STATIC}` }
+    const session = await req('/api/v1/auth/session', { headers })
+    expect(await session.json()).toMatchObject({ authenticated: true, mode: 'token' })
+
+    const data = await req('/api/v1/whoami', { headers })
+    expect(data.status).toBe(200)
+    expect(await data.json()).toEqual({ hasCredential: true, jwt: false })
+    expect((await req('/api/v1/auth/verify', { headers })).status).toBe(200)
+  })
+
+  it('treats a non-Bearer Authorization header alone as no credential', async () => {
+    const res = await req('/api/v1/whoami', { headers: { Authorization: `Basic ${STATIC}` } })
     expect(res.status).toBe(401)
+    expect((await res.json()).error).toBe('Authentication required')
+  })
+
+  it('a wrong Bearer header takes precedence over a valid cookie, on data calls and /session alike', async () => {
+    const headers = { Authorization: 'Bearer wrong', Cookie: `${SESSION_COOKIE}=${STATIC}` }
+    expect((await req('/api/v1/whoami', { headers })).status).toBe(401)
+    expect((await (await req('/api/v1/auth/session', { headers })).json()).authenticated).toBe(false)
   })
 
   it('blocks cross-site state-changing requests even with a valid cookie', async () => {
@@ -438,13 +455,42 @@ describe('DOT_AI_UI_SECURE_COOKIES', () => {
 })
 
 describe('GET /auth/logout', () => {
-  it('clears the cookie and redirects home', async () => {
-    const res = await req('/auth/logout')
+  /** Whether the response expires both session cookie names */
+  function clearsSession(res: Response): boolean {
+    const cookies = res.headers.getSetCookie()
+    return cookies.some((c) => new RegExp(`^${SESSION_COOKIE}=; .*Max-Age=0`).test(c)) &&
+      cookies.some((c) => new RegExp(`^${SECURE_SESSION_COOKIE}=; .*Max-Age=0.*Secure`).test(c))
+  }
+
+  const cookie = `${SESSION_COOKIE}=${STATIC}`
+
+  it.each(['same-origin', 'none'])('clears the cookie and redirects home (Sec-Fetch-Site: %s)', async (site) => {
+    const res = await req('/auth/logout', { headers: { Cookie: cookie, 'Sec-Fetch-Site': site } })
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/')
-    const cookies = res.headers.getSetCookie()
     // Both names are always expired, whichever one the browser holds
-    expect(cookies.some((c) => new RegExp(`^${SESSION_COOKIE}=; .*Max-Age=0`).test(c))).toBe(true)
-    expect(cookies.some((c) => new RegExp(`^${SECURE_SESSION_COOKIE}=; .*Max-Age=0.*Secure`).test(c))).toBe(true)
+    expect(clearsSession(res)).toBe(true)
+  })
+
+  it('clears the cookie for a same-origin Referer when fetch metadata is absent', async () => {
+    const res = await req('/auth/logout', { headers: { Cookie: cookie, Referer: `${base}/dashboard` } })
+    expect(clearsSession(res)).toBe(true)
+  })
+
+  it('does not clear the cookie on a cross-site navigation (forced-logout CSRF), but still redirects', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const attempts: Record<string, string>[] = [
+      { 'Sec-Fetch-Site': 'cross-site', Referer: 'https://evil.example/' },
+      { 'Sec-Fetch-Site': 'same-site' },
+      { Referer: 'https://evil.example/' },
+      {}, // no signal at all: fail closed
+    ]
+    for (const headers of attempts) {
+      const res = await req('/auth/logout', { headers: { Cookie: cookie, ...headers } })
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/')
+      expect(res.headers.getSetCookie()).toEqual([])
+    }
+    warnSpy.mockRestore()
   })
 })
