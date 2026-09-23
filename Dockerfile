@@ -1,5 +1,10 @@
 # Build stage - compile TypeScript and bundle React app
-FROM node:24-alpine AS builder
+# Runs on the build host's native platform, even for multi-arch builds: its output (bundled
+# frontend, compiled server, pruned production node_modules) is plain JavaScript, so it is
+# identical for every target. Emulating `npm ci` for arm64 under QEMU crashed with SIGILL and
+# hung the release. If a native (.node) module is ever added to production dependencies, this
+# stage must go back to the target platform.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS builder
 
 WORKDIR /app
 
