@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { AUTH_REQUIRED_EVENT } from '@/api/authHeaders'
 
 /**
  * Authentication state and methods
@@ -31,6 +32,9 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
+
+/** Shown on the login page when a live session ends under an open tab */
+export const SESSION_ENDED_MESSAGE = 'Your session has ended. Please sign in again.'
 
 /**
  * Keys earlier releases used to keep the token in sessionStorage. Removed on
@@ -100,8 +104,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Read once per mount: the URL is cleaned on first read, and StrictMode
   // runs the effect twice in development.
   const oauthErrorRef = useRef<string | null | undefined>(undefined)
+  // Mirrors of state for the re-check listeners, which outlive a render
+  const authEnabledRef = useRef(false)
+  const isAuthenticatedRef = useRef(false)
+  const initialCheckDoneRef = useRef(false)
+  const recheckInFlightRef = useRef(false)
+  // Bumped on every session change, so a re-check that started before a
+  // login/logout cannot overwrite its result.
+  const sessionGenerationRef = useRef(0)
 
   const applySession = useCallback((session: SessionResponse) => {
+    sessionGenerationRef.current += 1
+    isAuthenticatedRef.current = session.authenticated
     if (session.authenticated) {
       setAuthMode(session.mode ?? null)
       setUserEmail(session.mode === 'oauth' ? session.email ?? null : null)
@@ -139,6 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return
 
         setAuthEnabled(statusData.authEnabled)
+        authEnabledRef.current = statusData.authEnabled
         setStrategy(statusData.strategy)
         setOauthEnabled(statusData.oauthEnabled || false)
 
@@ -150,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const session = await fetchSession()
         if (cancelled) return
         applySession(session)
+        initialCheckDoneRef.current = true
       } catch (err) {
         console.error('[Auth] Failed to check auth status:', err)
         if (!cancelled) setError('Failed to connect to server')
@@ -166,6 +182,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuthStatus()
     return () => {
       cancelled = true
+    }
+  }, [applySession])
+
+  /**
+   * Re-check the session with the server. Triggered by a 401 from any API
+   * call and whenever the tab becomes visible again, because the cookie is
+   * shared across tabs and can expire or be cleared under this one. If the
+   * session is gone, the guard falls back to the login page.
+   */
+  useEffect(() => {
+    const recheck = async () => {
+      if (!initialCheckDoneRef.current || !authEnabledRef.current || recheckInFlightRef.current) return
+      recheckInFlightRef.current = true
+      try {
+        const generation = sessionGenerationRef.current
+        const wasAuthenticated = isAuthenticatedRef.current
+        const session = await fetchSession()
+        if (generation !== sessionGenerationRef.current) return
+        applySession(session)
+        if (wasAuthenticated && !session.authenticated) setError(SESSION_ENDED_MESSAGE)
+        if (!wasAuthenticated && session.authenticated) setError(null)
+      } catch {
+        // Server unreachable: keep the current state; the failing call shows its own error
+      } finally {
+        recheckInFlightRef.current = false
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void recheck()
+    }
+
+    window.addEventListener(AUTH_REQUIRED_EVENT, recheck)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener(AUTH_REQUIRED_EVENT, recheck)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [applySession])
 

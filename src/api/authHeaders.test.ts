@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { fetchWithAuth } from './authHeaders'
+import { fetchWithAuth, AUTH_REQUIRED_EVENT } from './authHeaders'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -27,5 +27,22 @@ describe('fetchWithAuth', () => {
     const headers = new Headers(init.headers)
     expect(headers.get('Content-Type')).toBe('application/json')
     expect(headers.has('Authorization')).toBe(false)
+  })
+
+  it('announces a 401 so the auth layer can re-check the session', async () => {
+    const listener = vi.fn()
+    window.addEventListener(AUTH_REQUIRED_EVENT, listener)
+    try {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 401 })))
+      const res = await fetchWithAuth('/api/v1/resources')
+      expect(res.status).toBe(401)
+      expect(listener).toHaveBeenCalledTimes(1)
+
+      vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })))
+      await fetchWithAuth('/api/v1/resources')
+      expect(listener).toHaveBeenCalledTimes(1)
+    } finally {
+      window.removeEventListener(AUTH_REQUIRED_EVENT, listener)
+    }
   })
 })

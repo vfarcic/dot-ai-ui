@@ -55,6 +55,10 @@ spec:
               key: {{ include "dot-ai-ui.uiAuthSecretKey" . }}
               optional: true
         {{- end }}
+        {{- with include "dot-ai-ui.secureCookies" . }}
+        - name: DOT_AI_UI_SECURE_COOKIES
+          value: {{ . | quote }}
+        {{- end }}
 {{- with .Values.extraEnv }}
         {{- toYaml . | nindent 8 }}
 {{- end }}

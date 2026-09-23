@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import type { Request, Response } from 'express'
 
 /**
@@ -13,6 +14,17 @@ import type { Request, Response } from 'express'
  * planting ("tossing") its own session cookie onto this host. Plain-HTTP
  * requests (local dev, E2E on http://localhost) cannot use the prefix, so they
  * fall back to the unprefixed name.
+ *
+ * Whether a request counts as HTTPS is set by DOT_AI_UI_SECURE_COOKIES:
+ *   true  - always HTTPS (Secure + `__Host-`, only the prefixed cookie is read).
+ *           Use this whenever users reach the UI over HTTPS: TLS often ends at
+ *           a proxy that forwards plain HTTP and a wrong X-Forwarded-Proto.
+ *           The Helm chart sets it when ingress TLS or an HTTPS gateway
+ *           listener is configured.
+ *   false - never (plain-HTTP installs only).
+ *   auto  - (default) `req.secure`, which honours X-Forwarded-Proto behind a
+ *           trusted proxy, or an `Origin: https://<this host>` header from the
+ *           browser (which reports the scheme the page was loaded over).
  */
 
 export const SESSION_COOKIE = 'dot-ai-ui-session'
@@ -82,12 +94,71 @@ export function serializeSessionCookie(value: string, { maxAgeSeconds, secure }:
   return parts.join('; ')
 }
 
+export type SecureCookieMode = 'always' | 'never' | 'auto'
+
+let warnedAboutSecureSetting = false
+
 /**
- * Whether the request arrived over HTTPS. `req.secure` honours
- * X-Forwarded-Proto when `trust proxy` is set (production).
+ * Parse DOT_AI_UI_SECURE_COOKIES. Unknown values fall back to `auto` with a
+ * one-time warning rather than refusing to start.
  */
-function isSecureRequest(req: Request): boolean {
-  return Boolean(req.secure)
+export function getSecureCookieMode(value = process.env.DOT_AI_UI_SECURE_COOKIES): SecureCookieMode {
+  const v = (value ?? '').trim().toLowerCase()
+  if (v === '' || v === 'auto') return 'auto'
+  if (['true', '1', 'yes', 'on', 'always'].includes(v)) return 'always'
+  if (['false', '0', 'no', 'off', 'never'].includes(v)) return 'never'
+  if (!warnedAboutSecureSetting) {
+    warnedAboutSecureSetting = true
+    console.warn(`[Auth] Ignoring invalid DOT_AI_UI_SECURE_COOKIES=${JSON.stringify(value)}; using auto`)
+  }
+  return 'auto'
+}
+
+/** True when the browser says the page came from https://<this host>. */
+function hasSameHostHttpsOrigin(req: Request): boolean {
+  const origin = req.headers.origin
+  if (typeof origin !== 'string' || !origin.startsWith('https://')) return false
+  try {
+    const originHost = new URL(origin).host.toLowerCase()
+    // Same host rule as the CSRF check: req.host (X-Forwarded-Host behind a
+    // trusted proxy) or the raw Host header.
+    const hosts = [req.host, req.headers.host].filter(Boolean).map((h) => String(h).toLowerCase())
+    return hosts.includes(originHost)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Whether session cookies for this request are issued as HTTPS cookies
+ * (Secure + `__Host-`). See DOT_AI_UI_SECURE_COOKIES above.
+ */
+export function isSecureRequest(req: Request): boolean {
+  switch (getSecureCookieMode()) {
+    case 'always':
+      return true
+    case 'never':
+      return false
+    default:
+      return Boolean(req.secure) || hasSameHostHttpsOrigin(req)
+  }
+}
+
+/**
+ * Whether only `__Host-` cookies are accepted from this request. Unlike
+ * isSecureRequest this ignores the Origin hint: Origin is only sent on some
+ * requests, and a cookie issued on a request without it (e.g. the OAuth
+ * callback) must still be read on one that has it.
+ */
+function acceptsOnlyPrefixedCookies(req: Request): boolean {
+  switch (getSecureCookieMode()) {
+    case 'always':
+      return true
+    case 'never':
+      return false
+    default:
+      return Boolean(req.secure)
+  }
 }
 
 function appendSetCookie(res: Response, cookie: string): void {
@@ -104,14 +175,14 @@ export function setSessionCookie(req: Request, res: Response, credential: string
 }
 
 /**
- * Clear the session cookie (both the prefixed and the plain name, so a
- * deployment that switched between HTTP and HTTPS leaves nothing behind).
+ * Clear the session cookie. Both the prefixed and the plain name are always
+ * expired: which one the browser holds can differ from how this request was
+ * classified (a deployment that switched between HTTP and HTTPS, or a cookie
+ * set on a POST whose Origin revealed HTTPS). A browser on plain HTTP simply
+ * ignores the Secure clearing header.
  */
-export function clearSessionCookie(req: Request, res: Response): void {
-  const secure = isSecureRequest(req)
-  if (secure) {
-    appendSetCookie(res, serializeSessionCookie('', { maxAgeSeconds: 0, secure: true }))
-  }
+export function clearSessionCookie(_req: Request, res: Response): void {
+  appendSetCookie(res, serializeSessionCookie('', { maxAgeSeconds: 0, secure: true }))
   appendSetCookie(res, serializeSessionCookie('', { maxAgeSeconds: 0, secure: false }))
   res.setHeader('Cache-Control', 'no-store')
 }
@@ -124,7 +195,7 @@ export function clearSessionCookie(req: Request, res: Response): void {
  */
 export function getSessionCookie(req: Request): string | null {
   const cookies = parseCookies(req.headers.cookie)
-  const value = isSecureRequest(req)
+  const value = acceptsOnlyPrefixedCookies(req)
     ? cookies[SECURE_SESSION_COOKIE]
     : cookies[SECURE_SESSION_COOKIE] ?? cookies[SESSION_COOKIE]
   return value ? value : null
@@ -213,4 +284,61 @@ export function oauthCookieMaxAge(token: string, expiresIn: number | undefined, 
   }
 
   return Math.min(Math.floor(maxAge), MAX_SESSION_SECONDS)
+}
+
+/**
+ * OAuth login binding cookie.
+ *
+ * GET /auth/login stores the OAuth `state` in this cookie, and
+ * GET /auth/callback only redeems a code whose `state` matches it. Without it
+ * any browser presenting a valid code+state pair (e.g. one an attacker
+ * obtained by starting a login themselves) would be signed in as that
+ * attacker (login CSRF / session fixation).
+ *
+ * SameSite=Lax, not Strict: the return from the identity provider is a
+ * cross-site top-level navigation, and Lax cookies are sent on those.
+ * On HTTPS it uses the `__Host-` prefix so a sibling subdomain cannot plant it.
+ */
+export const OAUTH_STATE_COOKIE = 'dot-ai-ui-oauth-state'
+export const SECURE_OAUTH_STATE_COOKIE = `__Host-${OAUTH_STATE_COOKIE}`
+
+/** Matches the server-side pending-authorization TTL. */
+export const OAUTH_STATE_SECONDS = 10 * 60
+
+function serializeOAuthStateCookie(value: string, maxAgeSeconds: number, secure: boolean): string {
+  const parts = [
+    `${secure ? SECURE_OAUTH_STATE_COOKIE : OAUTH_STATE_COOKIE}=${encodeURIComponent(value)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${maxAgeSeconds}`,
+  ]
+  if (maxAgeSeconds === 0) parts.push('Expires=Thu, 01 Jan 1970 00:00:00 GMT')
+  if (secure) parts.push('Secure')
+  return parts.join('; ')
+}
+
+export function setOAuthStateCookie(req: Request, res: Response, state: string): void {
+  appendSetCookie(res, serializeOAuthStateCookie(state, OAUTH_STATE_SECONDS, isSecureRequest(req)))
+  res.setHeader('Cache-Control', 'no-store')
+}
+
+export function clearOAuthStateCookie(res: Response): void {
+  appendSetCookie(res, serializeOAuthStateCookie('', 0, true))
+  appendSetCookie(res, serializeOAuthStateCookie('', 0, false))
+}
+
+/**
+ * Whether the callback's `state` matches the one this browser was given at
+ * /auth/login. Constant-time; on HTTPS only the `__Host-` cookie counts.
+ */
+export function oauthStateMatches(req: Request, state: string): boolean {
+  const cookies = parseCookies(req.headers.cookie)
+  const expected = acceptsOnlyPrefixedCookies(req)
+    ? cookies[SECURE_OAUTH_STATE_COOKIE]
+    : cookies[SECURE_OAUTH_STATE_COOKIE] ?? cookies[OAUTH_STATE_COOKIE]
+  if (!expected || !state) return false
+  const a = crypto.createHash('sha256').update(expected).digest()
+  const b = crypto.createHash('sha256').update(state).digest()
+  return crypto.timingSafeEqual(a, b)
 }

@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures'
 import type { BrowserContext, Page } from '@playwright/test'
-import { loginWithToken, SESSION_COOKIE } from './helpers'
+import { injectAuth, loginWithToken, SESSION_COOKIE } from './helpers'
 
 /** Everything page script could read: document.cookie plus both Web Storage areas. */
 async function scriptVisibleState(page: Page): Promise<string> {
@@ -75,6 +75,35 @@ test.describe('OAuth login flow', () => {
     // Still signed out after reload
     await page.reload()
     await expect(page.getByRole('button', { name: 'Login with SSO' })).toBeVisible()
+  })
+
+  test('an SSO callback link started in another browser is refused and does not replace the session', async ({ page, context, browser, baseURL }) => {
+    // Attacker: starts SSO in their own browser and stops before the callback,
+    // keeping the code+state pair (the state cookie stays in their browser).
+    const attacker = await browser.newContext()
+    try {
+      const toIdp = await attacker.request.get(`${baseURL}/auth/login`, { maxRedirects: 0 })
+      expect(toIdp.status()).toBe(302)
+      const toCallback = await attacker.request.get(toIdp.headers()['location'], { maxRedirects: 0 })
+      const callbackUrl = new URL(toCallback.headers()['location'], baseURL).toString()
+      expect(callbackUrl).toContain('/auth/callback?code=')
+
+      // Victim: already signed in as themselves, then opens the attacker's link
+      await injectAuth(page)
+      const victimToken = (await sessionCookie(context))!.value
+      await page.goto(callbackUrl)
+      await expect(page).toHaveURL(/\/dashboard$/)
+      await expect(page.getByText('test@dot-ai.local')).toBeVisible()
+      await expect(page.getByText('admin@dot-ai.local')).toHaveCount(0)
+      expect((await sessionCookie(context))!.value).toBe(victimToken)
+
+      // The browser that started the login can still finish it
+      const attackerPage = await attacker.newPage()
+      await attackerPage.goto(callbackUrl)
+      await expect(attackerPage.getByText('admin@dot-ai.local')).toBeVisible({ timeout: 15000 })
+    } finally {
+      await attacker.close()
+    }
   })
 
   test('switching to Token tab shows token input', async ({ page }) => {
@@ -193,5 +222,37 @@ test.describe('Session and CSRF endpoints', () => {
       data: { email: 'csrf@evil.example', password: 'x' },
     })
     expect(mutate.status()).toBe(403)
+  })
+})
+
+test.describe('Session ending under an open tab', () => {
+  test('a cookie that disappears (expiry) sends the tab back to the login page on the next API call', async ({ page, context }) => {
+    await injectAuth(page)
+    await page.goto('/dashboard')
+    await expect(page.getByRole('button', { name: 'Pod', exact: false })).toBeVisible()
+
+    await context.clearCookies() // what the browser does when Max-Age runs out
+    await page.getByRole('button', { name: 'Pod', exact: false }).click()
+
+    await expect(page.getByRole('button', { name: 'Login with SSO' })).toBeVisible()
+    await expect(page.getByText('Your session has ended. Please sign in again.')).toBeVisible()
+  })
+
+  test('signing out in one tab signs the other out when it is shown again', async ({ page, context }) => {
+    await injectAuth(page)
+    await page.goto('/dashboard')
+    await expect(page.getByText('test@dot-ai.local')).toBeVisible()
+
+    const other = await context.newPage()
+    await other.goto('/dashboard')
+    await expect(other.getByText('test@dot-ai.local')).toBeVisible()
+    await other.getByRole('button', { name: 'test@dot-ai.local' }).click()
+    await other.getByRole('button', { name: 'Sign Out' }).click()
+    await expect(other.getByRole('button', { name: 'Login with SSO' })).toBeVisible()
+
+    await page.bringToFront()
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+    await expect(page.getByRole('button', { name: 'Login with SSO' })).toBeVisible()
+    await other.close()
   })
 })

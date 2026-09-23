@@ -87,6 +87,23 @@ Create the key name for UI auth token in secret
 {{- end }}
 
 {{/*
+Value for DOT_AI_UI_SECURE_COOKIES: the explicit uiAuth.secureCookies setting,
+else "true" when the chart itself terminates TLS, else empty (server auto-detects).
+*/}}
+{{- define "dot-ai-ui.secureCookies" -}}
+{{- $explicit := .Values.uiAuth.secureCookies -}}
+{{- if kindIs "bool" $explicit -}}
+{{- toString $explicit -}}
+{{- else if $explicit -}}
+{{- toString $explicit -}}
+{{- else if and .Values.ingress.enabled .Values.ingress.tls.enabled -}}
+true
+{{- else if and .Values.gateway.create .Values.gateway.listeners.https.enabled -}}
+true
+{{- end -}}
+{{- end }}
+
+{{/*
 Merge global annotations with resource-specific annotations.
 Resource-specific annotations take precedence over global annotations.
 Usage: include "dot-ai-ui.annotations" (dict "global" .Values.annotations "local" .Values.ingress.annotations)

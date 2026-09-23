@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
-import { AuthProvider, useAuth } from './AuthContext'
+import { AuthProvider, useAuth, SESSION_ENDED_MESSAGE } from './AuthContext'
+import { AUTH_REQUIRED_EVENT } from '@/api/authHeaders'
 
 type Route = { status?: number; body: unknown }
 
@@ -222,5 +223,72 @@ describe('AuthProvider', () => {
     expect(screen.getByTestId('error')).toHaveTextContent('Failed to connect to server')
     expect(screen.getByTestId('authed')).toHaveTextContent('false')
     errSpy.mockRestore()
+  })
+
+  it('drops to signed-out when an API 401 shows the session cookie is gone (expiry or another tab signed out)', async () => {
+    let signedIn = true
+    const { calls } = stubFetch({
+      'GET /api/v1/auth/status': STATUS,
+      'GET /api/v1/auth/session': () =>
+        signedIn ? { body: { authenticated: true, authEnabled: true, mode: 'token' } } : SIGNED_OUT,
+    })
+    renderAuth()
+    await loaded()
+    expect(screen.getByTestId('authed')).toHaveTextContent('true')
+
+    signedIn = false
+    await act(async () => {
+      window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT))
+    })
+    await waitFor(() => expect(screen.getByTestId('authed')).toHaveTextContent('false'))
+    expect(screen.getByTestId('error')).toHaveTextContent(SESSION_ENDED_MESSAGE)
+    expect(calls.filter((c) => c.key === 'GET /api/v1/auth/session')).toHaveLength(2)
+  })
+
+  it('keeps the session when a 401 re-check finds it still valid', async () => {
+    const { calls } = stubFetch({
+      'GET /api/v1/auth/status': STATUS,
+      'GET /api/v1/auth/session': { body: { authenticated: true, authEnabled: true, mode: 'oauth', email: 'a@b' } },
+    })
+    renderAuth()
+    await loaded()
+
+    await act(async () => {
+      window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT))
+    })
+    await waitFor(() => expect(calls.filter((c) => c.key === 'GET /api/v1/auth/session')).toHaveLength(2))
+    expect(screen.getByTestId('authed')).toHaveTextContent('true')
+    expect(screen.getByTestId('email')).toHaveTextContent('a@b')
+    expect(screen.getByTestId('error')).toHaveTextContent('none')
+  })
+
+  it('re-checks the session when the tab becomes visible again', async () => {
+    let signedIn = true
+    stubFetch({
+      'GET /api/v1/auth/status': STATUS,
+      'GET /api/v1/auth/session': () =>
+        signedIn ? { body: { authenticated: true, authEnabled: true, mode: 'token' } } : SIGNED_OUT,
+    })
+    renderAuth()
+    await loaded()
+
+    signedIn = false
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await waitFor(() => expect(screen.getByTestId('authed')).toHaveTextContent('false'))
+  })
+
+  it('does not re-check when auth is disabled', async () => {
+    const { calls } = stubFetch({
+      'GET /api/v1/auth/status': { body: { authEnabled: false, strategy: null, oauthEnabled: false } },
+    })
+    renderAuth()
+    await loaded()
+    await act(async () => {
+      window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT))
+    })
+    expect(calls.some((c) => c.key.includes('/session'))).toBe(false)
+    expect(screen.getByTestId('authed')).toHaveTextContent('true')
   })
 })

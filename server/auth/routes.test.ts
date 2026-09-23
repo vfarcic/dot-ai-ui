@@ -24,7 +24,12 @@ import {
   describeSession,
 } from './index.js'
 import { createOAuthRouter } from './oauth-routes.js'
-import { SESSION_COOKIE, SECURE_SESSION_COOKIE } from './session.js'
+import {
+  SESSION_COOKIE,
+  SECURE_SESSION_COOKIE,
+  OAUTH_STATE_COOKIE,
+  SECURE_OAUTH_STATE_COOKIE,
+} from './session.js'
 
 const STATIC = 'unit-static-token'
 const passthrough: express.RequestHandler = (_req, _res, next) => next()
@@ -68,7 +73,11 @@ afterAll(async () => {
 
 beforeEach(() => {
   oauthMocks.exchangeCode.mockReset()
+  delete process.env.DOT_AI_UI_SECURE_COOKIES
 })
+
+/** The binding cookie /auth/login gives the browser that starts a login */
+const STATE_COOKIE = (state: string) => `${OAUTH_STATE_COOKIE}=${state}`
 
 function req(path: string, init: RequestInit = {}): Promise<Response> {
   return fetch(`${base}${path}`, { redirect: 'manual', ...init })
@@ -80,6 +89,14 @@ function jsonPost(path: string, body: unknown, headers: Record<string, string> =
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   })
+}
+
+/** Set-Cookie headers that set (not clear) a session cookie */
+function sessionCookiesSet(res: Response): string[] {
+  return res.headers
+    .getSetCookie()
+    .filter((c) => c.startsWith(`${SESSION_COOKIE}=`) || c.startsWith(`${SECURE_SESSION_COOKIE}=`))
+    .filter((c) => !c.includes('Max-Age=0'))
 }
 
 /** name=value of the first Set-Cookie, for sending back as a Cookie header */
@@ -261,13 +278,16 @@ describe('GET /auth/callback', () => {
     const accessToken = jwt({ email: 'sso@example.com', exp: Math.floor(Date.now() / 1000) + 600 })
     oauthMocks.exchangeCode.mockResolvedValue({ accessToken, expiresIn: 3600 })
 
-    const res = await req('/auth/callback?code=c&state=s')
+    const res = await req('/auth/callback?code=c&state=s', { headers: { Cookie: STATE_COOKIE('s') } })
     expect(oauthMocks.exchangeCode).toHaveBeenCalledWith('c', 's')
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/dashboard')
     expect(res.headers.get('location')).not.toContain(accessToken)
 
-    const [cookie] = res.headers.getSetCookie()
+    const setCookies = res.headers.getSetCookie()
+    // The single-use state cookie is expired
+    expect(setCookies.some((c) => c.startsWith(`${OAUTH_STATE_COOKIE}=;`) && c.includes('Max-Age=0'))).toBe(true)
+    const cookie = setCookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`))!
     expect(cookie.startsWith(`${SESSION_COOKIE}=${accessToken};`)).toBe(true)
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('SameSite=Strict')
@@ -275,7 +295,7 @@ describe('GET /auth/callback', () => {
     expect(maxAge).toBeGreaterThan(590)
     expect(maxAge).toBeLessThanOrEqual(600)
 
-    const session = await req('/api/v1/auth/session', { headers: { Cookie: cookiePair(res) } })
+    const session = await req('/api/v1/auth/session', { headers: { Cookie: cookie.split(';')[0] } })
     expect(await session.json()).toMatchObject({ authenticated: true, mode: 'oauth', email: 'sso@example.com' })
   })
 
@@ -283,10 +303,10 @@ describe('GET /auth/callback', () => {
     oauthMocks.exchangeCode.mockRejectedValue(new Error('Invalid or expired state parameter'))
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const res = await req('/auth/callback?code=c&state=bad')
+    const res = await req('/auth/callback?code=c&state=bad', { headers: { Cookie: STATE_COOKIE('bad') } })
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/dashboard?auth_error=Invalid%20or%20expired%20state%20parameter')
-    expect(res.headers.getSetCookie()).toEqual([])
+    expect(sessionCookiesSet(res)).toEqual([])
     errSpy.mockRestore()
   })
 
@@ -294,14 +314,126 @@ describe('GET /auth/callback', () => {
     oauthMocks.exchangeCode.mockResolvedValue({ accessToken: 'opaque', expiresIn: 3600 })
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const res = await req('/auth/callback?code=c&state=s')
+    const res = await req('/auth/callback?code=c&state=s', { headers: { Cookie: STATE_COOKIE('s') } })
     expect(res.headers.get('location')).toMatch(/^\/dashboard\?auth_error=/)
-    expect(res.headers.getSetCookie()).toEqual([])
+    expect(sessionCookiesSet(res)).toEqual([])
     errSpy.mockRestore()
   })
 
   it('returns 400 when code or state is missing', async () => {
     expect((await req('/auth/callback?code=c')).status).toBe(400)
+  })
+
+  it('refuses a code+state pair this browser did not start (login CSRF), leaving its session alone', async () => {
+    const errSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const victimSession = `${SESSION_COOKIE}=${STATIC}`
+
+    for (const cookie of [victimSession, `${victimSession}; ${STATE_COOKIE('someone-elses-state')}`]) {
+      const res = await req('/auth/callback?code=attacker-code&state=attacker-state', { headers: { Cookie: cookie } })
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toMatch(/^\/dashboard\?auth_error=/)
+      expect(sessionCookiesSet(res)).toEqual([])
+    }
+    expect(oauthMocks.exchangeCode).not.toHaveBeenCalled()
+    errSpy.mockRestore()
+  })
+
+  it('on HTTPS only trusts the __Host- state cookie (a sibling subdomain could plant the plain one)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const accessToken = jwt({ email: 'sso@example.com' })
+    oauthMocks.exchangeCode.mockResolvedValue({ accessToken, expiresIn: 3600 })
+
+    const tossed = await req('/auth/callback?code=c&state=s', {
+      headers: { 'X-Forwarded-Proto': 'https', Cookie: STATE_COOKIE('s') },
+    })
+    expect(tossed.headers.get('location')).toMatch(/auth_error=/)
+    expect(oauthMocks.exchangeCode).not.toHaveBeenCalled()
+
+    const ok = await req('/auth/callback?code=c&state=s', {
+      headers: { 'X-Forwarded-Proto': 'https', Cookie: `${SECURE_OAUTH_STATE_COOKIE}=s` },
+    })
+    expect(ok.headers.get('location')).toBe('/dashboard')
+    expect(ok.headers.getSetCookie().some((c) => c.startsWith(`${SECURE_SESSION_COOKIE}=${accessToken};`))).toBe(true)
+    warnSpy.mockRestore()
+  })
+
+  it('expires the state cookie on an IdP error redirect too', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await req('/auth/callback?error=access_denied', { headers: { Cookie: STATE_COOKIE('s') } })
+    expect(res.headers.get('location')).toBe('/dashboard?auth_error=access_denied')
+    expect(res.headers.getSetCookie().some((c) => c.startsWith(`${OAUTH_STATE_COOKIE}=;`))).toBe(true)
+    errSpy.mockRestore()
+  })
+})
+
+describe('GET /auth/login', () => {
+  beforeEach(() => {
+    oauthMocks.ensureRegistered.mockReset().mockResolvedValue(undefined)
+    oauthMocks.buildAuthorizeUrl.mockReset().mockReturnValue({
+      authorizeUrl: 'http://idp.example/authorize?state=abc123',
+      state: 'abc123',
+    })
+  })
+
+  it('binds the state to this browser with a Lax HttpOnly cookie and redirects to the IdP', async () => {
+    const res = await req('/auth/login')
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('http://idp.example/authorize?state=abc123')
+    const [cookie] = res.headers.getSetCookie()
+    expect(cookie).toMatch(new RegExp(`^${OAUTH_STATE_COOKIE}=abc123; `))
+    expect(cookie).toContain('HttpOnly')
+    expect(cookie).toContain('SameSite=Lax') // the IdP return is a cross-site top-level navigation
+    expect(cookie).toContain('Path=/')
+    expect(cookie).toContain('Max-Age=600')
+    expect(cookie).not.toContain('Secure')
+    expect(oauthMocks.ensureRegistered).toHaveBeenCalledWith(expect.stringMatching(/^http:\/\/127\.0\.0\.1:\d+\/auth\/callback$/))
+  })
+
+  it('uses a __Host- Secure state cookie on HTTPS', async () => {
+    const res = await req('/auth/login', { headers: { 'X-Forwarded-Proto': 'https' } })
+    const [cookie] = res.headers.getSetCookie()
+    expect(cookie).toMatch(new RegExp(`^${SECURE_OAUTH_STATE_COOKIE}=abc123; `))
+    expect(cookie).toContain('; Secure')
+  })
+
+  it('with DOT_AI_UI_SECURE_COOKIES=true registers an https callback even when the proxy hop says http', async () => {
+    process.env.DOT_AI_UI_SECURE_COOKIES = 'true'
+    const res = await req('/auth/login', { headers: { 'X-Forwarded-Proto': 'http' } })
+    expect(res.headers.getSetCookie()[0]).toMatch(new RegExp(`^${SECURE_OAUTH_STATE_COOKIE}=`))
+    expect(oauthMocks.ensureRegistered).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\//))
+  })
+})
+
+describe('DOT_AI_UI_SECURE_COOKIES', () => {
+  it('true: Secure __Host- cookie even when TLS ended before a plain-HTTP hop', async () => {
+    process.env.DOT_AI_UI_SECURE_COOKIES = 'true'
+    const res = await jsonPost('/api/v1/auth/login', { token: STATIC }, { 'X-Forwarded-Proto': 'http' })
+    const [cookie] = res.headers.getSetCookie()
+    expect(cookie).toMatch(new RegExp(`^${SECURE_SESSION_COOKIE}=`))
+    expect(cookie).toContain('; Secure')
+  })
+
+  it('true: only the __Host- cookie is read, so a tossed plain cookie is ignored', async () => {
+    process.env.DOT_AI_UI_SECURE_COOKIES = 'true'
+    expect((await req('/api/v1/whoami', { headers: { Cookie: `${SESSION_COOKIE}=${STATIC}` } })).status).toBe(401)
+    expect((await req('/api/v1/whoami', { headers: { Cookie: `${SECURE_SESSION_COOKIE}=${STATIC}` } })).status).toBe(200)
+  })
+
+  it('false: never Secure, even on HTTPS', async () => {
+    process.env.DOT_AI_UI_SECURE_COOKIES = 'false'
+    const res = await jsonPost('/api/v1/auth/login', { token: STATIC }, { 'X-Forwarded-Proto': 'https' })
+    const [cookie] = res.headers.getSetCookie()
+    expect(cookie).toMatch(new RegExp(`^${SESSION_COOKIE}=`))
+    expect(cookie).not.toContain('Secure')
+  })
+
+  it('auto: a browser Origin of https://<this host> marks the request as HTTPS', async () => {
+    const host = new URL(base).host
+    const res = await jsonPost('/api/v1/auth/login', { token: STATIC }, { Origin: `https://${host}` })
+    expect(res.status).toBe(200)
+    const [cookie] = res.headers.getSetCookie()
+    expect(cookie).toMatch(new RegExp(`^${SECURE_SESSION_COOKIE}=`))
+    expect(cookie).toContain('; Secure')
   })
 })
 
@@ -310,6 +442,9 @@ describe('GET /auth/logout', () => {
     const res = await req('/auth/logout')
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/')
-    expect(res.headers.getSetCookie()[0]).toMatch(new RegExp(`^${SESSION_COOKIE}=; .*Max-Age=0`))
+    const cookies = res.headers.getSetCookie()
+    // Both names are always expired, whichever one the browser holds
+    expect(cookies.some((c) => new RegExp(`^${SESSION_COOKIE}=; .*Max-Age=0`).test(c))).toBe(true)
+    expect(cookies.some((c) => new RegExp(`^${SECURE_SESSION_COOKIE}=; .*Max-Age=0.*Secure`).test(c))).toBe(true)
   })
 })

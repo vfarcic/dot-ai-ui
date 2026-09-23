@@ -82,6 +82,7 @@ Open your browser and navigate to the Web UI hostname. You should see the DevOps
 | `uiAuth.secretRef.name` | Existing secret with UI auth token | `""` |
 | `uiAuth.secretRef.key` | Key in existing secret | `ui-auth-token` |
 | `uiAuth.token` | UI auth token (if not using secretRef) | `""` |
+| `uiAuth.secureCookies` | Session cookie `Secure` flag: `true`, `false`, `auto`, or empty to use `true` when this chart configures TLS (ingress TLS or a created Gateway's HTTPS listener) and `auto` otherwise. Set `true` when users reach the UI over HTTPS through a referenced Gateway or a load balancer that terminates TLS in front of the ingress | `""` |
 | `ingress.enabled` | Enable Ingress resource | `false` |
 | `ingress.className` | Ingress class name | `nginx` |
 | `ingress.host` | Ingress hostname | `dot-ai-ui.127.0.0.1.nip.io` |

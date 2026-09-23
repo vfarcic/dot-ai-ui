@@ -50,6 +50,15 @@ uiAuth:
   # (check pod logs for the generated token)
   token: ""                      # UI auth token value
 
+  # Session cookie hardening (Secure flag + __Host- prefix)
+  # "" (default): "true" when ingress.tls.enabled or a created Gateway's HTTPS
+  #   listener is enabled, otherwise auto-detect per request from X-Forwarded-Proto
+  # "true": always Secure; set this when users reach the UI over HTTPS through a
+  #   referenced Gateway or a load balancer that terminates TLS in front of ingress
+  # "false": never Secure (plain-HTTP installs only)
+  # "auto": always auto-detect per request, even when the chart configures TLS
+  secureCookies: ""
+
 # Ingress configuration
 # NOTE: Mutually exclusive with gateway - only one can be enabled
 ingress:
