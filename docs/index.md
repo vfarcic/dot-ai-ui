@@ -117,9 +117,9 @@ OAuth is enabled automatically — no extra configuration needed. The Express ba
 If OAuth is not available, or if users prefer token-based access, the login page also offers a **"Login with Token"** tab:
 
 1. On first visit, users see a login page prompting for an access token
-2. The token is validated against the server
-3. Once authenticated, the token is stored in browser sessionStorage (cleared when the tab closes)
-4. All API requests include the token in the `Authorization: Bearer <token>` header
+2. The token is validated by the server (`POST /api/v1/auth/login`)
+3. Once authenticated, the server stores the credential in an `HttpOnly`, `SameSite=Strict` session cookie (`Secure` over HTTPS), so page scripts cannot read it. SSO logins get the same cookie from the OAuth callback. Static-token sessions last 8 hours; SSO sessions last as long as the access token
+4. The browser sends the cookie with every API request automatically. Scripts and other non-browser clients can call the API with an `Authorization: Bearer <token>` header instead
 
 **Getting your token:**
 
