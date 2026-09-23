@@ -1,14 +1,17 @@
 import express from 'express'
+import type { Request } from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import rateLimit from 'express-rate-limit'
 import { securityHeaders } from './security-headers.js'
 import {
   authMiddleware,
-  verifyHandler,
-  statusHandler,
   isAuthEnabled,
   getAuthStrategyName,
+  getRequestCredential,
+  csrfProtection,
+  createAuthApiRouter,
+  clearRejectedSessionCookie,
 } from './auth/index.js'
 import { createOAuthRouter } from './auth/oauth-routes.js'
 
@@ -35,14 +38,6 @@ const staticLimiter = rateLimit({
   legacyHeaders: false,
 })
 
-// Stricter rate limiter for auth endpoints to prevent brute-force attacks
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per 15 minutes per IP
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many authentication attempts, please try again later' },
-})
 const isDev = process.env.NODE_ENV !== 'production'
 const PORT = process.env.PORT || 3000
 const MCP_BASE_URL = process.env.DOT_AI_MCP_URL || 'http://localhost:8080'
@@ -57,11 +52,11 @@ console.log(`[Config] UI_AUTH: ${isAuthEnabled() ? `enabled (${getAuthStrategyNa
  * Get the authorization token to forward to the MCP server.
  * If the user authenticated via OAuth (JWT), forward their token.
  * Otherwise fall back to the static DOT_AI_AUTH_TOKEN.
+ * The user's credential comes from getRequestCredential() (session cookie,
+ * or Authorization header for API clients).
  */
-function getUpstreamToken(req: { headers: { authorization?: string } }): string | null {
-  const userToken = req.headers.authorization?.startsWith('Bearer ')
-    ? req.headers.authorization.slice(7)
-    : null
+function getUpstreamToken(req: Request): string | null {
+  const userToken = getRequestCredential(req)
 
   // If user has a JWT token (OAuth), forward it directly to MCP
   if (userToken && userToken.includes('.')) {
@@ -108,22 +103,23 @@ async function createServer() {
   // Authentication endpoints (before auth middleware)
   // ========================================
 
-  // Auth status - public endpoint to check if auth is enabled
-  // Used by frontend to decide whether to show login page
-  app.get('/api/v1/auth/status', authLimiter, statusHandler)
+  // Reject cross-site state-changing API requests (CSRF defence-in-depth on
+  // top of the SameSite=Strict session cookie)
+  app.use('/api/v1', csrfProtection)
 
-  // Auth verify - requires valid token, returns 200 if valid
-  // Used by frontend to validate token before storing
-  app.get('/api/v1/auth/verify', authLimiter, authMiddleware, verifyHandler)
+  // /api/v1/auth/{status,verify,session,login,logout} - each handles its own
+  // auth and carries its own rate limiter (see createAuthApiRouter)
+  app.use('/api/v1/auth', createAuthApiRouter())
 
   // ========================================
   // Protected API routes (auth middleware applied)
   // ========================================
 
   // Apply rate limiting and auth middleware to all /api/v1/* routes except auth endpoints
-  // Rate limiting here prevents DoS on the auth check itself
-  app.use('/api/v1', apiLimiter, (req, res, next) => {
-    // Skip auth for the status endpoint (already handled above with authLimiter)
+  // Rate limiting here prevents DoS on the auth check itself. A 401 for a
+  // cookie credential (local or relayed from dot-ai) also expires the cookie.
+  app.use('/api/v1', apiLimiter, clearRejectedSessionCookie, (req, res, next) => {
+    // Skip auth for the status endpoint (answered above by the auth router)
     if (req.path === '/auth/status') {
       return next()
     }
@@ -156,7 +152,6 @@ async function createServer() {
       const queryString = new URLSearchParams(req.query as Record<string, string>).toString()
       const url = `${MCP_BASE_URL}/api/v1/visualize/${sessionId}${queryString ? `?${queryString}` : ''}`
       console.log(`[Proxy] Fetching from MCP: ${url}`)
-      console.log(`[Proxy] Headers:`, JSON.stringify(headers))
 
       const response = await fetch(url, {
         method: 'GET',

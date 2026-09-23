@@ -23,7 +23,9 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     // Only unit tests. Playwright owns e2e/*.spec.ts — never let Vitest load those.
-    include: ['src/**/*.test.{ts,tsx}'],
+    // server/**/*.test.ts cover the Express auth layer; they opt into the node
+    // environment with a `@vitest-environment node` docblock.
+    include: ['src/**/*.test.{ts,tsx}', 'server/**/*.test.ts'],
     setupFiles: ['./src/test/setup.ts'],
     restoreMocks: true,
     coverage: {

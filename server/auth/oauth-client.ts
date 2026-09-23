@@ -93,9 +93,10 @@ function generatePkce(): { codeVerifier: string; codeChallenge: string } {
 
 /**
  * Build the authorization URL and store PKCE verifier for later exchange.
- * Returns the URL to redirect the browser to.
+ * Returns the URL to redirect the browser to, and the `state` so the caller
+ * can bind this authorization request to the browser that started it.
  */
-export function buildAuthorizeUrl(): string {
+export function buildAuthorizeUrl(): { authorizeUrl: string; state: string } {
   if (!clientId || !registeredCallbackUrl) {
     throw new Error('OAuth client not registered')
   }
@@ -118,7 +119,7 @@ export function buildAuthorizeUrl(): string {
     state,
   })
 
-  return `${MCP_BASE_URL}/authorize?${params}`
+  return { authorizeUrl: `${MCP_BASE_URL}/authorize?${params}`, state }
 }
 
 /**

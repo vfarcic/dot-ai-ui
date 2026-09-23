@@ -1,7 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { AUTH_REQUIRED_EVENT } from '@/api/authHeaders'
 
 /**
  * Authentication state and methods
+ *
+ * The credential itself lives in an HttpOnly session cookie managed by the
+ * server, so nothing here can read it. The app learns its session state from
+ * GET /api/v1/auth/session.
  */
 interface AuthContextType {
   /** Whether auth check is in progress */
@@ -22,40 +27,70 @@ interface AuthContextType {
   error: string | null
   /** Attempt to authenticate with a token */
   login: (token: string) => Promise<boolean>
-  /** Clear authentication */
-  logout: () => void
-  /** Get the current token (for API requests) */
-  getToken: () => string | null
+  /** Clear authentication (server clears the session cookie) */
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-const TOKEN_STORAGE_KEY = 'dot-ai-ui-auth-token'
-const AUTH_MODE_KEY = 'dot-ai-ui-auth-mode'
-const USER_EMAIL_KEY = 'dot-ai-ui-user-email'
+/** Shown on the login page when a live session ends under an open tab */
+export const SESSION_ENDED_MESSAGE = 'Your session has ended. Please sign in again.'
 
 /**
- * Decode a JWT payload client-side to extract user info (email, sub).
- * No signature verification — the token is trusted because it came from
- * the server-side OAuth code exchange.
+ * Keys earlier releases used to keep the token in sessionStorage. Removed on
+ * startup so a tab that survives an upgrade does not keep a readable token.
  */
-function decodeJwtPayload(token: string): { sub?: string; email?: string; exp?: number } | null {
+const LEGACY_STORAGE_KEYS = ['dot-ai-ui-auth-token', 'dot-ai-ui-auth-mode', 'dot-ai-ui-user-email']
+
+function clearLegacyStorage(): void {
   try {
-    const parts = token.split('.')
-    if (parts.length !== 3) return null
-    const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
-    return JSON.parse(payload)
+    for (const key of LEGACY_STORAGE_KEYS) {
+      sessionStorage.removeItem(key)
+    }
   } catch {
-    return null
+    // Storage can be unavailable (privacy mode); nothing to clean up then.
   }
+}
+
+/** Shape of GET /api/v1/auth/session and POST /api/v1/auth/login responses */
+interface SessionResponse {
+  authenticated: boolean
+  authEnabled?: boolean
+  mode?: 'oauth' | 'token'
+  email?: string
+  expiresAt?: number
+  error?: string
+}
+
+async function fetchSession(): Promise<SessionResponse> {
+  const res = await fetch('/api/v1/auth/session', {
+    credentials: 'same-origin',
+    cache: 'no-store',
+  })
+  if (!res.ok) {
+    throw new Error(`Session check failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+/**
+ * Read (and strip from the URL) an OAuth error the server passed back via
+ * ?auth_error=... after a failed callback.
+ */
+function takeOAuthError(): string | null {
+  const searchParams = new URLSearchParams(window.location.search)
+  const authError = searchParams.get('auth_error')
+  if (authError) {
+    window.history.replaceState({}, '', window.location.pathname)
+  }
+  return authError
 }
 
 /**
  * Authentication Provider
  *
  * Wraps the app and provides authentication state/methods.
- * On mount, checks if auth is enabled and validates any stored token.
- * Handles OAuth callback tokens from URL fragments.
+ * On mount, checks if auth is enabled and asks the server for the session.
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
@@ -66,158 +101,129 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authMode, setAuthMode] = useState<'oauth' | 'token' | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [token, setToken] = useState<string | null>(null)
+  // Read once per mount: the URL is cleaned on first read, and StrictMode
+  // runs the effect twice in development.
+  const oauthErrorRef = useRef<string | null | undefined>(undefined)
+  // Mirrors of state for the re-check listeners, which outlive a render
+  const authEnabledRef = useRef(false)
+  const isAuthenticatedRef = useRef(false)
+  const initialCheckDoneRef = useRef(false)
+  const recheckInFlightRef = useRef(false)
+  // Bumped on every session change, so a re-check that started before a
+  // login/logout cannot overwrite its result.
+  const sessionGenerationRef = useRef(0)
 
-  // Check auth status on mount
-  useEffect(() => {
-    checkAuthStatus()
+  const applySession = useCallback((session: SessionResponse) => {
+    sessionGenerationRef.current += 1
+    isAuthenticatedRef.current = session.authenticated
+    if (session.authenticated) {
+      setAuthMode(session.mode ?? null)
+      setUserEmail(session.mode === 'oauth' ? session.email ?? null : null)
+      setIsAuthenticated(true)
+    } else {
+      setAuthMode(null)
+      setUserEmail(null)
+      setIsAuthenticated(false)
+    }
   }, [])
 
-  /**
-   * Check for OAuth callback token in URL fragment or query params.
-   * Returns { token, error } — at most one will be set.
-   */
-  const handleOAuthCallback = (): { token: string | null; error: string | null } => {
-    // Check /auth/complete#token=... (fragment-based)
-    if (window.location.pathname === '/auth/complete' && window.location.hash) {
-      const params = new URLSearchParams(window.location.hash.slice(1))
-      const callbackToken = params.get('token')
-      if (callbackToken) {
-        return { token: callbackToken, error: null }
+  useEffect(() => {
+    let cancelled = false
+
+    const checkAuthStatus = async () => {
+      setIsLoading(true)
+      setError(null)
+      clearLegacyStorage()
+
+      if (oauthErrorRef.current === undefined) {
+        oauthErrorRef.current = takeOAuthError()
       }
-    }
+      const oauthError = oauthErrorRef.current
 
-    // Check for auth error in query string
-    const searchParams = new URLSearchParams(window.location.search)
-    const authError = searchParams.get('auth_error')
-    if (authError) {
-      const cleanUrl = window.location.pathname
-      window.history.replaceState({}, '', cleanUrl)
-      return { token: null, error: authError }
-    }
-
-    return { token: null, error: null }
-  }
-
-  /**
-   * Check if auth is enabled and validate stored token
-   */
-  const checkAuthStatus = async () => {
-    setIsLoading(true)
-    setError(null)
-
-    // Check for OAuth callback token or error before async work
-    const { token: oauthToken, error: oauthError } = handleOAuthCallback()
-
-    try {
-
-      // Check if auth is enabled
-      const statusRes = await fetch('/api/v1/auth/status')
-      if (!statusRes.ok) {
-        throw new Error(`Auth status check failed: ${statusRes.status}`)
-      }
-      const statusData = await statusRes.json()
-
-      if (typeof statusData.authEnabled !== 'boolean') {
-        throw new Error('Invalid auth status response')
-      }
-
-      setAuthEnabled(statusData.authEnabled)
-      setStrategy(statusData.strategy)
-      setOauthEnabled(statusData.oauthEnabled || false)
-
-      if (!statusData.authEnabled) {
-        setIsAuthenticated(true)
-        setIsLoading(false)
-        return
-      }
-
-      // If we got an OAuth callback token, trust it (it came from server-side code exchange)
-      // sessionStorage is the standard approach for SPA OAuth tokens — scoped to tab,
-      // cleared on close, and not sent in HTTP requests (unlike cookies).
-      if (oauthToken) {
-        sessionStorage.setItem(TOKEN_STORAGE_KEY, oauthToken)
-        sessionStorage.setItem(AUTH_MODE_KEY, 'oauth')
-        const payload = decodeJwtPayload(oauthToken)
-        if (payload?.email) {
-          sessionStorage.setItem(USER_EMAIL_KEY, payload.email)
+      try {
+        const statusRes = await fetch('/api/v1/auth/status')
+        if (!statusRes.ok) {
+          throw new Error(`Auth status check failed: ${statusRes.status}`)
         }
-        // Full navigation to dashboard so the router initializes with the correct URL
-        window.location.replace('/dashboard')
-        return
-      }
+        const statusData = await statusRes.json()
 
-      // Check for stored token
-      const storedToken = sessionStorage.getItem(TOKEN_STORAGE_KEY)
-      const storedMode = sessionStorage.getItem(AUTH_MODE_KEY) as 'oauth' | 'token' | null
-      const storedEmail = sessionStorage.getItem(USER_EMAIL_KEY)
+        if (typeof statusData.authEnabled !== 'boolean') {
+          throw new Error('Invalid auth status response')
+        }
+        if (cancelled) return
 
-      if (storedToken) {
-        if (storedMode === 'oauth') {
-          // OAuth JWT — trust it, check expiry client-side
-          const payload = decodeJwtPayload(storedToken)
-          if (!payload || !payload.exp || payload.exp * 1000 < Date.now()) {
-            // Token malformed or expired, clear it
-            sessionStorage.removeItem(TOKEN_STORAGE_KEY)
-            sessionStorage.removeItem(AUTH_MODE_KEY)
-            sessionStorage.removeItem(USER_EMAIL_KEY)
-          } else {
-            setToken(storedToken)
-            setAuthMode('oauth')
-            setUserEmail(payload.email || storedEmail || null)
-            setIsAuthenticated(true)
+        setAuthEnabled(statusData.authEnabled)
+        authEnabledRef.current = statusData.authEnabled
+        setStrategy(statusData.strategy)
+        setOauthEnabled(statusData.oauthEnabled || false)
+
+        if (!statusData.authEnabled) {
+          setIsAuthenticated(true)
+          return
+        }
+
+        const session = await fetchSession()
+        if (cancelled) return
+        applySession(session)
+        initialCheckDoneRef.current = true
+      } catch (err) {
+        console.error('[Auth] Failed to check auth status:', err)
+        if (!cancelled) setError('Failed to connect to server')
+      } finally {
+        if (!cancelled) {
+          if (oauthError) {
+            setError(oauthError)
           }
-        } else {
-          // Bearer token — validate with server
-          const valid = await validateToken(storedToken)
-          if (valid.authenticated) {
-            setToken(storedToken)
-            setAuthMode('token')
-            setUserEmail(null)
-            setIsAuthenticated(true)
-          } else {
-            sessionStorage.removeItem(TOKEN_STORAGE_KEY)
-            sessionStorage.removeItem(AUTH_MODE_KEY)
-            sessionStorage.removeItem(USER_EMAIL_KEY)
-          }
+          setIsLoading(false)
         }
       }
-    } catch (err) {
-      console.error('[Auth] Failed to check auth status:', err)
-      setError('Failed to connect to server')
-    } finally {
-      if (oauthError) {
-        setError(oauthError)
-      }
-      setIsLoading(false)
     }
-  }
+
+    checkAuthStatus()
+    return () => {
+      cancelled = true
+    }
+  }, [applySession])
 
   /**
-   * Validate a token against the server
+   * Re-check the session with the server. Triggered by a 401 from any API
+   * call and whenever the tab becomes visible again, because the cookie is
+   * shared across tabs and can expire or be cleared under this one. If the
+   * session is gone, the guard falls back to the login page.
    */
-  const validateToken = async (
-    tokenToValidate: string
-  ): Promise<{ authenticated: boolean; userEmail?: string }> => {
-    try {
-      const res = await fetch('/api/v1/auth/verify', {
-        headers: {
-          Authorization: `Bearer ${tokenToValidate}`,
-        },
-      })
-      if (!res.ok) return { authenticated: false }
-      const data = await res.json()
-      return {
-        authenticated: data.authenticated,
-        userEmail: data.userEmail,
+  useEffect(() => {
+    const recheck = async () => {
+      if (!initialCheckDoneRef.current || !authEnabledRef.current || recheckInFlightRef.current) return
+      recheckInFlightRef.current = true
+      try {
+        const generation = sessionGenerationRef.current
+        const wasAuthenticated = isAuthenticatedRef.current
+        const session = await fetchSession()
+        if (generation !== sessionGenerationRef.current) return
+        applySession(session)
+        if (wasAuthenticated && !session.authenticated) setError(SESSION_ENDED_MESSAGE)
+        if (!wasAuthenticated && session.authenticated) setError(null)
+      } catch {
+        // Server unreachable: keep the current state; the failing call shows its own error
+      } finally {
+        recheckInFlightRef.current = false
       }
-    } catch {
-      return { authenticated: false }
     }
-  }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void recheck()
+    }
+
+    window.addEventListener(AUTH_REQUIRED_EVENT, recheck)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener(AUTH_REQUIRED_EVENT, recheck)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [applySession])
 
   /**
-   * Attempt to authenticate with a bearer token
+   * Sign in with the static UI token. The server validates it and sets the
+   * HttpOnly session cookie; the token is not kept anywhere in the page.
    */
   const login = useCallback(async (newToken: string): Promise<boolean> => {
     setError(null)
@@ -227,40 +233,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false
     }
 
-    const valid = await validateToken(newToken)
+    try {
+      const res = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: newToken }),
+      })
+      const data: SessionResponse = await res.json().catch(() => ({ authenticated: false }))
 
-    if (valid.authenticated) {
-      sessionStorage.setItem(TOKEN_STORAGE_KEY, newToken)
-      sessionStorage.setItem(AUTH_MODE_KEY, 'token')
-      setToken(newToken)
-      setAuthMode('token')
-      setIsAuthenticated(true)
-      return true
-    } else {
-      setError('Invalid token')
+      if (res.ok && data.authenticated) {
+        applySession(data)
+        return true
+      }
+
+      setError(res.status === 429 ? 'Too many attempts, please try again later' : 'Invalid token')
+      return false
+    } catch {
+      setError('Failed to connect to server')
       return false
     }
-  }, [])
+  }, [applySession])
 
   /**
-   * Clear authentication and stored token
+   * Sign out: the server clears the session cookie.
    */
-  const logout = useCallback(() => {
-    sessionStorage.removeItem(TOKEN_STORAGE_KEY)
-    sessionStorage.removeItem(AUTH_MODE_KEY)
-    sessionStorage.removeItem(USER_EMAIL_KEY)
-    setToken(null)
-    setAuthMode(null)
-    setUserEmail(null)
-    setIsAuthenticated(false)
-  }, [])
-
-  /**
-   * Get the current token for API requests
-   */
-  const getToken = useCallback(() => {
-    return token || sessionStorage.getItem(TOKEN_STORAGE_KEY)
-  }, [token])
+  const logout = useCallback(async (): Promise<void> => {
+    try {
+      await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' })
+    } catch (err) {
+      console.error('[Auth] Logout request failed:', err)
+    } finally {
+      clearLegacyStorage()
+      applySession({ authenticated: false })
+    }
+  }, [applySession])
 
   return (
     <AuthContext.Provider
@@ -275,7 +282,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error,
         login,
         logout,
-        getToken,
       }}
     >
       {children}

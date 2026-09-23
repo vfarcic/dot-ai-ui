@@ -260,7 +260,7 @@ test.describe('Unified Search', () => {
 
     test('loading page with search params restores search state', async ({ page }) => {
       // Navigate directly with search params
-      // sessionStorage persists across same-origin page.goto() within the same tab
+      // The session cookie persists across page.goto() within the same context
       await page.goto('/dashboard?q=RBAC&scope=knowledge')
 
       // Search input should have the query

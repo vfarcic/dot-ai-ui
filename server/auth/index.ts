@@ -1,6 +1,23 @@
+import { Router } from 'express'
 import type { Request, Response, NextFunction } from 'express'
+import rateLimit from 'express-rate-limit'
 import type { AuthConfig } from './types.js'
-import { bearerStrategy } from './strategies/bearer.js'
+import { bearerStrategy, isValidStaticToken } from './strategies/bearer.js'
+import {
+  getRequestCredential,
+  getSessionCookie,
+  credentialIsFromCookie,
+  setSessionCookie,
+  clearSessionCookie,
+  isJwtShaped,
+  decodeJwtClaims,
+  MAX_CREDENTIAL_LENGTH,
+  STATIC_TOKEN_SESSION_SECONDS,
+} from './session.js'
+import type { SessionMode } from './session.js'
+
+export { csrfProtection } from './csrf.js'
+export { getRequestCredential } from './session.js'
 
 /**
  * Authentication Module
@@ -8,6 +25,9 @@ import { bearerStrategy } from './strategies/bearer.js'
  * Two auth paths:
  * 1. JWT tokens (OAuth) — passed through to dot-ai server for validation
  * 2. Bearer tokens (static) — validated locally against DOT_AI_UI_AUTH_TOKEN
+ *
+ * The browser app presents either credential as an HttpOnly session cookie
+ * (see session.ts). API clients may send `Authorization: Bearer` instead.
  *
  * Auth is always enabled. If DOT_AI_UI_AUTH_TOKEN is not set, a random
  * token is auto-generated and printed to the console at startup.
@@ -55,11 +75,10 @@ export async function authMiddleware(
   }
 
   try {
-    const authHeader = req.headers.authorization
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+    const token = getRequestCredential(req)
 
     // JWT tokens (OAuth) — pass through, let dot-ai server validate
-    if (token && token.includes('.')) {
+    if (token && isJwtShaped(token)) {
       next()
       return
     }
@@ -88,14 +107,50 @@ export async function authMiddleware(
 }
 
 /**
+ * Middleware for the protected /api/v1 routes: when a response goes out as
+ * 401 and the request's credential was the session cookie, expire that
+ * cookie on the same response.
+ *
+ * A JWT cookie is only verified by the dot-ai server; when it rejects the
+ * token (expired, revoked, re-keyed issuer) the proxy relays the 401. Without
+ * clearing the cookie, /api/v1/auth/session would keep reporting the
+ * decodable JWT as signed in and the tab would stay "signed in" with every
+ * call failing. With it, the frontend's 401 -> session re-check lands on the
+ * login page. A local 401 for a stale static-token cookie is treated alike.
+ *
+ * Left alone: credentials sent in an Authorization header, any status other
+ * than 401 (403 means "signed in, not allowed"), and a cookie holding the
+ * current static UI token. That token is never forwarded upstream (the
+ * server's DOT_AI_AUTH_TOKEN is), so an upstream 401 cannot be about it.
+ *
+ * The Set-Cookie is added in writeHead, the last point before headers are
+ * sent, so every handler is covered without changes to each one.
+ */
+export function clearRejectedSessionCookie(req: Request, res: Response, next: NextFunction): void {
+  if (!credentialIsFromCookie(req) || isValidStaticToken(getSessionCookie(req))) {
+    next()
+    return
+  }
+  const writeHead = res.writeHead
+  res.writeHead = function (this: Response, ...args: unknown[]) {
+    const status = typeof args[0] === 'number' ? args[0] : this.statusCode
+    if (status === 401 && !this.headersSent) {
+      clearSessionCookie(req, this)
+    }
+    return (writeHead as (...a: unknown[]) => Response).apply(this, args)
+  } as typeof res.writeHead
+  next()
+}
+
+/**
  * Endpoint handler for token verification
  *
  * The dot-ai backend is the single authority on JWT validity and re-verifies
  * the signature on every proxied data request. This endpoint therefore never
  * makes an auth decision about a JWT on its own: a JWT presented here falls
  * through to the static-bearer comparison and, unless it happens to equal the
- * configured DOT_AI_UI_AUTH_TOKEN, correctly receives 401. (OAuth JWTs are
- * validated client-side for expiry and never routed through /verify.)
+ * configured DOT_AI_UI_AUTH_TOKEN, correctly receives 401. (The browser app
+ * learns its OAuth session state from /api/v1/auth/session, not /verify.)
  *
  * Bearer tokens: validated locally.
  */
@@ -145,4 +200,151 @@ export function statusHandler(_req: Request, res: Response): void {
     strategy: isAuthEnabled() ? config.strategy.name : null,
     oauthEnabled: true,
   })
+}
+
+/**
+ * Session state as seen by the browser app. The credential itself is never
+ * included — the app only learns whether it is signed in and as whom.
+ */
+export interface SessionInfo {
+  authenticated: boolean
+  authEnabled: boolean
+  mode?: SessionMode
+  email?: string
+  /** Epoch milliseconds, from the token's exp claim (OAuth only) */
+  expiresAt?: number
+}
+
+/**
+ * Describe the session for a credential, without making any decision the
+ * dot-ai server owns. A JWT is reported as an OAuth session: the dot-ai
+ * server verifies it on every proxied request, and its claims are used here
+ * for display only (the same trust the UI placed in them when it decoded the
+ * token client-side). Anything else must match the static UI token.
+ */
+export function describeSession(credential: string | null): SessionInfo {
+  if (!isAuthEnabled()) {
+    return { authenticated: true, authEnabled: false }
+  }
+  if (!credential) {
+    return { authenticated: false, authEnabled: true }
+  }
+  if (isValidStaticToken(credential)) {
+    return { authenticated: true, authEnabled: true, mode: 'token' }
+  }
+  if (isJwtShaped(credential)) {
+    const claims = decodeJwtClaims(credential)
+    if (!claims) {
+      return { authenticated: false, authEnabled: true }
+    }
+    const info: SessionInfo = { authenticated: true, authEnabled: true, mode: 'oauth' }
+    if (claims.email) info.email = claims.email
+    if (claims.exp !== undefined) info.expiresAt = claims.exp * 1000
+    return info
+  }
+  return { authenticated: false, authEnabled: true }
+}
+
+/**
+ * GET /api/v1/auth/session
+ *
+ * Tells the frontend whether it is signed in, in which mode, and (OAuth) as
+ * whom. Always 200 so the app can render the login page without error noise.
+ * A cookie that no longer describes a valid session is cleared.
+ */
+export function sessionHandler(req: Request, res: Response): void {
+  const credential = getRequestCredential(req)
+  const info = describeSession(credential)
+  const cookie = getSessionCookie(req)
+  if (!info.authenticated && cookie && cookie === credential) {
+    clearSessionCookie(req, res)
+  }
+  res.setHeader('Cache-Control', 'no-store')
+  res.json(info)
+}
+
+/**
+ * POST /api/v1/auth/login  { "token": "<static UI token>" }
+ *
+ * Validates the static UI token and, on success, stores it in the HttpOnly
+ * session cookie. The response body never echoes the token.
+ */
+export function loginHandler(req: Request, res: Response): void {
+  const token = typeof req.body?.token === 'string' ? req.body.token.trim() : ''
+
+  if (!token) {
+    res.status(400).json({ authenticated: false, error: 'Token cannot be empty' })
+    return
+  }
+
+  if (token.length > MAX_CREDENTIAL_LENGTH || !isValidStaticToken(token)) {
+    res.status(401).json({ authenticated: false, error: 'Invalid token' })
+    return
+  }
+
+  setSessionCookie(req, res, token, STATIC_TOKEN_SESSION_SECONDS)
+  res.json(describeSession(token))
+}
+
+/**
+ * POST /api/v1/auth/logout — clears the session cookie.
+ */
+export function logoutHandler(req: Request, res: Response): void {
+  clearSessionCookie(req, res)
+  res.json({ authenticated: false, authEnabled: isAuthEnabled() })
+}
+
+/**
+ * Rate limiters for /api/v1/auth/*. They are created here and placed directly
+ * in each route's middleware chain (not injected), so the limit on every route
+ * is visible where the route is declared.
+ *
+ * - authApiLimiter: the general API budget (same as the /api/v1 limiter in
+ *   server/index.ts). For routes that run on every page load or take no
+ *   credential; a stricter limit here caused 429s on ordinary navigation.
+ * - credentialLimiter: strict brute-force guard for routes that check a
+ *   submitted credential. One shared budget for /login and /verify.
+ */
+const authApiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 1000, // 1000 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+})
+
+const credentialLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts, please try again later' },
+})
+
+/**
+ * Router for /api/v1/auth/*. Mount at `/api/v1/auth` before the /api/v1 auth
+ * gate; every route here handles its own authentication and rate limiting.
+ */
+export function createAuthApiRouter(): Router {
+  const router = Router()
+
+  // Public: is auth enabled, which strategy, is SSO available. Takes no
+  // credential and is called on every page load, so like /session it gets the
+  // general API limiter; the strict limiter guards credential checks.
+  router.get('/status', authApiLimiter, statusHandler)
+
+  // Static token check for API clients (Authorization header or cookie)
+  router.get('/verify', credentialLimiter, authMiddleware, verifyHandler)
+
+  // Session state for the browser app. Called on every page load, so it only
+  // gets the general API limiter, not the strict one.
+  router.get('/session', authApiLimiter, sessionHandler)
+
+  // Static-token sign-in: validates the token and sets the HttpOnly cookie
+  router.post('/login', credentialLimiter, loginHandler)
+
+  // Sign-out: clears the cookie
+  router.post('/logout', authApiLimiter, logoutHandler)
+
+  return router
 }

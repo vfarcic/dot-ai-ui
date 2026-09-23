@@ -60,8 +60,10 @@ npm run test:unit:ui        # Interactive UI
 npm run test:unit:coverage  # With coverage (writes coverage/unit/)
 ```
 
-Tests live next to the code as `*.test.ts` / `*.test.tsx` under `src/`. Vitest only picks up
-`src/**/*.test.{ts,tsx}` — `e2e/*.spec.ts` belongs to Playwright and must never be matched.
+Tests live next to the code as `*.test.ts` / `*.test.tsx` under `src/` and `server/`. Vitest only
+picks up `src/**/*.test.{ts,tsx}` and `server/**/*.test.ts` — `e2e/*.spec.ts` belongs to Playwright
+and must never be matched. Server tests start with a `// @vitest-environment node` docblock and are
+excluded from `server/tsconfig.json` so they never reach the production build.
 
 Conventions:
 - Import test helpers explicitly (`import { describe, it, expect } from 'vitest'`); globals are off.

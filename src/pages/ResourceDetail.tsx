@@ -60,10 +60,7 @@ function ResourceDetailUserMenu() {
               type="button"
               onClick={() => {
                 setOpen(false)
-                if (authMode === 'oauth') {
-                  fetch('/auth/logout').catch(() => {})
-                }
-                logout()
+                void logout()
               }}
               className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-background transition-colors"
             >
