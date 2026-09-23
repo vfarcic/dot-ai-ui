@@ -7,58 +7,9 @@ import { submitRecommendIntent, isSolutionsResponse } from '../../api/recommend'
 import { useActionSelection, type SelectedResource, type Tool } from '../../context/ActionSelectionContext'
 import { useToolAccess } from '../../context/ToolAccessContext'
 import { APIError } from '../../api/client'
+import { extractUrlContext } from '../../utils/urlContext'
 
 export type { Tool }
-
-// Internal/UI params to exclude from context (version is redundant - group is more meaningful for CRDs)
-const EXCLUDED_PARAMS = new Set(['sb', 'tab', 'version', 'q'])
-
-// Friendly labels for param keys
-const PARAM_LABELS: Record<string, string> = {
-  ns: 'namespace',
-  kind: 'kind',
-  group: 'group',
-  name: 'name',
-}
-
-/**
- * Extract context from URL params (both route and query params)
- * Returns YAML-like formatted lines (without header prefix)
- */
-function extractUrlContext(
-  routeParams: Record<string, string | undefined>,
-  searchParams: URLSearchParams
-): string {
-  const lines: string[] = []
-
-  // Process route params (from resource detail page)
-  // Route: /dashboard/:group/:version/:kind/:namespace/:name
-  if (routeParams.kind) {
-    lines.push(`kind: ${routeParams.kind}`)
-  }
-  // Include group only for non-core resources (CRDs)
-  if (routeParams.group && routeParams.group !== '_core') {
-    lines.push(`group: ${routeParams.group}`)
-  }
-  if (routeParams.namespace && routeParams.namespace !== '_cluster') {
-    lines.push(`namespace: ${routeParams.namespace}`)
-  }
-  if (routeParams.name) {
-    lines.push(`name: ${routeParams.name}`)
-  }
-
-  // Process query params (from resource list page)
-  searchParams.forEach((value, key) => {
-    if (EXCLUDED_PARAMS.has(key)) return
-    // Skip if already added from route params
-    if (routeParams[key]) return
-
-    const label = PARAM_LABELS[key] || key
-    lines.push(`${label}: ${value}`)
-  })
-
-  return lines.join('\n')
-}
 
 /**
  * Build context string from selected resources
