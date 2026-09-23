@@ -1,6 +1,13 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
 import { buildAuthorizeUrl, exchangeCode, ensureRegistered } from './oauth-client.js'
+import {
+  setSessionCookie,
+  clearSessionCookie,
+  oauthCookieMaxAge,
+  isJwtShaped,
+  MAX_CREDENTIAL_LENGTH,
+} from './session.js'
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -15,7 +22,7 @@ const authLimiter = rateLimit({
  * Routes:
  *   GET /auth/login    - Initiate OAuth flow (redirect to Dex via dot-ai)
  *   GET /auth/callback - Handle OAuth callback (exchange code for token)
- *   GET /auth/logout   - Clear session and redirect to login
+ *   GET /auth/logout   - Clear the session cookie and redirect to login
  */
 export function createOAuthRouter(): Router {
   const router = Router()
@@ -66,11 +73,18 @@ export function createOAuthRouter(): Router {
     }
 
     try {
-      const { accessToken } = await exchangeCode(code, state)
+      const { accessToken, expiresIn } = await exchangeCode(code, state)
 
-      // Redirect to frontend with token in URL fragment (not query string)
-      // Fragment is not sent to the server on subsequent requests
-      res.redirect(`/auth/complete#token=${accessToken}`)
+      if (
+        typeof accessToken !== 'string' ||
+        !isJwtShaped(accessToken) ||
+        accessToken.length > MAX_CREDENTIAL_LENGTH
+      ) {
+        throw new Error('Authorization server returned an unusable access token')
+      }
+
+      setSessionCookie(req, res, accessToken, oauthCookieMaxAge(accessToken, expiresIn))
+      res.redirect('/dashboard')
     } catch (err) {
       console.error('[OAuth] Token exchange failed:', err)
       const message = err instanceof Error ? err.message : 'Token exchange failed'
@@ -81,10 +95,11 @@ export function createOAuthRouter(): Router {
   /**
    * GET /auth/logout
    *
-   * Clears the session and redirects to the login page.
-   * The frontend handles clearing sessionStorage.
+   * Clears the session cookie and redirects to the login page. The browser
+   * app signs out with POST /api/v1/auth/logout; this GET remains for links.
    */
-  router.get('/auth/logout', (_req, res) => {
+  router.get('/auth/logout', (req, res) => {
+    clearSessionCookie(req, res)
     res.redirect('/')
   })
 

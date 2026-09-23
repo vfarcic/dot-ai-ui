@@ -1,6 +1,7 @@
 import type { Request } from 'express'
 import crypto from 'crypto'
 import type { AuthStrategy, AuthResult } from '../types.js'
+import { getRequestCredential } from '../session.js'
 
 /**
  * Generate a cryptographically secure random token
@@ -44,10 +45,20 @@ export function getAuthToken(): string {
 }
 
 /**
+ * Check a presented credential against the configured static UI token.
+ * Constant-time, so response timing does not leak how much of it matched.
+ */
+export function isValidStaticToken(candidate: string | null | undefined): boolean {
+  if (!candidate) return false
+  return constantTimeEqual(candidate, authToken)
+}
+
+/**
  * Bearer token authentication strategy
  *
- * Validates requests using the Authorization header:
- *   Authorization: Bearer <token>
+ * Validates the static UI token, presented either as the HttpOnly session
+ * cookie (browser app) or as `Authorization: Bearer <token>` (API clients).
+ * See getRequestCredential() for the lookup order.
  *
  * Token is configured via DOT_AI_UI_AUTH_TOKEN environment variable.
  * If the env var is not set, a random token is generated and logged at startup.
@@ -66,28 +77,25 @@ export const bearerStrategy: AuthStrategy = {
   },
 
   authenticate: async (req: Request): Promise<AuthResult> => {
-    const expectedToken = authToken
-
     const authHeader = req.headers.authorization
 
-    if (!authHeader) {
-      return {
-        authenticated: false,
-        error: 'Authorization header required',
-      }
-    }
-
-    if (!authHeader.startsWith('Bearer ')) {
+    if (authHeader && !authHeader.startsWith('Bearer ')) {
       return {
         authenticated: false,
         error: 'Invalid authorization format. Expected: Bearer <token>',
       }
     }
 
-    const providedToken = authHeader.slice(7) // Remove 'Bearer ' prefix
+    const providedToken = getRequestCredential(req)
 
-    // Constant-time comparison to prevent timing attacks
-    if (!constantTimeEqual(providedToken, expectedToken)) {
+    if (!providedToken) {
+      return {
+        authenticated: false,
+        error: 'Authentication required',
+      }
+    }
+
+    if (!isValidStaticToken(providedToken)) {
       return {
         authenticated: false,
         error: 'Invalid token',
