@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- towncrier release notes start -->
 
+## [0.16.0] - 2026-09-24
+
+### Bug Fixes
+
+- ## Mermaid Diagrams Block Script Injection
+
+  Diagrams rendered in the visualization view can no longer run injected JavaScript. AI-generated diagram source is untrusted, so a `click` directive carrying a `javascript:` URL or a callback could previously run code in the viewer's authenticated session with a single click on a node.
+
+  Mermaid now renders in `strict` security mode, and every `click`, `href`, `call`, and `link` directive in the diagram source is removed before rendering. The rendered SVG is sanitized before it is added to the page. Expanding and collapsing subgraphs works as before, and diagrams look the same; clickable links written into diagram source are no longer honored. URL parameters passed to the dashboard's AI actions are restricted to `kind`, `group`, `ns`, and `name`, and must be valid Kubernetes names.
+
+  The UI server now sends a Content-Security-Policy that blocks inline scripts, `javascript:` URLs, and connections to other origins. It also blocks images from other origins, so external images embedded in knowledge-base answers no longer load. ([#162](https://github.com/vfarcic/dot-ai-ui/issues/162))
+
+### Breaking Changes
+
+- ## Session credential moves to an HttpOnly cookie
+
+  The UI credential, whether an SSO access token or the static UI token, now lives in an `HttpOnly`, `SameSite=Strict` session cookie instead of `sessionStorage`. The cookie is `Secure` and uses the `__Host-` prefix over HTTPS. Previously any script running on the page could read the token and replay it, so a single XSS sink was enough to hijack a session. Page scripts can no longer see the credential, and it never appears in a URL: the SSO callback exchanges the code on the server and sets the cookie directly.
+
+  **What changes for users.** Tabs that were signed in before the upgrade are signed out once and need to log in again. Tokens stored in `sessionStorage` are no longer read, and the app deletes them. After that, sessions survive page reloads and are shared across tabs. Static-token sessions last 8 hours, and SSO sessions last as long as the access token. When a session ends under an open tab, because it expired or you signed out in another tab, that tab returns to the login page. Scripts and other non-browser clients still call the API with `Authorization: Bearer <token>`.
+
+  **Security hardening that comes with it.** State-changing API requests from other sites are rejected. SSO sign-in only completes in the browser that started it, so someone else's sign-in link cannot log you into their account. Another site can no longer sign you out by sending your browser to `/auth/logout`.
+
+  **New setting: `DOT_AI_UI_SECURE_COOKIES`** (Helm: `uiAuth.secureCookies`). It controls whether the session cookie is issued as `Secure`. It accepts `true`, `false` or `auto`, and the default is `auto`, which detects HTTPS from `X-Forwarded-Proto`. Set it to `true` whenever users reach the UI over HTTPS through a proxy chain that may report the scheme wrongly, such as a cloud load balancer that terminates TLS in front of the ingress controller, or a referenced Gateway. The Helm chart sets it to `true` on its own when it configures TLS itself (ingress TLS or a created Gateway's HTTPS listener). Use `false` only for plain-HTTP installs.
+
+  See [Authentication](https://devopstoolkit.ai/docs/ui/#authentication) and the [Kubernetes Setup Guide](https://devopstoolkit.ai/docs/ui/setup/kubernetes-setup) for details. ([#164](https://github.com/vfarcic/dot-ai-ui/issues/164))
+
+
 ## [0.15.2] - 2026-09-09
 
 ### Other Changes
