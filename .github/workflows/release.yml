@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
     - name: Checkout code
@@ -311,7 +311,7 @@ jobs:
 
   update-umbrella:
     needs: [release]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: ${{ !inputs.notes_only }}
     permissions:
       contents: read

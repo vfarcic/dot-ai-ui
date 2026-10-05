@@ -53,6 +53,7 @@
     "yaml": "^2.8.2"
   },
   "overrides": {
+    "basic-ftp": "^6.2.1",
     "body-parser": "^2.3.0",
     "lodash": "4.18.1",
     "lodash-es": "4.18.1",
