@@ -55,9 +55,12 @@
   "overrides": {
     "basic-ftp": "^6.2.1",
     "body-parser": "^2.3.0",
+    "js-yaml": {
+      "argparse": "^2.0.1"
+    },
     "lodash": "4.18.1",
     "lodash-es": "4.18.1",
-    "shell-quote": "^1.10.0"
+    "shell-quote": "^1.12.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
