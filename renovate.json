@@ -23,6 +23,12 @@
       "matchUpdateTypes": ["minor", "patch", "pin", "digest", "lockFileMaintenance"],
       "automerge": true,
       "automergeType": "pr"
+    },
+    {
+      "description": "argparse is only an override that keeps js-yaml 3 (via nyc) off sprintf-js - Renovate can't sync the lockfile for that nested override, and a new major brings nothing",
+      "matchPackageNames": ["argparse"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
     }
   ]
 }
