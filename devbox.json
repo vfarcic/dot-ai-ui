@@ -5,7 +5,7 @@
     "git@2.55.0",
     "vals@0.47.0",
     "kubectl@1.37.1",
-    "yq-go@4.53.3",
+    "yq-go@4.54.1",
     "kubectl-tree@0.6.0"
   ],
   "shell": {
