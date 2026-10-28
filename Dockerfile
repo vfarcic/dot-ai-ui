@@ -4,7 +4,7 @@
 # identical for every target. Emulating `npm ci` for arm64 under QEMU crashed with SIGILL and
 # hung the release. If a native (.node) module is ever added to production dependencies, this
 # stage must go back to the target platform.
-FROM --platform=$BUILDPLATFORM node:24-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:26-alpine AS builder
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ RUN npx tsc --project server/tsconfig.json
 RUN npm prune --omit=dev
 
 # Runtime stage - minimal image for serving
-FROM node:24-alpine
+FROM node:26-alpine
 
 WORKDIR /app
 
